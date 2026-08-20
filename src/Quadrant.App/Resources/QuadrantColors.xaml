@@ -1,0 +1,7 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="QuadrantQ1AccentBrush" Color="#D13438" />
+    <SolidColorBrush x:Key="QuadrantQ2AccentBrush" Color="#0F6CBD" />
+    <SolidColorBrush x:Key="QuadrantQ3AccentBrush" Color="#CA5010" />
+    <SolidColorBrush x:Key="QuadrantQ4AccentBrush" Color="#6B6B6B" />
+</ResourceDictionary>

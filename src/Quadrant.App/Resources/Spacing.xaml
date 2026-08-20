@@ -1,0 +1,23 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <sys:Double x:Key="SpaceXS" xmlns:sys="clr-namespace:System;assembly=System.Runtime">4</sys:Double>
+    <sys:Double x:Key="SpaceS" xmlns:sys="clr-namespace:System;assembly=System.Runtime">8</sys:Double>
+    <sys:Double x:Key="SpaceM" xmlns:sys="clr-namespace:System;assembly=System.Runtime">12</sys:Double>
+    <sys:Double x:Key="SpaceL" xmlns:sys="clr-namespace:System;assembly=System.Runtime">16</sys:Double>
+    <sys:Double x:Key="SpaceXL" xmlns:sys="clr-namespace:System;assembly=System.Runtime">24</sys:Double>
+    <sys:Double x:Key="SpaceXXL" xmlns:sys="clr-namespace:System;assembly=System.Runtime">32</sys:Double>
+
+    <Thickness x:Key="InsetS">8</Thickness>
+    <Thickness x:Key="InsetM">12</Thickness>
+    <Thickness x:Key="InsetL">16</Thickness>
+
+    <CornerRadius x:Key="RadiusSmall">4</CornerRadius>
+    <CornerRadius x:Key="RadiusMedium">8</CornerRadius>
+
+    <Thickness x:Key="WindowMargin">16</Thickness>
+    <Thickness x:Key="ToolbarSecondaryMargin">16,0,0,0</Thickness>
+    <Thickness x:Key="QuadrantTopLeftMargin">0,0,8,8</Thickness>
+    <Thickness x:Key="QuadrantTopRightMargin">8,0,0,8</Thickness>
+    <Thickness x:Key="QuadrantBottomLeftMargin">0,8,8,0</Thickness>
+    <Thickness x:Key="QuadrantBottomRightMargin">8,8,0,0</Thickness>
+</ResourceDictionary>

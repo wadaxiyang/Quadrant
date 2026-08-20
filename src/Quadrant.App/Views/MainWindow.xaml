@@ -7,7 +7,7 @@
         MinWidth="920"
         MinHeight="620"
         WindowStartupLocation="CenterScreen">
-    <Grid Margin="16">
+    <Grid Margin="{StaticResource WindowMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="56" />
             <RowDefinition Height="*" />
@@ -16,13 +16,12 @@
         <DockPanel Grid.Row="0" LastChildFill="False">
             <TextBlock DockPanel.Dock="Left"
                        VerticalAlignment="Center"
-                       FontSize="20"
-                       FontWeight="SemiBold"
+                       Style="{StaticResource TitleLargeTextStyle}"
                        Text="{Binding AppTitle}" />
             <TextBlock DockPanel.Dock="Right"
-                       Margin="16,0,0,0"
+                       Margin="{StaticResource ToolbarSecondaryMargin}"
                        VerticalAlignment="Center"
-                       FontSize="14"
+                       Style="{StaticResource BodyTextStyle}"
                        Opacity="0.7"
                        Text="{Binding PlaceholderTitle}" />
         </DockPanel>
@@ -37,17 +36,17 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Row="0" Grid.Column="0" Margin="0,0,8,8" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Padding="16">
-                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="Q1" />
+            <Border Grid.Row="0" Grid.Column="0" Margin="{StaticResource QuadrantTopLeftMargin}" Style="{StaticResource QuadrantPanelStyle}">
+                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="Q1" />
             </Border>
-            <Border Grid.Row="0" Grid.Column="1" Margin="8,0,0,8" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Padding="16">
-                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="Q2" />
+            <Border Grid.Row="0" Grid.Column="1" Margin="{StaticResource QuadrantTopRightMargin}" Style="{StaticResource QuadrantPanelStyle}">
+                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="Q2" />
             </Border>
-            <Border Grid.Row="1" Grid.Column="0" Margin="0,8,8,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Padding="16">
-                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="Q3" />
+            <Border Grid.Row="1" Grid.Column="0" Margin="{StaticResource QuadrantBottomLeftMargin}" Style="{StaticResource QuadrantPanelStyle}">
+                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="Q3" />
             </Border>
-            <Border Grid.Row="1" Grid.Column="1" Margin="8,8,0,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Padding="16">
-                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="Q4" />
+            <Border Grid.Row="1" Grid.Column="1" Margin="{StaticResource QuadrantBottomRightMargin}" Style="{StaticResource QuadrantPanelStyle}">
+                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="Q4" />
             </Border>
         </Grid>
     </Grid>

@@ -391,7 +391,7 @@
     ]
   },
   "packageFolders": {
-    "C:\\123\\CODE\\Quadrant_WPF_Codex_Pack\\.nuget\\packages": {}
+    "C:\\Users\\wadaxiyang\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
@@ -399,13 +399,14 @@
       "projectUniqueName": "C:\\123\\CODE\\Quadrant_WPF_Codex_Pack\\src\\Quadrant.App\\Quadrant.App.csproj",
       "projectName": "Quadrant.App",
       "projectPath": "C:\\123\\CODE\\Quadrant_WPF_Codex_Pack\\src\\Quadrant.App\\Quadrant.App.csproj",
-      "packagesPath": "C:\\123\\CODE\\Quadrant_WPF_Codex_Pack\\.nuget\\packages",
+      "packagesPath": "C:\\Users\\wadaxiyang\\.nuget\\packages\\",
       "outputPath": "C:\\123\\CODE\\Quadrant_WPF_Codex_Pack\\src\\Quadrant.App\\obj\\",
       "projectStyle": "PackageReference",
       "centralPackageVersionsManagementEnabled": true,
       "CentralPackageTransitivePinningEnabled": true,
       "configFilePaths": [
-        "C:\\123\\CODE\\Quadrant_WPF_Codex_Pack\\NuGet.Config"
+        "C:\\123\\CODE\\Quadrant_WPF_Codex_Pack\\NuGet.Config",
+        "C:\\Users\\wadaxiyang\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net10.0-windows10.0.19041.0"

@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_01_FLUENT_SHELL` — implementation complete; manual GUI checks pending
+`STAGE_02_DESIGN_TOKENS` — implementation complete; manual GUI checks pending
 
 ## Completed
 
@@ -19,6 +19,10 @@
 - Added explicit composition from `App.xaml.cs` to `MainViewModel` and `MainWindow`.
 - Added the 1180x760 main window shell with 920x620 minimum size, top tool area, and 2x2 placeholder grid.
 - Added minimal MVVM bindings for application title and placeholder title.
+- Added merged WPF ResourceDictionaries for spacing, typography, quadrant colors, and reusable control styles.
+- Replaced MainWindow layout/font/border magic values with shared resource tokens and styles.
+- Kept Fluent/system brushes as `DynamicResource` references so theme changes can update them.
+- Fixed WPF layout resource typing by using `Thickness` tokens for `Margin`/`Padding`; the app now starts successfully.
 
 ## Files changed
 
@@ -39,6 +43,10 @@
 - `src/Quadrant.App/ViewModels/MainViewModel.cs`
 - `src/Quadrant.App/Views/MainWindow.xaml`
 - `src/Quadrant.App/Views/MainWindow.xaml.cs`
+- `src/Quadrant.App/Resources/Spacing.xaml`
+- `src/Quadrant.App/Resources/Typography.xaml`
+- `src/Quadrant.App/Resources/QuadrantColors.xaml`
+- `src/Quadrant.App/Resources/ControlStyles.xaml`
 - `STATUS.md`
 
 ## Architecture decisions / deviations
@@ -53,6 +61,11 @@
 - `Microsoft.WindowsAppSDK` was intentionally not added; it belongs to Stage 10.
 - The .NET 10 SDK reported `NETSDK1137` for `Microsoft.NET.Sdk.WindowsDesktop`; the WPF project now uses `Microsoft.NET.Sdk` with `UseWPF=true`, as recommended by the SDK.
 - WPF native Fluent is applied at application scope with `ThemeMode="System"`, based on current Microsoft Learn guidance. Light/Dark programmatic switching is deferred to the settings stage.
+- `Spacing.xaml` defines the required 4/8/12/16/24/32 spacing tokens and 4/8 corner radii.
+- `Typography.xaml` defines the required 20/16/14/12 text hierarchy.
+- `QuadrantColors.xaml` defines the exact four quadrant accents from `DESIGN_SYSTEM.md`; no panel background is filled with these colors.
+- `ControlStyles.xaml` defines `QuadrantPanelStyle`, `TaskCardStyle`, `SectionTitleTextStyle`, `CaptionTextStyle`, and a native-based `IconButtonStyle` without shadows or custom templates.
+- WPF `DynamicResource` is used for Fluent system border brushes; no third-party theme package was added.
 - No architecture deviations recorded.
 
 ## Tests run + results
@@ -62,11 +75,14 @@
 - `dotnet build Quadrant.sln -c Debug --no-restore` — passed; 0 warnings, 0 errors.
 - `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed; 2 tests passed, 0 failed.
 - Manual project/reference inspection — passed.
+- MainWindow XAML resource/style compilation — passed as part of build.
+- `dotnet run --project .\src\Quadrant.App\Quadrant.App.csproj --no-restore` — initially reproduced a startup crash caused by invalid `Double` resources assigned to `Margin`; fixed with `Thickness` tokens.
+- Built EXE launch smoke check — passed; process remained running for 5 seconds without exiting.
 
 ## Manual tests pending
 
-- Windows 11 System Light launch and native Fluent visual appearance — pending; no usable Windows UI automation session was available.
-- Windows 11 Dark theme behavior after restart — pending; no usable Windows UI automation session was available.
+- Windows 11 Light/Dark token appearance — pending; no usable Windows UI automation session was available.
+- High Contrast token appearance — pending; no usable Windows UI automation session was available.
 - 125%, 150%, and minimum-size visual inspection — pending; no usable Windows UI automation session was available.
 
 ## Sources checked
@@ -81,6 +97,11 @@
 - https://api.nuget.org/v3-flatcontainer/xunit.runner.visualstudio/index.json — checked 2026-08-20.
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/whats-new/net90 — checked 2026-08-20; WPF Fluent Theme and `ThemeMode` syntax.
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/whats-new/net100 — checked 2026-08-20; .NET 10 WPF changes.
+- https://learn.microsoft.com/en-us/dotnet/desktop/wpf/systems/xaml-resources-overview — checked 2026-08-20; ResourceDictionary guidance.
+- https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/staticresource-markup-extension — checked 2026-08-20; StaticResource behavior.
+- https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/dynamicresource-markup-extension — checked 2026-08-20; DynamicResource behavior.
+- https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/control-styles-and-templates — checked 2026-08-20; WPF style/template guidance.
+- https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/wpf-brushes-overview — checked 2026-08-20; WPF brush/resource guidance.
 
 ## Known issues
 
@@ -91,4 +112,4 @@
 
 After the pending GUI checks pass:
 
-`stages/STAGE_02_DESIGN_TOKENS.md`
+`stages/STAGE_03_CORE_DOMAIN.md`
