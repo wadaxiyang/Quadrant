@@ -5,7 +5,7 @@ namespace Quadrant.App.ViewModels;
 
 public sealed class TaskCardViewModel
 {
-    public TaskCardViewModel(TaskItem task, ICommand editCommand, ICommand completeCommand, ICommand deleteCommand)
+    public TaskCardViewModel(TaskItem task, ICommand editCommand, ICommand completeCommand, ICommand deleteCommand, DateTimeOffset now)
     {
         Id = task.Id;
         QuadrantId = task.QuadrantId;
@@ -15,6 +15,8 @@ public sealed class TaskCardViewModel
         EditCommand = editCommand;
         CompleteCommand = completeCommand;
         DeleteCommand = deleteCommand;
+        IsOverdue = task.DueAt is { } due && !task.IsCompleted && due < now;
+        DueStatusText = IsOverdue ? "已逾期" : task.DueAt is { } dueAt && dueAt.ToLocalTime().Date == now.ToLocalTime().Date ? "今天" : string.Empty;
     }
 
     public long Id { get; }
@@ -34,6 +36,10 @@ public sealed class TaskCardViewModel
     public string ReminderText => ReminderAt is { } reminder
         ? $"提醒 {reminder.ToLocalTime():yyyy-MM-dd HH:mm}"
         : string.Empty;
+
+    public bool IsOverdue { get; }
+
+    public string DueStatusText { get; }
 
     public ICommand EditCommand { get; }
 

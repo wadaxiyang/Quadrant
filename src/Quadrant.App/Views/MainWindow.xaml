@@ -1,12 +1,15 @@
 <Window x:Class="Quadrant.App.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Quadrant.App"
+        xmlns:enums="clr-namespace:Quadrant.Core.Enums;assembly=Quadrant.Core"
         Title="{Binding AppTitle}"
         Width="1180"
         Height="760"
         MinWidth="920"
         MinHeight="620"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        PreviewKeyDown="MainWindow_PreviewKeyDown">
     <Grid Margin="{StaticResource WindowMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="56" />
@@ -18,13 +21,19 @@
                        VerticalAlignment="Center"
                        Style="{StaticResource TitleLargeTextStyle}"
                        Text="{Binding AppTitle}" />
-            <TextBlock DockPanel.Dock="Right"
-                       Margin="{StaticResource ToolbarSecondaryMargin}"
-                       VerticalAlignment="Center"
-                       Style="{StaticResource BodyTextStyle}"
-                       Opacity="0.7"
-                       Text="{Binding PlaceholderTitle}" />
             <Button DockPanel.Dock="Right" Margin="{StaticResource ToolbarSecondaryMargin}" Command="{Binding NewTaskCommand}" Content="新建任务" />
+            <Button DockPanel.Dock="Right" Margin="{StaticResource ToolbarSecondaryMargin}" Click="Completed_Click" Content="已完成" />
+            <TextBox x:Name="SearchBox"
+                     DockPanel.Dock="Right"
+                     Width="220"
+                     Margin="{StaticResource ToolbarSecondaryMargin}"
+                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="{Binding SearchPlaceholder}" />
+            <StackPanel DockPanel.Dock="Right" Margin="{StaticResource ToolbarSecondaryMargin}" Orientation="Horizontal">
+                <Button Command="{Binding SelectFilterCommand}" CommandParameter="{x:Static enums:TaskFilter.All}" Content="全部" />
+                <Button Margin="{StaticResource ButtonGap}" Command="{Binding SelectFilterCommand}" CommandParameter="{x:Static enums:TaskFilter.Today}" Content="今天" />
+                <Button Margin="{StaticResource ButtonGap}" Command="{Binding SelectFilterCommand}" CommandParameter="{x:Static enums:TaskFilter.Overdue}" Content="已逾期" />
+            </StackPanel>
         </DockPanel>
 
         <Grid Grid.Row="1">

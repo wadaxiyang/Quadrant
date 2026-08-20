@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_07_DRAG_DROP` — implementation complete; manual GUI checks pending
+`STAGE_08_FILTER_SEARCH_COMPLETED` — implementation complete; manual GUI checks pending
 
 ## Completed
 
@@ -50,6 +50,16 @@
 - Added `MoveTaskCommand` request flow in `MainViewModel`; WPF Drop forwards only task id and target quadrant id.
 - Added native WPF drag threshold handling, `DataObject` payload with internal task-id format, `AllowDrop`, `DragOver` feedback, `Drop`, and `DragLeave` cleanup.
 - Kept drag/drop limited to quadrant movement; no manual order, multi-select, or drag-out delete was added.
+- Added single `SelectedFilter` state with All/Today/Overdue while retaining the four quadrant collections.
+- Added in-memory, case-insensitive Title/Note search combined with the selected filter; no debounce timer or advanced query syntax.
+- Added Ctrl+F search focus and Esc search clear/filter reset behavior.
+- Added explicit Today/Overdue status text on task cards without coloring entire cards.
+- Added a separate completed-task window ordered by CompletedAt descending with restore and permanent delete commands.
+- Restoring a completed task uses its original QuadrantId and reloads the active quadrant view.
+- Fixed TaskEditorWindow runtime crash on open: `ColumnDefinition.Width` was incorrectly assigned the `Double` spacing resource `SpaceL`; added the dedicated `GridLength` resource `FormColumnGap`.
+- Clarified task editor validation: title/name is required; due date is optional; no due date persists `DueAt = null`.
+- Added recoverable error handling around new/edit save events so repository or refresh failures show a warning instead of escaping from `async void` and terminating the app.
+- Fixed startup/runtime XAML crash caused by `StringToVisibilityConverter` scope in `TaskCardTemplate.xaml`; the converter is now declared in that resource dictionary before the template.
 
 ## Files changed
 
@@ -75,6 +85,9 @@
 - `src/Quadrant.Core/Services/TaskService.cs`
 - `Tests/Quadrant.Core.Tests/TaskServiceTests.cs`
 - `src/Quadrant.App/Resources/TaskCardTemplate.xaml`
+- `src/Quadrant.App/ViewModels/CompletedTaskViewModel.cs`
+- `src/Quadrant.App/Views/CompletedWindow.xaml`
+- `src/Quadrant.App/Views/CompletedWindow.xaml.cs`
 - `src/Quadrant.App/Views/MainWindow.xaml.cs`
 - `src/Quadrant.App/ViewModels/TaskEditorViewModel.cs`
 - `src/Quadrant.App/Views/TaskEditorWindow.xaml`
@@ -173,6 +186,10 @@
 - `dotnet test Quadrant.sln -c Debug --no-restore` — passed; 19 tests passed, 0 failed.
 - `dotnet build Quadrant.sln -c Debug --no-restore` — passed after Stage 07 implementation; 0 warnings, 0 errors.
 - `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after Stage 07 implementation; 23 tests passed, 0 failed.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed after Stage 08 implementation; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after Stage 08 implementation; 26 tests passed, 0 failed.
+- Direct EXE launch after TaskEditorWindow fix — passed; process remained running for 5 seconds.
+- `dotnet run --project .\src\Quadrant.App\Quadrant.App.csproj --no-restore` — passed after converter scope fix; process remained running until manually stopped.
 - Git generated-file cleanup — `.gitignore` updated; `git rm --cached` could not create `.git/index.lock` due to environment permission, so already-tracked bin/obj entries remain tracked until run in a normal Git-enabled shell.
 - SQL parameterization inspection — passed; user values are bound parameters, not interpolated SQL.
 - `dotnet build Quadrant.sln -c Debug --no-restore` — passed; 0 warnings, 0 errors.
@@ -226,7 +243,8 @@
 - Stage 06 GUI manual acceptance is pending: editor save/cancel, date-only 23:59, exact custom time, invalid time, multiline note, completion, and delete confirmation need Windows GUI verification.
 - Already-tracked generated `bin/` and `obj/` files could not be removed from the Git index in this restricted environment.
 - Stage 07 GUI manual acceptance is pending: Q1 to Q2, Q4 to Q1, empty-area drop, drag threshold/Esc behavior, 150% DPI, and persistence after restart.
+- Stage 08 GUI manual acceptance is pending: filter/search combination, Ctrl+F, Esc reset, completed restore to original quadrant, permanent delete, and overdue status semantics.
 
 ## Next stage
 
-`stages/STAGE_08_FILTER_SEARCH_COMPLETED.md`
+`stages/STAGE_09_REMINDER_DOMAIN.md`

@@ -29,26 +29,73 @@ public partial class MainWindow : System.Windows.Window
         viewModel.DeleteTaskRequested += DeleteTaskRequested;
     }
 
-    private async void NewTaskRequested(object? sender, EventArgs e)
+    private async void Completed_Click(object sender, RoutedEventArgs e)
     {
         var viewModel = (MainViewModel)DataContext;
-        var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition)));
-        editor.Owner = this;
-        if (editor.ShowDialog() == true && editor.DraftResult is { } draft)
+        await viewModel.LoadCompletedAsync();
+        var window = new CompletedWindow(viewModel)
         {
-            await viewModel.CreateAsync(draft);
+            Owner = this
+        };
+        window.ShowDialog();
+    }
+
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            SearchBox.Focus();
+            SearchBox.SelectAll();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && SearchBox.IsKeyboardFocusWithin)
+        {
+            SearchBox.Clear();
+            ((MainViewModel)DataContext).SelectedFilter = Quadrant.Core.Enums.TaskFilter.All;
+            Keyboard.ClearFocus();
+            e.Handled = true;
+        }
+    }
+
+    private async void NewTaskRequested(object? sender, EventArgs e)
+    {
+        try
+        {
+            var viewModel = (MainViewModel)DataContext;
+            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition)));
+            editor.Owner = this;
+            if (editor.ShowDialog() == true && editor.DraftResult is { } draft)
+            {
+                await viewModel.CreateAsync(draft);
+            }
+        }
+        catch (Exception exception)
+        {
+            ShowRecoverableError("任务保存失败", exception);
         }
     }
 
     private async void EditTaskRequested(object? sender, TaskItem task)
     {
-        var viewModel = (MainViewModel)DataContext;
-        var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), task));
-        editor.Owner = this;
-        if (editor.ShowDialog() == true && editor.UpdateResult is { } update)
+        try
         {
-            await viewModel.UpdateAsync(update);
+            var viewModel = (MainViewModel)DataContext;
+            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), task));
+            editor.Owner = this;
+            if (editor.ShowDialog() == true && editor.UpdateResult is { } update)
+            {
+                await viewModel.UpdateAsync(update);
+            }
         }
+        catch (Exception exception)
+        {
+            ShowRecoverableError("任务保存失败", exception);
+        }
+    }
+
+    private void ShowRecoverableError(string title, Exception exception)
+    {
+        MessageBox.Show($"{title}。\n{exception.Message}", title, MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private async void DeleteTaskRequested(object? sender, long id)

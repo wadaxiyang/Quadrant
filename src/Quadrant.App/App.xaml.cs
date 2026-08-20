@@ -17,7 +17,8 @@ public partial class App : System.Windows.Application
             taskRepository,
             new Quadrant.Infrastructure.Notifications.NoOpReminderScheduler(),
             new Quadrant.Infrastructure.Windows.SystemClock());
-        var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository);
+        var clock = new Quadrant.Infrastructure.Windows.SystemClock();
+        var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock);
         await viewModel.LoadAsync();
 
         var mainWindow = new Views.MainWindow

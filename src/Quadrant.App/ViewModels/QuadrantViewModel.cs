@@ -6,7 +6,7 @@ namespace Quadrant.App.ViewModels;
 
 public sealed class QuadrantViewModel
 {
-    public QuadrantViewModel(QuadrantDefinition definition, IEnumerable<TaskItem> tasks, ICommand editCommand, ICommand completeCommand, ICommand deleteCommand)
+    public QuadrantViewModel(QuadrantDefinition definition, IEnumerable<TaskItem> tasks, ICommand editCommand, ICommand completeCommand, ICommand deleteCommand, DateTimeOffset now)
     {
         Id = definition.Id;
         Name = definition.Name;
@@ -16,7 +16,7 @@ public sealed class QuadrantViewModel
                 .OrderBy(task => task.DueAt is null)
                 .ThenBy(task => task.DueAt)
                 .ThenBy(task => task.CreatedAt)
-                .Select(task => new TaskCardViewModel(task, editCommand, completeCommand, deleteCommand)));
+                .Select(task => new TaskCardViewModel(task, editCommand, completeCommand, deleteCommand, now)));
     }
 
     public int Id { get; }

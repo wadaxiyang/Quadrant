@@ -48,6 +48,32 @@ public sealed class TaskRulesTests
     }
 
     [Fact]
+    public void Today_excludes_task_after_local_midnight()
+    {
+        var dueAt = new DateTimeOffset(2026, 8, 21, 0, 0, 0, TimeSpan.FromHours(8));
+        var task = CreateTask(dueAt: dueAt);
+
+        Assert.False(TaskRules.IsDueToday(task, Now));
+    }
+
+    [Fact]
+    public void Today_and_overdue_exclude_tasks_without_due_date()
+    {
+        var task = CreateTask();
+
+        Assert.False(TaskRules.IsDueToday(task, Now));
+        Assert.False(TaskRules.IsOverdue(task, Now));
+    }
+
+    [Fact]
+    public void Overdue_excludes_completed_tasks_even_when_due_is_past()
+    {
+        var task = CreateTask(dueAt: Now.AddDays(-1)) with { IsCompleted = true };
+
+        Assert.False(TaskRules.IsOverdue(task, Now));
+    }
+
+    [Fact]
     public void Overdue_excludes_completed_tasks()
     {
         var task = CreateTask(dueAt: Now.AddMinutes(-1));

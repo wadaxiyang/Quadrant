@@ -41,6 +41,8 @@ public partial class TaskEditorViewModel : ObservableObject
 
     public bool IsEdit { get; }
 
+    public string EditorTitle => IsEdit ? "编辑任务" : "新建任务";
+
     public long? Id { get; }
 
     [ObservableProperty]
@@ -72,7 +74,7 @@ public partial class TaskEditorViewModel : ObservableObject
 
     public bool TryBuildDraft(out TaskDraft draft)
     {
-        TitleError = string.IsNullOrWhiteSpace(Title) ? "请输入任务标题。" : null;
+        TitleError = string.IsNullOrWhiteSpace(Title) ? "任务名称不能为空。" : null;
         DueTimeError = null;
 
         DateTimeOffset? dueAt = null;

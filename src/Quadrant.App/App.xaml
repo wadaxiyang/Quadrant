@@ -5,6 +5,8 @@
              ThemeMode="System">
     <Application.Resources>
         <ResourceDictionary>
+            <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Resources/Spacing.xaml" />
                 <ResourceDictionary Source="Resources/Typography.xaml" />
@@ -12,8 +14,6 @@
                 <ResourceDictionary Source="Resources/ControlStyles.xaml" />
                 <ResourceDictionary Source="Resources/TaskCardTemplate.xaml" />
             </ResourceDictionary.MergedDictionaries>
-            <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
-            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

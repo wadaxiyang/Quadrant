@@ -22,7 +22,5 @@
         <Setter Property="FontSize" Value="12" />
     </Style>
 
-    <Style x:Key="ValidationTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
-        <Setter Property="Foreground" Value="{DynamicResource SystemColorControlErrorTextBrush}" />
-    </Style>
+    <Style x:Key="ValidationTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}" />
 </ResourceDictionary>
