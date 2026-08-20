@@ -27,6 +27,7 @@
 
 # Test and coverage output
 TestResults/
+**/TestResults/
 coverage/
 *.coverage
 *.coveragexml
