@@ -44,6 +44,27 @@ public sealed class TaskService : ITaskService
         return task;
     }
 
+    public async Task<TaskItem?> MoveTaskAsync(
+        long id,
+        int targetQuadrantId,
+        CancellationToken cancellationToken = default)
+    {
+        if (targetQuadrantId is < 1 or > 4)
+        {
+            throw new TaskValidationException("Quadrant must be between 1 and 4.");
+        }
+
+        var task = await repository.GetByIdAsync(id, cancellationToken);
+        if (task is null || task.IsCompleted || task.QuadrantId == targetQuadrantId)
+        {
+            return task;
+        }
+
+        return await UpdateAsync(
+            new TaskUpdate(task.Id, task.Title, targetQuadrantId, task.DueAt, task.ReminderAt, task.Note),
+            cancellationToken);
+    }
+
     public async Task<TaskItem> SetCompletedAsync(
         long id,
         bool isCompleted,

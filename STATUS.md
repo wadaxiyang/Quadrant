@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_06_TASK_EDITOR_CRUD` — implementation complete; manual GUI checks pending
+`STAGE_07_DRAG_DROP` — implementation complete; manual GUI checks pending
 
 ## Completed
 
@@ -46,6 +46,10 @@
 - Preserved existing ReminderAt when editing; Reminder controls remain deferred to Stage 09.
 - Added TaskService completion/delete scheduler interaction coverage.
 - Expanded .gitignore for nested generated output, IDE state, dumps, and scratch/test artifacts. Removing already-tracked generated files from the Git index was attempted but blocked by environment permission on `.git/index.lock` creation.
+- Added `TaskService.MoveTaskAsync` with fixed quadrant validation, same-quadrant no-op, completed-task no-op, and reminder rescheduling through the existing update path.
+- Added `MoveTaskCommand` request flow in `MainViewModel`; WPF Drop forwards only task id and target quadrant id.
+- Added native WPF drag threshold handling, `DataObject` payload with internal task-id format, `AllowDrop`, `DragOver` feedback, `Drop`, and `DragLeave` cleanup.
+- Kept drag/drop limited to quadrant movement; no manual order, multi-select, or drag-out delete was added.
 
 ## Files changed
 
@@ -67,6 +71,11 @@
 - `src/Quadrant.App/Views/MainWindow.xaml`
 - `src/Quadrant.App/Views/MainWindow.xaml.cs`
 - `src/Quadrant.App/Resources/Spacing.xaml`
+- `src/Quadrant.Core/Interfaces/ITaskService.cs`
+- `src/Quadrant.Core/Services/TaskService.cs`
+- `Tests/Quadrant.Core.Tests/TaskServiceTests.cs`
+- `src/Quadrant.App/Resources/TaskCardTemplate.xaml`
+- `src/Quadrant.App/Views/MainWindow.xaml.cs`
 - `src/Quadrant.App/ViewModels/TaskEditorViewModel.cs`
 - `src/Quadrant.App/Views/TaskEditorWindow.xaml`
 - `src/Quadrant.App/Views/TaskEditorWindow.xaml.cs`
@@ -140,6 +149,8 @@
 - Stage 06 time parsing is implemented in the editor ViewModel with invariant `H:mm` / `HH:mm` exact parsing and inline errors.
 - Reminder UI and reminder editing remain intentionally deferred to Stage 09; existing ReminderAt is preserved during task edits.
 - Official Microsoft Learn browsing was attempted for DatePicker, WPF validation, and editable ComboBox behavior, but network socket access was blocked in this environment; existing project sources and recorded official WPF guidance were used.
+- Stage 07 event boundary: `TaskCardTemplate.xaml` contains the card visual; `MainWindow.xaml` declares quadrant drop targets; `MainWindow.xaml.cs` handles mouse threshold, `DoDragDrop`, drop feedback, and forwarding; `MainViewModel.MoveTaskCommand` and `TaskService.MoveTaskAsync` handle business movement.
+- No third-party DragDrop package was added.
 
 ## Tests run + results
 
@@ -160,6 +171,8 @@
 - `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed; 18 tests passed, 0 failed.
 - `dotnet build Quadrant.sln -c Debug --no-restore` — passed; 0 warnings, 0 errors after Stage 06 implementation.
 - `dotnet test Quadrant.sln -c Debug --no-restore` — passed; 19 tests passed, 0 failed.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed after Stage 07 implementation; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after Stage 07 implementation; 23 tests passed, 0 failed.
 - Git generated-file cleanup — `.gitignore` updated; `git rm --cached` could not create `.git/index.lock` due to environment permission, so already-tracked bin/obj entries remain tracked until run in a normal Git-enabled shell.
 - SQL parameterization inspection — passed; user values are bound parameters, not interpolated SQL.
 - `dotnet build Quadrant.sln -c Debug --no-restore` — passed; 0 warnings, 0 errors.
@@ -199,6 +212,9 @@
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/optimizing-performance-controls — checked 2026-08-20; WPF control virtualization guidance.
 - https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.virtualizingstackpanel.virtualizationmode — checked 2026-08-20; Recycling mode API.
 - https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.virtualizingpanel.isvirtualizing — checked 2026-08-20; virtualization property API.
+- https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/drag-and-drop-overview — attempted 2026-08-20; blocked by environment network policy.
+- https://learn.microsoft.com/en-us/dotnet/api/system.windows.dragdrop.dodragdrop — attempted 2026-08-20; blocked by environment network policy.
+- https://learn.microsoft.com/en-us/dotnet/api/system.windows.uielement.allowdrop — attempted 2026-08-20; blocked by environment network policy.
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/datepicker — attempted 2026-08-20; blocked by environment network policy.
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/how-to-use-validation-rules-to-implement-validation — attempted 2026-08-20; blocked by environment network policy.
 - https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.combobox.iseditable — attempted 2026-08-20; blocked by environment network policy.
@@ -209,7 +225,8 @@
 - Stage 05 GUI manual acceptance is pending because this environment did not expose a usable Windows UI automation session.
 - Stage 06 GUI manual acceptance is pending: editor save/cancel, date-only 23:59, exact custom time, invalid time, multiline note, completion, and delete confirmation need Windows GUI verification.
 - Already-tracked generated `bin/` and `obj/` files could not be removed from the Git index in this restricted environment.
+- Stage 07 GUI manual acceptance is pending: Q1 to Q2, Q4 to Q1, empty-area drop, drag threshold/Esc behavior, 150% DPI, and persistence after restart.
 
 ## Next stage
 
-`stages/STAGE_07_DRAG_DROP.md`
+`stages/STAGE_08_FILTER_SEARCH_COMPLETED.md`

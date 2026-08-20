@@ -37,7 +37,7 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Row="0" Grid.Column="0" Margin="{StaticResource QuadrantTopLeftMargin}" Style="{StaticResource QuadrantPanelStyle}">
+            <Border Grid.Row="0" Grid.Column="0" Tag="1" AllowDrop="True" DragOver="Quadrant_DragOver" Drop="Quadrant_Drop" DragLeave="Quadrant_DragLeave" Margin="{StaticResource QuadrantTopLeftMargin}" Style="{StaticResource QuadrantPanelStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -73,7 +73,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="0" Grid.Column="1" Margin="{StaticResource QuadrantTopRightMargin}" Style="{StaticResource QuadrantPanelStyle}">
+            <Border Grid.Row="0" Grid.Column="1" Tag="2" AllowDrop="True" DragOver="Quadrant_DragOver" Drop="Quadrant_Drop" DragLeave="Quadrant_DragLeave" Margin="{StaticResource QuadrantTopRightMargin}" Style="{StaticResource QuadrantPanelStyle}">
                 <Grid>
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                     <Grid Grid.Row="0" Margin="{StaticResource QuadrantHeaderBottomMargin}">
@@ -92,7 +92,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="1" Grid.Column="0" Margin="{StaticResource QuadrantBottomLeftMargin}" Style="{StaticResource QuadrantPanelStyle}">
+            <Border Grid.Row="1" Grid.Column="0" Tag="3" AllowDrop="True" DragOver="Quadrant_DragOver" Drop="Quadrant_Drop" DragLeave="Quadrant_DragLeave" Margin="{StaticResource QuadrantBottomLeftMargin}" Style="{StaticResource QuadrantPanelStyle}">
                 <Grid>
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                     <Grid Grid.Row="0" Margin="{StaticResource QuadrantHeaderBottomMargin}">
@@ -111,7 +111,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="1" Grid.Column="1" Margin="{StaticResource QuadrantBottomRightMargin}" Style="{StaticResource QuadrantPanelStyle}">
+            <Border Grid.Row="1" Grid.Column="1" Tag="4" AllowDrop="True" DragOver="Quadrant_DragOver" Drop="Quadrant_Drop" DragLeave="Quadrant_DragLeave" Margin="{StaticResource QuadrantBottomRightMargin}" Style="{StaticResource QuadrantPanelStyle}">
                 <Grid>
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                     <Grid Grid.Row="0" Margin="{StaticResource QuadrantHeaderBottomMargin}">

@@ -37,6 +37,50 @@ public sealed class TaskServiceTests
         Assert.All(scheduler.CancelledTaskIds, id => Assert.Equal(1, id));
     }
 
+    [Fact]
+    public async Task Move_updates_only_the_target_quadrant()
+    {
+        var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));
+        var repository = new FakeTaskRepository
+        {
+            CurrentTask = new TaskItem(1, "Task", 1, null, null, "note", false, null, now, now)
+        };
+        var service = new TaskService(repository, new FakeReminderScheduler(), new FakeClock(now));
+
+        var moved = await service.MoveTaskAsync(1, 2);
+
+        Assert.Equal(2, moved?.QuadrantId);
+        Assert.Equal(2, repository.LastUpdate?.QuadrantId);
+        Assert.Equal("Task", repository.LastUpdate?.Title);
+    }
+
+    [Fact]
+    public async Task Move_to_same_quadrant_is_a_no_op()
+    {
+        var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));
+        var repository = new FakeTaskRepository
+        {
+            CurrentTask = new TaskItem(1, "Task", 2, null, null, null, false, null, now, now)
+        };
+        var service = new TaskService(repository, new FakeReminderScheduler(), new FakeClock(now));
+
+        var moved = await service.MoveTaskAsync(1, 2);
+
+        Assert.Same(repository.CurrentTask, moved);
+        Assert.Null(repository.LastUpdate);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5)]
+    public async Task Move_to_invalid_quadrant_is_rejected(int targetQuadrantId)
+    {
+        var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));
+        var service = new TaskService(new FakeTaskRepository(), new FakeReminderScheduler(), new FakeClock(now));
+
+        await Assert.ThrowsAsync<TaskValidationException>(() => service.MoveTaskAsync(1, targetQuadrantId));
+    }
+
     private sealed class FakeClock(DateTimeOffset now) : IClock
     {
         public DateTimeOffset Now { get; } = now;
@@ -45,6 +89,10 @@ public sealed class TaskServiceTests
     private sealed class FakeTaskRepository : ITaskRepository
     {
         public TaskDraft? LastDraft { get; private set; }
+
+        public TaskUpdate? LastUpdate { get; private set; }
+
+        public TaskItem? CurrentTask { get; init; }
 
         public DateTimeOffset LastNow { get; private set; }
 
@@ -55,7 +103,7 @@ public sealed class TaskServiceTests
             Task.FromResult<IReadOnlyList<TaskItem>>([]);
 
         public Task<TaskItem?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
-            Task.FromResult<TaskItem?>(null);
+            Task.FromResult(CurrentTask);
 
         public Task<TaskItem> CreateAsync(TaskDraft draft, DateTimeOffset now, CancellationToken cancellationToken = default)
         {
@@ -64,8 +112,11 @@ public sealed class TaskServiceTests
             return Task.FromResult(new TaskItem(1, draft.Title, draft.QuadrantId, draft.DueAt, draft.ReminderAt, draft.Note, false, null, now, now));
         }
 
-        public Task<TaskItem> UpdateAsync(TaskUpdate update, DateTimeOffset now, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+        public Task<TaskItem> UpdateAsync(TaskUpdate update, DateTimeOffset now, CancellationToken cancellationToken = default)
+        {
+            LastUpdate = update;
+            return Task.FromResult(new TaskItem(update.Id, update.Title, update.QuadrantId, update.DueAt, update.ReminderAt, update.Note, false, null, now, now));
+        }
 
         public Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, DateTimeOffset now, CancellationToken cancellationToken = default) =>
             Task.FromResult(new TaskItem(id, "Task", 1, null, null, null, isCompleted, isCompleted ? now : null, now, now));

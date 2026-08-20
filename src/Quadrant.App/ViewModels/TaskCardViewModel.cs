@@ -8,6 +8,7 @@ public sealed class TaskCardViewModel
     public TaskCardViewModel(TaskItem task, ICommand editCommand, ICommand completeCommand, ICommand deleteCommand)
     {
         Id = task.Id;
+        QuadrantId = task.QuadrantId;
         Title = task.Title;
         DueAt = task.DueAt;
         ReminderAt = task.ReminderAt;
@@ -17,6 +18,8 @@ public sealed class TaskCardViewModel
     }
 
     public long Id { get; }
+
+    public int QuadrantId { get; }
 
     public string Title { get; }
 

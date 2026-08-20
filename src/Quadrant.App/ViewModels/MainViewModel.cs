@@ -53,6 +53,13 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task MoveTask(MoveTaskRequest request)
+    {
+        await taskService.MoveTaskAsync(request.TaskId, request.TargetQuadrantId);
+        await LoadAsync();
+    }
+
+    [RelayCommand]
     private async Task DeleteTask(long id)
     {
         DeleteTaskRequested?.Invoke(this, id);
@@ -95,3 +102,5 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(Quadrants));
     }
 }
+
+public sealed record MoveTaskRequest(long TaskId, int TargetQuadrantId);

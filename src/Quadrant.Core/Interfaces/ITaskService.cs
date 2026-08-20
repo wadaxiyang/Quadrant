@@ -14,6 +14,8 @@ public interface ITaskService
 
     Task<TaskItem> UpdateAsync(TaskUpdate update, CancellationToken cancellationToken = default);
 
+    Task<TaskItem?> MoveTaskAsync(long id, int targetQuadrantId, CancellationToken cancellationToken = default);
+
     Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, CancellationToken cancellationToken = default);
 
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
