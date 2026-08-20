@@ -10,3 +10,4 @@ C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.Core\obj\Debug\net10.0\Quadrant
 C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.Core\obj\Debug\net10.0\refint\Quadrant.Core.dll
 C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.Core\obj\Debug\net10.0\Quadrant.Core.pdb
 C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.Core\obj\Debug\net10.0\ref\Quadrant.Core.dll
+C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.Core\obj\Debug\net10.0\Quadrant.Core.sourcelink.json

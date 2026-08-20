@@ -1,0 +1,54 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Aa]rtifacts/
+[Pp]ublish/
+
+# Visual Studio / Rider / VS Code user state
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.rsuser
+*.sln.iml
+
+# Test and coverage output
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# NuGet local caches and generated restore files
+packages/
+*.nupkg
+*.snupkg
+project.assets.json
+project.packagespec.json
+*.nuget.g.props
+*.nuget.g.targets
+
+# Local SDK / CLI state used by this workspace
+.dotnet-home/
+.nuget/
+.appdata/
+
+# Local application data and diagnostics
+*.db
+*.db-shm
+*.db-wal
+logs/
+*.log
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~

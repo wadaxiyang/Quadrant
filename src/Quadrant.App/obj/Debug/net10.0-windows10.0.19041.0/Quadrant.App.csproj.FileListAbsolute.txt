@@ -49,3 +49,8 @@ C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10
 C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\Quadrant.App.pdb
 C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\Quadrant.App.genruntimeconfig.cache
 C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\ref\Quadrant.App.dll
+C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\Views\MainWindow.baml
+C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\App.baml
+C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\Views\MainWindow.g.cs
+C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\Quadrant.App.g.resources
+C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\Quadrant.App.sourcelink.json
