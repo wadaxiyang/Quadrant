@@ -4,6 +4,12 @@
 [Aa]rtifacts/
 [Pp]ublish/
 
+# Never commit generated output, even when a parent folder is explicitly added
+**/[Bb]in/
+**/[Oo]bj/
+**/[Aa]rtifacts/
+**/[Pp]ublish/
+
 # Visual Studio / Rider / VS Code user state
 .vs/
 .idea/
@@ -13,6 +19,11 @@
 *.userosscache
 *.rsuser
 *.sln.iml
+*.csproj.user
+*.csproj.FileListAbsolute.txt
+*.cache
+*.tlog
+*.lastcodeanalysis.failed
 
 # Test and coverage output
 TestResults/
@@ -29,6 +40,13 @@ project.packagespec.json
 *.nuget.g.props
 *.nuget.g.targets
 
+# IDE and local tooling state
+.fleet/
+.history/
+.ionide/
+.vscode-test/
+*.DotSettings.user
+
 # Local SDK / CLI state used by this workspace
 .dotnet-home/
 .nuget/
@@ -40,6 +58,8 @@ project.packagespec.json
 *.db-wal
 logs/
 *.log
+*.dmp
+*.stackdump
 
 # OS-generated files
 .DS_Store
@@ -52,3 +72,8 @@ Desktop.ini
 *.bak
 *.swp
 *~
+
+# Local test fixtures and scratch files
+test-results/
+test-output/
+scratch/

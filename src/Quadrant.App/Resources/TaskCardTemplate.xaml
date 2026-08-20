@@ -2,20 +2,22 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <DataTemplate x:Key="TaskCardTemplate">
         <Border Style="{StaticResource TaskCardStyle}" Margin="{StaticResource TaskCardBottomMargin}">
-            <StackPanel>
-                <TextBlock Style="{StaticResource BodyStrongTextStyle}"
-                           Text="{Binding Title}"
-                           TextWrapping="Wrap" />
-                <TextBlock Style="{StaticResource CaptionTextStyle}"
-                           Margin="{StaticResource CaptionTopMargin}"
-                           Opacity="0.72"
-                           Text="{Binding DueText}" />
-                <TextBlock Style="{StaticResource CaptionTextStyle}"
-                           Margin="{StaticResource CaptionTopMargin}"
-                           Opacity="0.72"
-                           Text="{Binding ReminderText}"
-                           Visibility="{Binding ReminderText, Converter={StaticResource StringToVisibilityConverter}}" />
-            </StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Style="{StaticResource BodyStrongTextStyle}" Text="{Binding Title}" TextWrapping="Wrap" />
+                    <TextBlock Style="{StaticResource CaptionTextStyle}" Margin="{StaticResource CaptionTopMargin}" Opacity="0.72" Text="{Binding DueText}" />
+                    <TextBlock Style="{StaticResource CaptionTextStyle}" Margin="{StaticResource CaptionTopMargin}" Opacity="0.72" Text="{Binding ReminderText}" Visibility="{Binding ReminderText, Converter={StaticResource StringToVisibilityConverter}}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Command="{Binding CompleteCommand}" CommandParameter="{Binding Id}" Content="完成" />
+                    <Button Margin="{StaticResource ButtonGap}" Command="{Binding EditCommand}" CommandParameter="{Binding Id}" Content="编辑" />
+                    <Button Margin="{StaticResource ButtonGap}" Command="{Binding DeleteCommand}" CommandParameter="{Binding Id}" Content="删除" />
+                </StackPanel>
+            </Grid>
         </Border>
     </DataTemplate>
 </ResourceDictionary>

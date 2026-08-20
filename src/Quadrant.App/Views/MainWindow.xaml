@@ -24,6 +24,7 @@
                        Style="{StaticResource BodyTextStyle}"
                        Opacity="0.7"
                        Text="{Binding PlaceholderTitle}" />
+            <Button DockPanel.Dock="Right" Margin="{StaticResource ToolbarSecondaryMargin}" Command="{Binding NewTaskCommand}" Content="新建任务" />
         </DockPanel>
 
         <Grid Grid.Row="1">

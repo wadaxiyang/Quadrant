@@ -1,11 +1,12 @@
 using System.Collections.ObjectModel;
+using System.Windows.Input;
 using Quadrant.Core.Models;
 
 namespace Quadrant.App.ViewModels;
 
 public sealed class QuadrantViewModel
 {
-    public QuadrantViewModel(QuadrantDefinition definition, IEnumerable<TaskItem> tasks)
+    public QuadrantViewModel(QuadrantDefinition definition, IEnumerable<TaskItem> tasks, ICommand editCommand, ICommand completeCommand, ICommand deleteCommand)
     {
         Id = definition.Id;
         Name = definition.Name;
@@ -15,7 +16,7 @@ public sealed class QuadrantViewModel
                 .OrderBy(task => task.DueAt is null)
                 .ThenBy(task => task.DueAt)
                 .ThenBy(task => task.CreatedAt)
-                .Select(task => new TaskCardViewModel(task)));
+                .Select(task => new TaskCardViewModel(task, editCommand, completeCommand, deleteCommand)));
     }
 
     public int Id { get; }

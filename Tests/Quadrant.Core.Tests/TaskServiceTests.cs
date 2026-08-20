@@ -22,6 +22,21 @@ public sealed class TaskServiceTests
         Assert.Same(task, scheduler.LastScheduled);
     }
 
+    [Fact]
+    public async Task Complete_cancels_reminder_and_delete_cancels_again()
+    {
+        var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));
+        var repository = new FakeTaskRepository();
+        var scheduler = new FakeReminderScheduler();
+        var service = new TaskService(repository, scheduler, new FakeClock(now));
+
+        await service.SetCompletedAsync(1, true);
+        await service.DeleteAsync(1);
+
+        Assert.Equal(2, scheduler.CancelledTaskIds.Count);
+        Assert.All(scheduler.CancelledTaskIds, id => Assert.Equal(1, id));
+    }
+
     private sealed class FakeClock(DateTimeOffset now) : IClock
     {
         public DateTimeOffset Now { get; } = now;
@@ -53,7 +68,7 @@ public sealed class TaskServiceTests
             throw new NotSupportedException();
 
         public Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, DateTimeOffset now, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            Task.FromResult(new TaskItem(id, "Task", 1, null, null, null, isCompleted, isCompleted ? now : null, now, now));
 
         public Task DeleteAsync(long id, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
@@ -63,14 +78,19 @@ public sealed class TaskServiceTests
     {
         public TaskItem? LastScheduled { get; private set; }
 
+        public List<long> CancelledTaskIds { get; } = [];
+
         public Task ScheduleAsync(TaskItem task, CancellationToken cancellationToken = default)
         {
             LastScheduled = task;
             return Task.CompletedTask;
         }
 
-        public Task CancelAsync(long taskId, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
+        public Task CancelAsync(long taskId, CancellationToken cancellationToken = default)
+        {
+            CancelledTaskIds.Add(taskId);
+            return Task.CompletedTask;
+        }
 
         public Task RescheduleAsync(TaskItem task, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
