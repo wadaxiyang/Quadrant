@@ -42,6 +42,8 @@ public partial class MainViewModel : ObservableObject
 
     public string SearchPlaceholder => "搜索标题或备注";
 
+    public IClock Clock => clock;
+
     public event EventHandler? NewTaskRequested;
 
     public event EventHandler<TaskItem>? EditTaskRequested;

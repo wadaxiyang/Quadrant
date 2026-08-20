@@ -15,11 +15,12 @@ public sealed class TaskServiceTests
         var scheduler = new FakeReminderScheduler();
         var service = new TaskService(repository, scheduler, new FakeClock(now));
 
-        var task = await service.CreateAsync(new TaskDraft("  Write brief  ", 1));
+        var task = await service.CreateAsync(new TaskDraft("  Write brief  ", 1, ReminderAt: now.AddHours(1)));
 
         Assert.Equal("Write brief", repository.LastDraft?.Title);
         Assert.Equal(now, repository.LastNow);
-        Assert.Same(task, scheduler.LastScheduled);
+        Assert.Single(scheduler.RescheduledTaskIds);
+        Assert.Contains(task.Id, scheduler.RescheduledTaskIds);
     }
 
     [Fact]
@@ -35,6 +36,31 @@ public sealed class TaskServiceTests
 
         Assert.Equal(2, scheduler.CancelledTaskIds.Count);
         Assert.All(scheduler.CancelledTaskIds, id => Assert.Equal(1, id));
+    }
+
+    [Fact]
+    public async Task Create_without_reminder_cancels_any_existing_schedule()
+    {
+        var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));
+        var scheduler = new FakeReminderScheduler();
+        var service = new TaskService(new FakeTaskRepository(), scheduler, new FakeClock(now));
+
+        await service.CreateAsync(new TaskDraft("Task", 1));
+
+        Assert.Contains(1, scheduler.CancelledTaskIds);
+    }
+
+    [Fact]
+    public async Task Restore_cancels_old_schedule_instead_of_rescheduling_it()
+    {
+        var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));
+        var scheduler = new FakeReminderScheduler();
+        var service = new TaskService(new FakeTaskRepository(), scheduler, new FakeClock(now));
+
+        await service.SetCompletedAsync(1, false);
+
+        Assert.Empty(scheduler.RescheduledTaskIds);
+        Assert.Contains(1, scheduler.CancelledTaskIds);
     }
 
     [Fact]
@@ -127,13 +153,12 @@ public sealed class TaskServiceTests
 
     private sealed class FakeReminderScheduler : IReminderScheduler
     {
-        public TaskItem? LastScheduled { get; private set; }
-
         public List<long> CancelledTaskIds { get; } = [];
+
+        public List<long> RescheduledTaskIds { get; } = [];
 
         public Task ScheduleAsync(TaskItem task, CancellationToken cancellationToken = default)
         {
-            LastScheduled = task;
             return Task.CompletedTask;
         }
 
@@ -143,7 +168,10 @@ public sealed class TaskServiceTests
             return Task.CompletedTask;
         }
 
-        public Task RescheduleAsync(TaskItem task, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
+        public Task RescheduleAsync(TaskItem task, CancellationToken cancellationToken = default)
+        {
+            RescheduledTaskIds.Add(task.Id);
+            return Task.CompletedTask;
+        }
     }
 }

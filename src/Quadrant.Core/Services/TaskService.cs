@@ -31,16 +31,18 @@ public sealed class TaskService : ITaskService
     public async Task<TaskItem> CreateAsync(TaskDraft draft, CancellationToken cancellationToken = default)
     {
         var validatedDraft = TaskRules.Validate(draft);
+        TaskRules.ValidateReminderAt(validatedDraft.ReminderAt, clock.Now);
         var task = await repository.CreateAsync(validatedDraft, clock.Now, cancellationToken);
-        await reminderScheduler.ScheduleAsync(task, cancellationToken);
+        await SyncReminderAsync(task, cancellationToken);
         return task;
     }
 
     public async Task<TaskItem> UpdateAsync(TaskUpdate update, CancellationToken cancellationToken = default)
     {
         var validatedUpdate = TaskRules.Validate(update);
+        TaskRules.ValidateReminderAt(validatedUpdate.ReminderAt, clock.Now);
         var task = await repository.UpdateAsync(validatedUpdate, clock.Now, cancellationToken);
-        await reminderScheduler.RescheduleAsync(task, cancellationToken);
+        await SyncReminderAsync(task, cancellationToken);
         return task;
     }
 
@@ -77,7 +79,9 @@ public sealed class TaskService : ITaskService
         }
         else
         {
-            await reminderScheduler.RescheduleAsync(task, cancellationToken);
+            // Restoring a task never revives an old OS schedule. The DB value is
+            // retained for in-app context and can be explicitly rescheduled later.
+            await reminderScheduler.CancelAsync(id, cancellationToken);
         }
 
         return task;
@@ -87,5 +91,16 @@ public sealed class TaskService : ITaskService
     {
         await repository.DeleteAsync(id, cancellationToken);
         await reminderScheduler.CancelAsync(id, cancellationToken);
+    }
+
+    private async Task SyncReminderAsync(TaskItem task, CancellationToken cancellationToken)
+    {
+        if (task.ReminderAt is null)
+        {
+            await reminderScheduler.CancelAsync(task.Id, cancellationToken);
+            return;
+        }
+
+        await reminderScheduler.RescheduleAsync(task, cancellationToken);
     }
 }

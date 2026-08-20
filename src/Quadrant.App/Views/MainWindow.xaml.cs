@@ -62,7 +62,7 @@ public partial class MainWindow : System.Windows.Window
         try
         {
             var viewModel = (MainViewModel)DataContext;
-            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition)));
+            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock));
             editor.Owner = this;
             if (editor.ShowDialog() == true && editor.DraftResult is { } draft)
             {
@@ -80,7 +80,7 @@ public partial class MainWindow : System.Windows.Window
         try
         {
             var viewModel = (MainViewModel)DataContext;
-            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), task));
+            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock, task));
             editor.Owner = this;
             if (editor.ShowDialog() == true && editor.UpdateResult is { } update)
             {

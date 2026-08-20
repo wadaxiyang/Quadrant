@@ -15,6 +15,8 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" Style="{StaticResource TitleMediumTextStyle}" Text="{Binding EditorTitle}" />
@@ -56,6 +58,29 @@
         </Grid>
 
         <StackPanel Grid.Row="4" Margin="{StaticResource FieldTopMargin}">
+            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="提醒" />
+            <ComboBox Margin="{StaticResource CaptionTopMargin}"
+                      ItemsSource="{Binding ReminderPresets}"
+                      SelectedItem="{Binding ReminderPreset}">
+                <ComboBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding Converter={StaticResource ReminderPresetDisplayConverter}}" />
+                </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <Grid Margin="{StaticResource CaptionTopMargin}" IsEnabled="{Binding ReminderPreset, Converter={StaticResource ReminderPresetToCustomEnabledConverter}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="{StaticResource FormColumnGap}" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <DatePicker Grid.Column="0" SelectedDate="{Binding CustomReminderDate}" />
+                <ComboBox Grid.Column="2" IsEditable="True" IsTextSearchEnabled="False" ItemsSource="{Binding TimeSuggestions}" Text="{Binding CustomReminderTimeText, UpdateSourceTrigger=PropertyChanged}" />
+            </Grid>
+            <TextBlock Style="{StaticResource ValidationTextStyle}" Text="{Binding ReminderError}" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="5" Margin="{StaticResource FieldTopMargin}">
             <TextBlock Style="{StaticResource CaptionTextStyle}" Text="备注" />
             <TextBox Margin="{StaticResource CaptionTopMargin}"
                      MinHeight="96"
@@ -65,7 +90,7 @@
                      Text="{Binding Note, UpdateSourceTrigger=PropertyChanged}" />
         </StackPanel>
 
-        <StackPanel Grid.Row="5" Margin="{StaticResource FieldTopMargin}" HorizontalAlignment="Right" Orientation="Horizontal">
+        <StackPanel Grid.Row="6" Margin="{StaticResource FieldTopMargin}" HorizontalAlignment="Right" Orientation="Horizontal">
             <Button IsCancel="True" MinWidth="80" Content="取消" />
             <Button Margin="{StaticResource ButtonGap}" IsDefault="True" IsEnabled="{Binding IsValid}" MinWidth="80" Click="Save_Click" Content="保存" />
         </StackPanel>

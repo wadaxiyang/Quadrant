@@ -89,18 +89,15 @@ public static class TaskRules
     public static DateTimeOffset? CalculateReminderAt(
         DateTimeOffset? dueAt,
         ReminderPreset preset,
-        DateTimeOffset? customReminderAt = null)
+        DateTimeOffset? customReminderAt = null) =>
+        ReminderCalculator.Calculate(preset, dueAt, customReminderAt);
+
+    public static void ValidateReminderAt(DateTimeOffset? reminderAt, DateTimeOffset now)
     {
-        return preset switch
+        if (reminderAt is { } value && value <= now)
         {
-            ReminderPreset.None => null,
-            ReminderPreset.Custom => customReminderAt,
-            ReminderPreset.AtDueTime => dueAt,
-            ReminderPreset.TenMinutesBefore => dueAt?.AddMinutes(-10),
-            ReminderPreset.OneHourBefore => dueAt?.AddHours(-1),
-            ReminderPreset.OneDayBefore => dueAt?.AddDays(-1),
-            _ => throw new ArgumentOutOfRangeException(nameof(preset), preset, "Unknown reminder preset.")
-        };
+            throw new TaskValidationException("提醒时间必须晚于当前时间。");
+        }
     }
 
     private static string? NormalizeNote(string? note)

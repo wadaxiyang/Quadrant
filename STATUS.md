@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_08_FILTER_SEARCH_COMPLETED` — implementation complete; manual GUI checks pending
+`STAGE_09_REMINDER_DOMAIN` — implementation complete; manual GUI checks pending
 
 ## Completed
 
@@ -60,6 +60,11 @@
 - Clarified task editor validation: title/name is required; due date is optional; no due date persists `DueAt = null`.
 - Added recoverable error handling around new/edit save events so repository or refresh failures show a warning instead of escaping from `async void` and terminating the app.
 - Fixed startup/runtime XAML crash caused by `StringToVisibilityConverter` scope in `TaskCardTemplate.xaml`; the converter is now declared in that resource dictionary before the template.
+- Added `ReminderCalculator` and future/past reminder validation.
+- Added Reminder preset/custom editor UX; relative presets require DueAt, while Custom works without DueAt.
+- Updated TaskService scheduling: future reminders reschedule, null reminders cancel, and restore cancels without reviving an old schedule.
+- Added fake scheduler coverage for reminder scheduling, cancellation, restore behavior, custom reminders, and past reminder rejection.
+- Fixed reminder editor validation state: changing DueDate or custom reminder date now re-enables Save after a past-time validation error.
 
 ## Files changed
 
@@ -85,6 +90,9 @@
 - `src/Quadrant.Core/Services/TaskService.cs`
 - `Tests/Quadrant.Core.Tests/TaskServiceTests.cs`
 - `src/Quadrant.App/Resources/TaskCardTemplate.xaml`
+- `src/Quadrant.Core/Services/ReminderCalculator.cs`
+- `src/Quadrant.App/Converters/ReminderPresetToCustomEnabledConverter.cs`
+- `src/Quadrant.App/Converters/ReminderPresetDisplayConverter.cs`
 - `src/Quadrant.App/ViewModels/CompletedTaskViewModel.cs`
 - `src/Quadrant.App/Views/CompletedWindow.xaml`
 - `src/Quadrant.App/Views/CompletedWindow.xaml.cs`
@@ -92,6 +100,7 @@
 - `src/Quadrant.App/ViewModels/TaskEditorViewModel.cs`
 - `src/Quadrant.App/Views/TaskEditorWindow.xaml`
 - `src/Quadrant.App/Views/TaskEditorWindow.xaml.cs`
+- `src/Quadrant.App/ViewModels/TaskEditorViewModel.cs`
 - `src/Quadrant.App/Views/MainWindow.xaml.cs`
 - `src/Quadrant.App/Resources/Typography.xaml`
 - `src/Quadrant.App/Resources/Typography.xaml`
@@ -164,6 +173,10 @@
 - Official Microsoft Learn browsing was attempted for DatePicker, WPF validation, and editable ComboBox behavior, but network socket access was blocked in this environment; existing project sources and recorded official WPF guidance were used.
 - Stage 07 event boundary: `TaskCardTemplate.xaml` contains the card visual; `MainWindow.xaml` declares quadrant drop targets; `MainWindow.xaml.cs` handles mouse threshold, `DoDragDrop`, drop feedback, and forwarding; `MainViewModel.MoveTaskCommand` and `TaskService.MoveTaskAsync` handle business movement.
 - No third-party DragDrop package was added.
+- Stage 09 keeps `ReminderAt` as the only persisted reminder value; preset selection is editor state only.
+- Stage 09 follows the specified restore behavior: retain old `ReminderAt` for in-app context, cancel its external schedule, and do not automatically restore it.
+- Stage 09 does not add Microsoft.WindowsAppSDK, toast APIs, polling, or multiple reminders.
+- Reminder editor validation now resets `IsValid` for all relevant date/time/preset inputs, not only time text.
 
 ## Tests run + results
 
@@ -198,10 +211,16 @@
 - Reproduced `dotnet run` crash with `XamlParseException` caused by `Double` assigned to `ColumnDefinition.Width`; fixed with `GridLength`.
 - `dotnet run --project .\src\Quadrant.App\Quadrant.App.csproj --no-restore` — passed after fix; process remained running for 8 seconds with empty stdout/stderr.
 - Direct EXE launch — passed after fix; process remained running for 5 seconds.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed after Stage 09; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after Stage 09; 30 tests passed, 0 failed.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed after reminder validation fix; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after reminder validation fix; 30 tests passed, 0 failed.
 
 ## Manual tests pending
 
 - Windows GUI checks for four populated quadrants, task ordering, independent scrolling, resize, and 100+ synthetic tasks remain pending; no usable Windows UI automation session was available.
+- Stage 09 GUI checks remain pending: preset enablement, custom reminder without Due, inline past-time validation, edit inference, and clear Due/Reminder separation.
+- The reported regression is covered by the input-change fix; interactive GUI confirmation remains pending in this environment.
 
 ## Sources checked
 
@@ -235,6 +254,8 @@
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/datepicker — attempted 2026-08-20; blocked by environment network policy.
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/how-to-use-validation-rules-to-implement-validation — attempted 2026-08-20; blocked by environment network policy.
 - https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.combobox.iseditable — attempted 2026-08-20; blocked by environment network policy.
+- https://learn.microsoft.com/en-us/dotnet/api/system.datetimeoffset.addminutes — attempted 2026-08-20; blocked by environment network policy.
+- https://learn.microsoft.com/en-us/dotnet/api/system.datetimeoffset.now — attempted 2026-08-20; blocked by environment network policy.
 
 ## Known issues
 
@@ -244,7 +265,8 @@
 - Already-tracked generated `bin/` and `obj/` files could not be removed from the Git index in this restricted environment.
 - Stage 07 GUI manual acceptance is pending: Q1 to Q2, Q4 to Q1, empty-area drop, drag threshold/Esc behavior, 150% DPI, and persistence after restart.
 - Stage 08 GUI manual acceptance is pending: filter/search combination, Ctrl+F, Esc reset, completed restore to original quadrant, permanent delete, and overdue status semantics.
+- Stage 09 GUI manual acceptance is pending: reminder preset enablement, Custom without Due, future/past validation, and edit preset inference.
 
 ## Next stage
 
-`stages/STAGE_09_REMINDER_DOMAIN.md`
+`stages/STAGE_10_WINDOWS_NOTIFICATIONS.md`

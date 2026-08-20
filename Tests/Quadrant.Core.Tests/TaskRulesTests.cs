@@ -118,6 +118,23 @@ public sealed class TaskRulesTests
         }
     }
 
+    [Fact]
+    public void Custom_reminder_can_be_calculated_without_due_time()
+    {
+        var custom = Now.AddHours(2);
+
+        Assert.Equal(custom, ReminderCalculator.Calculate(ReminderPreset.Custom, null, custom));
+    }
+
+    [Fact]
+    public void Past_reminder_is_rejected_against_clock_time()
+    {
+        var exception = Assert.Throws<TaskValidationException>(() =>
+            TaskRules.ValidateReminderAt(Now.AddMinutes(-1), Now));
+
+        Assert.Contains("晚于", exception.Message);
+    }
+
     private static TaskItem CreateTask(DateTimeOffset? dueAt = null) =>
         new(
             1,
