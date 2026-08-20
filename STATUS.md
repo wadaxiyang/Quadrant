@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_09_REMINDER_DOMAIN` — implementation complete; manual GUI checks pending
+`STAGE_10_WINDOWS_NOTIFICATIONS` — implementation complete; manual GUI checks pending
 
 ## Completed
 
@@ -65,6 +65,11 @@
 - Updated TaskService scheduling: future reminders reschedule, null reminders cancel, and restore cancels without reviving an old schedule.
 - Added fake scheduler coverage for reminder scheduling, cancellation, restore behavior, custom reminders, and past reminder rejection.
 - Fixed reminder editor validation state: changing DueDate or custom reminder date now re-enables Save after a past-time validation error.
+- Added stable `Microsoft.WindowsAppSDK` 2.4.0 package pin and references for the unpackaged WPF App and Windows infrastructure.
+- Enabled official unpackaged auto-initialization with `<WindowsPackageType>None</WindowsPackageType>` in the App project.
+- Added diagnostic-only `WindowsAppSdkEnvironmentProbe` using official WinRT `ReleaseInfo`; DEBUG startup writes runtime availability/version without adding UI or notification behavior.
+- Verified the development machine has Windows App Runtime 2.4.0 installed for x64 and x86.
+- Migrated all App ViewModel `[ObservableProperty]` fields to generated `public partial` properties to remove MVVMTK0045 warnings while preserving existing property names and change callbacks.
 
 ## Files changed
 
@@ -137,6 +142,13 @@
 - `src/Quadrant.App/Converters/StringToVisibilityConverter.cs`
 - `src/Quadrant.App/Resources/Spacing.xaml`
 - `STATUS.md`
+- `Directory.Packages.props`
+- `src/Quadrant.App/Quadrant.App.csproj`
+- `src/Quadrant.App/App.xaml.cs`
+- `src/Quadrant.Infrastructure/Quadrant.Infrastructure.csproj`
+- `src/Quadrant.Infrastructure/Windows/WindowsAppSdkEnvironmentProbe.cs`
+- `src/Quadrant.App/ViewModels/MainViewModel.cs`
+- `src/Quadrant.App/ViewModels/TaskEditorViewModel.cs`
 
 ## Architecture decisions / deviations
 
@@ -177,6 +189,11 @@
 - Stage 09 follows the specified restore behavior: retain old `ReminderAt` for in-app context, cancel its external schedule, and do not automatically restore it.
 - Stage 09 does not add Microsoft.WindowsAppSDK, toast APIs, polling, or multiple reminders.
 - Reminder editor validation now resets `IsValid` for all relevant date/time/preset inputs, not only time text.
+- Stage 10 uses Microsoft-documented automatic initialization for unpackaged .NET desktop apps; no explicit bootstrapper code was added.
+- Stage 10 remains unpackaged and does not add MSIX, package identity, notification UI, scheduling, or self-contained publish settings.
+- Release direction is framework-dependent folder deployment during development/release preparation, with the Windows App SDK runtime installer/runtime packages and VC++ Redistributable treated as deployment prerequisites. Self-contained packaging remains a later release decision and is not enabled in this Stage.
+- The Windows App SDK package version is `2.4.0`; official runtime release version `2.4.0` was separately verified and not conflated with a NuGet version assumption.
+- CommunityToolkit.Mvvm partial properties are used for App ViewModels per the official MVVMTK0045 guidance; no Core or product boundary changes were made.
 
 ## Tests run + results
 
@@ -215,12 +232,20 @@
 - `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after Stage 09; 30 tests passed, 0 failed.
 - `dotnet build Quadrant.sln -c Debug --no-restore` — passed after reminder validation fix; 0 warnings, 0 errors.
 - `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after reminder validation fix; 30 tests passed, 0 failed.
+- `dotnet restore Quadrant.sln --configfile NuGet.Config` — passed after Windows App SDK package addition.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed; 0 warnings, 0 errors after Stage 10 integration.
+- `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed; 30 tests passed, 0 failed after Stage 10 integration.
+- `Get-AppxPackage -Name '*WindowsAppRuntime*'` — passed; Windows App Runtime 2.4.0 installed for x64 and x86.
+- Direct `Quadrant.App.exe` launch smoke check — passed; process remained running for 8 seconds without SDK initialization/startup failure.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed after MVVMTK0045 migration; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after MVVMTK0045 migration; 30 tests passed, 0 failed.
 
 ## Manual tests pending
 
 - Windows GUI checks for four populated quadrants, task ordering, independent scrolling, resize, and 100+ synthetic tasks remain pending; no usable Windows UI automation session was available.
 - Stage 09 GUI checks remain pending: preset enablement, custom reminder without Due, inline past-time validation, edit inference, and clear Due/Reminder separation.
 - The reported regression is covered by the input-change fix; interactive GUI confirmation remains pending in this environment.
+- Stage 10 manual GUI/runtime checks remain pending: DEBUG output should be inspected from an IDE/debug listener to confirm the probe prints the installed 2.4.0 runtime string.
 
 ## Sources checked
 
@@ -256,6 +281,14 @@
 - https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.combobox.iseditable — attempted 2026-08-20; blocked by environment network policy.
 - https://learn.microsoft.com/en-us/dotnet/api/system.datetimeoffset.addminutes — attempted 2026-08-20; blocked by environment network policy.
 - https://learn.microsoft.com/en-us/dotnet/api/system.datetimeoffset.now — attempted 2026-08-20; blocked by environment network policy.
+- https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/ — checked 2026-08-20; Windows App SDK supports existing WPF apps and unpackaged deployment.
+- https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/use-windows-app-sdk-in-existing-project — checked 2026-08-20; WPF NuGet integration, runtime prerequisite, and `WindowsPackageType=None` auto-initialization.
+- https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads — checked 2026-08-20; stable runtime 2.4.0 and matching installer/runtime downloads.
+- https://www.nuget.org/packages/Microsoft.WindowsAppSDK — checked 2026-08-20; stable NuGet package 2.4.0.
+- https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/deploy-unpackaged-apps — checked 2026-08-20; unpackaged runtime deployment prerequisites and framework-dependent direction.
+- https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.windows.applicationmodel.windowsappruntime.releaseinfo — checked 2026-08-20; `ReleaseInfo` probe API.
+- https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/generators/observableproperty — checked 2026-08-20; partial type/property requirements and generated property behavior.
+- https://aka.ms/mvvmtoolkit/errors/mvvmtk0045 — checked 2026-08-20; official migration from annotated fields to partial properties.
 
 ## Known issues
 
@@ -266,7 +299,9 @@
 - Stage 07 GUI manual acceptance is pending: Q1 to Q2, Q4 to Q1, empty-area drop, drag threshold/Esc behavior, 150% DPI, and persistence after restart.
 - Stage 08 GUI manual acceptance is pending: filter/search combination, Ctrl+F, Esc reset, completed restore to original quadrant, permanent delete, and overdue status semantics.
 - Stage 09 GUI manual acceptance is pending: reminder preset enablement, Custom without Due, future/past validation, and edit preset inference.
+- Stage 10 cannot validate the DEBUG probe through the xUnit test host because automatic initialization is generated for the App executable; direct App launch passed, while runtime version output remains an IDE/debug-listener check.
+- No known MVVMTK0045 warnings remain after the partial-property migration.
 
 ## Next stage
 
-`stages/STAGE_10_WINDOWS_NOTIFICATIONS.md`
+`stages/STAGE_11_APP_NOTIFICATIONS_SINGLE_INSTANCE.md`

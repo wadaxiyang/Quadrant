@@ -6,6 +6,14 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
+#if DEBUG
+        var windowsAppSdkProbe = new Quadrant.Infrastructure.Windows.WindowsAppSdkEnvironmentProbe().Probe();
+        System.Diagnostics.Debug.WriteLine(
+            windowsAppSdkProbe.IsAvailable
+                ? $"Windows App SDK runtime: {windowsAppSdkProbe.RuntimeVersion}"
+                : $"Windows App SDK runtime unavailable: {windowsAppSdkProbe.ErrorType}: {windowsAppSdkProbe.ErrorMessage}");
+#endif
+
         var pathProvider = new Quadrant.Infrastructure.Storage.LocalAppDataPathProvider();
         var connectionFactory = new Quadrant.Infrastructure.Storage.SqliteConnectionFactory(pathProvider.DatabasePath);
         var initializer = new Quadrant.Infrastructure.Storage.SqliteDatabaseInitializer(connectionFactory);

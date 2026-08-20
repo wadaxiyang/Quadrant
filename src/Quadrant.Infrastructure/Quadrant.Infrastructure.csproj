@@ -5,5 +5,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Quadrant.Core\Quadrant.Core.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" />
   </ItemGroup>
 </Project>

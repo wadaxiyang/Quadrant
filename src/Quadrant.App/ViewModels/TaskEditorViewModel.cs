@@ -63,40 +63,40 @@ public partial class TaskEditorViewModel : ObservableObject
     public long? Id { get; }
 
     [ObservableProperty]
-    private string title;
+    public partial string Title { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private int quadrantId;
+    public partial int QuadrantId { get; set; }
 
     [ObservableProperty]
-    private DateTime? dueDate;
+    public partial DateTime? DueDate { get; set; }
 
     [ObservableProperty]
-    private string dueTimeText = string.Empty;
+    public partial string DueTimeText { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string note;
+    public partial string Note { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private ReminderPreset reminderPreset;
+    public partial ReminderPreset ReminderPreset { get; set; }
 
     [ObservableProperty]
-    private DateTime? customReminderDate;
+    public partial DateTime? CustomReminderDate { get; set; }
 
     [ObservableProperty]
-    private string customReminderTimeText = string.Empty;
+    public partial string CustomReminderTimeText { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string? titleError;
+    public partial string? TitleError { get; set; }
 
     [ObservableProperty]
-    private string? dueTimeError;
+    public partial string? DueTimeError { get; set; }
 
     [ObservableProperty]
-    private string? reminderError;
+    public partial string? ReminderError { get; set; }
 
     [ObservableProperty]
-    private bool isValid = true;
+    public partial bool IsValid { get; set; } = true;
 
     public IEnumerable<string> TimeSuggestions => Enumerable.Range(0, 24 * 4)
         .Select(index => TimeSpan.FromMinutes(index * 15).ToString("h\\:mm", CultureInfo.InvariantCulture));

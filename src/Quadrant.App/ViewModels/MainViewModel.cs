@@ -22,16 +22,16 @@ public partial class MainViewModel : ObservableObject
     }
 
     [ObservableProperty]
-    private string appTitle = "Quadrant";
+    public partial string AppTitle { get; set; } = "Quadrant";
 
     [ObservableProperty]
-    private string placeholderTitle = "四象限任务工作区";
+    public partial string PlaceholderTitle { get; set; } = "四象限任务工作区";
 
     [ObservableProperty]
-    private TaskFilter selectedFilter = TaskFilter.All;
+    public partial TaskFilter SelectedFilter { get; set; } = TaskFilter.All;
 
     [ObservableProperty]
-    private string searchText = string.Empty;
+    public partial string SearchText { get; set; } = string.Empty;
 
     public IReadOnlyList<QuadrantViewModel> Quadrants { get; private set; } = [];
 
