@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_02_DESIGN_TOKENS` — implementation complete; manual GUI checks pending
+`STAGE_03_CORE_DOMAIN` — passed
 
 ## Completed
 
@@ -23,6 +23,11 @@
 - Replaced MainWindow layout/font/border magic values with shared resource tokens and styles.
 - Kept Fluent/system brushes as `DynamicResource` references so theme changes can update them.
 - Fixed WPF layout resource typing by using `Thickness` tokens for `Margin`/`Padding`; the app now starts successfully.
+- Added pure Core models: `TaskItem`, `TaskDraft`, `TaskUpdate`, and `QuadrantDefinition`.
+- Added `TaskFilter` and `ReminderPreset` enums.
+- Added repository, quadrant, reminder scheduler, clock, and task service contracts.
+- Added `TaskRules` for title/quadrant validation, local Today/Overdue checks, completion/restore semantics, and initial reminder preset calculation.
+- Added `TaskService` CRUD orchestration skeleton using injected `IClock` and reminder scheduler.
 
 ## Files changed
 
@@ -47,6 +52,22 @@
 - `src/Quadrant.App/Resources/Typography.xaml`
 - `src/Quadrant.App/Resources/QuadrantColors.xaml`
 - `src/Quadrant.App/Resources/ControlStyles.xaml`
+- `src/Quadrant.Core/Models/TaskItem.cs`
+- `src/Quadrant.Core/Models/TaskDraft.cs`
+- `src/Quadrant.Core/Models/TaskUpdate.cs`
+- `src/Quadrant.Core/Models/QuadrantDefinition.cs`
+- `src/Quadrant.Core/Enums/TaskFilter.cs`
+- `src/Quadrant.Core/Enums/ReminderPreset.cs`
+- `src/Quadrant.Core/Interfaces/IClock.cs`
+- `src/Quadrant.Core/Interfaces/ITaskRepository.cs`
+- `src/Quadrant.Core/Interfaces/IQuadrantRepository.cs`
+- `src/Quadrant.Core/Interfaces/IReminderScheduler.cs`
+- `src/Quadrant.Core/Interfaces/ITaskService.cs`
+- `src/Quadrant.Core/Services/TaskValidationException.cs`
+- `src/Quadrant.Core/Services/TaskRules.cs`
+- `src/Quadrant.Core/Services/TaskService.cs`
+- `Tests/Quadrant.Core.Tests/TaskRulesTests.cs`
+- `Tests/Quadrant.Core.Tests/TaskServiceTests.cs`
 - `STATUS.md`
 
 ## Architecture decisions / deviations
@@ -66,6 +87,9 @@
 - `QuadrantColors.xaml` defines the exact four quadrant accents from `DESIGN_SYSTEM.md`; no panel background is filled with these colors.
 - `ControlStyles.xaml` defines `QuadrantPanelStyle`, `TaskCardStyle`, `SectionTitleTextStyle`, `CaptionTextStyle`, and a native-based `IconButtonStyle` without shadows or custom templates.
 - WPF `DynamicResource` is used for Fluent system border brushes; no third-party theme package was added.
+- Core remains ordinary C# on `net10.0`; it does not reference WPF, Windows App SDK, WinForms, SQLite, or Win32.
+- `DateTimeOffset` is used for all task timestamps; Today compares local calendar dates and Overdue compares the instant against the injected clock.
+- Reminder preset calculation is intentionally minimal; detailed scheduling validation belongs to Stage 09.
 - No architecture deviations recorded.
 
 ## Tests run + results
@@ -78,12 +102,14 @@
 - MainWindow XAML resource/style compilation — passed as part of build.
 - `dotnet run --project .\src\Quadrant.App\Quadrant.App.csproj --no-restore` — initially reproduced a startup crash caused by invalid `Double` resources assigned to `Margin`; fixed with `Thickness` tokens.
 - Built EXE launch smoke check — passed; process remained running for 5 seconds without exiting.
+- `dotnet test .\Tests\Quadrant.Core.Tests\Quadrant.Core.Tests.csproj -c Debug --no-restore` — passed; 14 tests passed, 0 failed.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed; 15 tests passed, 0 failed.
+- Core project boundary inspection — passed; `net10.0`, no Windows-only or SQLite implementation dependency.
 
 ## Manual tests pending
 
-- Windows 11 Light/Dark token appearance — pending; no usable Windows UI automation session was available.
-- High Contrast token appearance — pending; no usable Windows UI automation session was available.
-- 125%, 150%, and minimum-size visual inspection — pending; no usable Windows UI automation session was available.
+- Stage 02 GUI visual checks remain pending; no usable Windows UI automation session was available.
 
 ## Sources checked
 
@@ -102,6 +128,7 @@
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/dynamicresource-markup-extension — checked 2026-08-20; DynamicResource behavior.
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/control-styles-and-templates — checked 2026-08-20; WPF style/template guidance.
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/wpf-brushes-overview — checked 2026-08-20; WPF brush/resource guidance.
+- No version-sensitive external API was required for Stage 03; CommunityToolkit.Mvvm remains pinned from Stage 00 and is not used by the Core domain model.
 
 ## Known issues
 
@@ -110,6 +137,4 @@
 
 ## Next stage
 
-After the pending GUI checks pass:
-
-`stages/STAGE_03_CORE_DOMAIN.md`
+`stages/STAGE_04_SQLITE_STORAGE.md`

@@ -1,0 +1,20 @@
+using Quadrant.Core.Models;
+
+namespace Quadrant.Core.Interfaces;
+
+public interface ITaskService
+{
+    Task<IReadOnlyList<TaskItem>> GetActiveAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TaskItem>> GetCompletedAsync(CancellationToken cancellationToken = default);
+
+    Task<TaskItem?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
+
+    Task<TaskItem> CreateAsync(TaskDraft draft, CancellationToken cancellationToken = default);
+
+    Task<TaskItem> UpdateAsync(TaskUpdate update, CancellationToken cancellationToken = default);
+
+    Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, CancellationToken cancellationToken = default);
+
+    Task DeleteAsync(long id, CancellationToken cancellationToken = default);
+}
