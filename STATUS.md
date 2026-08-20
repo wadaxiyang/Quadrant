@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_04_SQLITE_STORAGE` — passed
+`STAGE_05_MAIN_QUADRANT_VIEW` — implementation complete; manual GUI checks pending
 
 ## Completed
 
@@ -33,6 +33,13 @@
 - Added schema version initializer at version 1 with parameterized migration and default quadrants.
 - Added `SqliteTaskRepository` and `SqliteQuadrantRepository` with parameterized SQL, transactions for create/migration, and ISO-8601 `DateTimeOffset` mapping.
 - Added independent temporary-database infrastructure tests for migration, CRUD, nullable values, timestamps, completion/restore, deletion, foreign keys, idempotent startup, and apostrophe-containing titles.
+- Added `SystemClock` and `NoOpReminderScheduler` for application composition.
+- Added `QuadrantViewModel` and `TaskCardViewModel`; entities are not used as WPF observable objects.
+- Composed startup as async DB initialization, repository creation, `TaskService` creation, and active-task loading before showing `MainWindow`.
+- Replaced placeholder cells with four explicit 2x2 quadrant panels backed by real database data.
+- Added independently scrolling virtualized/recycling `ListBox` task lists with due/reminder text and empty states.
+- Added fixed due/created sorting inside each quadrant: dated tasks first, due ascending, created ascending.
+- Fixed Stage 05 startup crash: `GridLength` is now used for the 3px quadrant accent column token instead of `Double`.
 
 ## Files changed
 
@@ -80,6 +87,13 @@
 - `src/Quadrant.Infrastructure/Storage/SqliteTaskRepository.cs`
 - `src/Quadrant.Infrastructure/Storage/SqliteQuadrantRepository.cs`
 - `Tests/Quadrant.Infrastructure.Tests/SqliteStorageTests.cs`
+- `src/Quadrant.Infrastructure/Windows/SystemClock.cs`
+- `src/Quadrant.Infrastructure/Notifications/NoOpReminderScheduler.cs`
+- `src/Quadrant.App/ViewModels/TaskCardViewModel.cs`
+- `src/Quadrant.App/ViewModels/QuadrantViewModel.cs`
+- `src/Quadrant.App/Resources/TaskCardTemplate.xaml`
+- `src/Quadrant.App/Converters/StringToVisibilityConverter.cs`
+- `src/Quadrant.App/Resources/Spacing.xaml`
 - `STATUS.md`
 
 ## Architecture decisions / deviations
@@ -106,6 +120,10 @@
 - Database time values use ISO-8601 round-trip (`O`) text with `DateTimeOffset.Parse` using invariant culture and round-trip styles.
 - Each opened connection enables `PRAGMA foreign_keys = ON` and sets `PRAGMA busy_timeout = 5000`.
 - Current Microsoft.Data.Sqlite async transaction factory exposed `DbTransaction`; implementation uses synchronous `BeginTransaction()` to obtain the concrete `SqliteTransaction` required by `SqliteCommand.Transaction`.
+- Stage 05 remains read-only: no CRUD, filtering, search, drag/drop, or reminder scheduling was added.
+- `ListBox` uses `ScrollViewer.CanContentScroll`, `VirtualizingPanel.IsVirtualizing`, and `VirtualizationMode=Recycling` per current WPF guidance.
+- MainViewModel loads four fixed quadrant definitions from SQLite and partitions active tasks by `QuadrantId`; no automatic quadrant generation is used.
+- WPF layout tokens use property-specific types: `Thickness` for margins/padding and `GridLength` for grid column widths.
 - No architecture deviations recorded.
 
 ## Tests run + results
@@ -126,10 +144,16 @@
 - `dotnet build Quadrant.sln -c Debug --no-restore` — passed; 0 warnings, 0 errors.
 - `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed; 18 tests passed, 0 failed.
 - SQL parameterization inspection — passed; user values are bound parameters, not interpolated SQL.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed; 18 tests passed, 0 failed.
+- Application EXE launch smoke check — passed; process remained running for 5 seconds after async database initialization.
+- Reproduced `dotnet run` crash with `XamlParseException` caused by `Double` assigned to `ColumnDefinition.Width`; fixed with `GridLength`.
+- `dotnet run --project .\src\Quadrant.App\Quadrant.App.csproj --no-restore` — passed after fix; process remained running for 8 seconds with empty stdout/stderr.
+- Direct EXE launch — passed after fix; process remained running for 5 seconds.
 
 ## Manual tests pending
 
-- Stage 02 GUI visual checks remain pending; no usable Windows UI automation session was available.
+- Windows GUI checks for four populated quadrants, task ordering, independent scrolling, resize, and 100+ synthetic tasks remain pending; no usable Windows UI automation session was available.
 
 ## Sources checked
 
@@ -154,13 +178,15 @@
 - https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/parameters — checked 2026-08-20; parameter binding.
 - https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/transactions — checked 2026-08-20; transaction usage.
 - https://www.sqlite.org/foreignkeys.html — checked 2026-08-20; SQLite foreign key behavior.
+- https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/optimizing-performance-controls — checked 2026-08-20; WPF control virtualization guidance.
+- https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.virtualizingstackpanel.virtualizationmode — checked 2026-08-20; Recycling mode API.
+- https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.virtualizingpanel.isvirtualizing — checked 2026-08-20; virtualization property API.
 
 ## Known issues
 
 - Working product name `Quadrant` remains provisional.
-- GUI manual acceptance is pending because this environment did not expose a usable Windows UI automation session.
-- Stage 04 does not yet compose the database into the WPF app; UI integration is intentionally deferred to Stage 05.
+- Stage 05 GUI manual acceptance is pending because this environment did not expose a usable Windows UI automation session.
 
 ## Next stage
 
-`stages/STAGE_05_MAIN_QUADRANT_VIEW.md`
+`stages/STAGE_06_TASK_EDITOR_CRUD.md`

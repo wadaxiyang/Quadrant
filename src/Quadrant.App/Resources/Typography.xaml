@@ -14,6 +14,10 @@
         <Setter Property="FontSize" Value="14" />
     </Style>
 
+    <Style x:Key="BodyStrongTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
     <Style x:Key="CaptionTextStyle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="12" />
     </Style>

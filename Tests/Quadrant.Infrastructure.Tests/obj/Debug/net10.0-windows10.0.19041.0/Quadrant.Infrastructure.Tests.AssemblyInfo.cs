@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Quadrant.Infrastructure.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0b407265584f9f461edd5688304d17cc9ef95268")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2ff06a559d36a727684da355e5b7f7bd0922c17c")]
 [assembly: System.Reflection.AssemblyProductAttribute("Quadrant.Infrastructure.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Quadrant.Infrastructure.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

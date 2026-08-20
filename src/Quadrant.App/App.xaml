@@ -1,6 +1,7 @@
 <Application x:Class="Quadrant.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:Quadrant.App.Converters"
              ThemeMode="System">
     <Application.Resources>
         <ResourceDictionary>
@@ -9,7 +10,10 @@
                 <ResourceDictionary Source="Resources/Typography.xaml" />
                 <ResourceDictionary Source="Resources/QuadrantColors.xaml" />
                 <ResourceDictionary Source="Resources/ControlStyles.xaml" />
+                <ResourceDictionary Source="Resources/TaskCardTemplate.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

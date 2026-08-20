@@ -58,3 +58,6 @@ C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10
 C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\Resources\QuadrantColors.baml
 C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\Resources\Spacing.baml
 C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\Resources\Typography.baml
+C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\Resources\TaskCardTemplate.baml
+C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\GeneratedInternalTypeHelper.g.cs
+C:\123\CODE\Quadrant_WPF_Codex_Pack\src\Quadrant.App\obj\Debug\net10.0-windows10.0.19041.0\Quadrant.App_MarkupCompile.lref

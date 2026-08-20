@@ -37,16 +37,96 @@
             </Grid.ColumnDefinitions>
 
             <Border Grid.Row="0" Grid.Column="0" Margin="{StaticResource QuadrantTopLeftMargin}" Style="{StaticResource QuadrantPanelStyle}">
-                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="Q1" />
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="{StaticResource QuadrantHeaderBottomMargin}">
+                        <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="{StaticResource QuadrantAccentWidth}" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="{DynamicResource QuadrantQ1AccentBrush}" />
+                        <StackPanel Grid.Column="1" Margin="{StaticResource CaptionTopMargin}">
+                            <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding Quadrants[0].Name}" />
+                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="{Binding Quadrants[0].Subtitle}" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Style="{StaticResource CaptionTextStyle}" Text="{Binding Quadrants[0].TaskCountText}" />
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <ListBox ItemsSource="{Binding Quadrants[0].Tasks}"
+                                 ItemTemplate="{StaticResource TaskCardTemplate}"
+                                 Padding="0"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 ScrollViewer.CanContentScroll="True"
+                                 VirtualizingPanel.IsVirtualizing="True"
+                                 VirtualizingPanel.VirtualizationMode="Recycling" />
+                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Text="{Binding Quadrants[0].EmptyText}"
+                                   Visibility="{Binding Quadrants[0].IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </Grid>
+                </Grid>
             </Border>
+
             <Border Grid.Row="0" Grid.Column="1" Margin="{StaticResource QuadrantTopRightMargin}" Style="{StaticResource QuadrantPanelStyle}">
-                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="Q2" />
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="{StaticResource QuadrantHeaderBottomMargin}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="{StaticResource QuadrantAccentWidth}" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="{DynamicResource QuadrantQ2AccentBrush}" />
+                        <StackPanel Grid.Column="1" Margin="{StaticResource CaptionTopMargin}">
+                            <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding Quadrants[1].Name}" />
+                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="{Binding Quadrants[1].Subtitle}" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Style="{StaticResource CaptionTextStyle}" Text="{Binding Quadrants[1].TaskCountText}" />
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <ListBox ItemsSource="{Binding Quadrants[1].Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}" Padding="0" BorderThickness="0" Background="Transparent" ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" />
+                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="{Binding Quadrants[1].EmptyText}" Visibility="{Binding Quadrants[1].IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </Grid>
+                </Grid>
             </Border>
+
             <Border Grid.Row="1" Grid.Column="0" Margin="{StaticResource QuadrantBottomLeftMargin}" Style="{StaticResource QuadrantPanelStyle}">
-                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="Q3" />
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="{StaticResource QuadrantHeaderBottomMargin}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="{StaticResource QuadrantAccentWidth}" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="{DynamicResource QuadrantQ3AccentBrush}" />
+                        <StackPanel Grid.Column="1" Margin="{StaticResource CaptionTopMargin}">
+                            <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding Quadrants[2].Name}" />
+                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="{Binding Quadrants[2].Subtitle}" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Style="{StaticResource CaptionTextStyle}" Text="{Binding Quadrants[2].TaskCountText}" />
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <ListBox ItemsSource="{Binding Quadrants[2].Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}" Padding="0" BorderThickness="0" Background="Transparent" ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" />
+                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="{Binding Quadrants[2].EmptyText}" Visibility="{Binding Quadrants[2].IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </Grid>
+                </Grid>
             </Border>
+
             <Border Grid.Row="1" Grid.Column="1" Margin="{StaticResource QuadrantBottomRightMargin}" Style="{StaticResource QuadrantPanelStyle}">
-                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="Q4" />
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="{StaticResource QuadrantHeaderBottomMargin}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="{StaticResource QuadrantAccentWidth}" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="{DynamicResource QuadrantQ4AccentBrush}" />
+                        <StackPanel Grid.Column="1" Margin="{StaticResource CaptionTopMargin}">
+                            <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="{Binding Quadrants[3].Name}" />
+                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="{Binding Quadrants[3].Subtitle}" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Style="{StaticResource CaptionTextStyle}" Text="{Binding Quadrants[3].TaskCountText}" />
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <ListBox ItemsSource="{Binding Quadrants[3].Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}" Padding="0" BorderThickness="0" Background="Transparent" ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" />
+                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="{Binding Quadrants[3].EmptyText}" Visibility="{Binding Quadrants[3].IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </Grid>
+                </Grid>
             </Border>
         </Grid>
     </Grid>

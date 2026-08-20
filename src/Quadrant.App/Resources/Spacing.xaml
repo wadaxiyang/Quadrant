@@ -10,6 +10,10 @@
     <Thickness x:Key="InsetS">8</Thickness>
     <Thickness x:Key="InsetM">12</Thickness>
     <Thickness x:Key="InsetL">16</Thickness>
+    <Thickness x:Key="CaptionTopMargin">0,4,0,0</Thickness>
+    <Thickness x:Key="TaskCardBottomMargin">0,0,8,0</Thickness>
+    <Thickness x:Key="QuadrantHeaderBottomMargin">0,0,12,0</Thickness>
+    <GridLength x:Key="QuadrantAccentWidth">3</GridLength>
 
     <CornerRadius x:Key="RadiusSmall">4</CornerRadius>
     <CornerRadius x:Key="RadiusMedium">8</CornerRadius>
