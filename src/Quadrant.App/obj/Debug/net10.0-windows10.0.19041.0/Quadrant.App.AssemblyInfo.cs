@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Quadrant.App")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c03de50c4cddecb151f917d20f4b2783580bbd90")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0b407265584f9f461edd5688304d17cc9ef95268")]
 [assembly: System.Reflection.AssemblyProductAttribute("Quadrant.App")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Quadrant.App")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

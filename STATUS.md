@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_03_CORE_DOMAIN` — passed
+`STAGE_04_SQLITE_STORAGE` — passed
 
 ## Completed
 
@@ -28,6 +28,11 @@
 - Added repository, quadrant, reminder scheduler, clock, and task service contracts.
 - Added `TaskRules` for title/quadrant validation, local Today/Overdue checks, completion/restore semantics, and initial reminder preset calculation.
 - Added `TaskService` CRUD orchestration skeleton using injected `IClock` and reminder scheduler.
+- Added `LocalAppDataPathProvider` using `%LOCALAPPDATA%\Quadrant\quadrant.db` resolution via `Environment.SpecialFolder.LocalApplicationData`.
+- Added `SqliteConnectionFactory` with explicit read-write-create connection settings and disabled pooling for deterministic test cleanup.
+- Added schema version initializer at version 1 with parameterized migration and default quadrants.
+- Added `SqliteTaskRepository` and `SqliteQuadrantRepository` with parameterized SQL, transactions for create/migration, and ISO-8601 `DateTimeOffset` mapping.
+- Added independent temporary-database infrastructure tests for migration, CRUD, nullable values, timestamps, completion/restore, deletion, foreign keys, idempotent startup, and apostrophe-containing titles.
 
 ## Files changed
 
@@ -68,6 +73,13 @@
 - `src/Quadrant.Core/Services/TaskService.cs`
 - `Tests/Quadrant.Core.Tests/TaskRulesTests.cs`
 - `Tests/Quadrant.Core.Tests/TaskServiceTests.cs`
+- `src/Quadrant.Infrastructure/Storage/LocalAppDataPathProvider.cs`
+- `src/Quadrant.Infrastructure/Storage/SqliteConnectionFactory.cs`
+- `src/Quadrant.Infrastructure/Storage/SqliteDatabaseInitializer.cs`
+- `src/Quadrant.Infrastructure/Storage/SqliteValueConverter.cs`
+- `src/Quadrant.Infrastructure/Storage/SqliteTaskRepository.cs`
+- `src/Quadrant.Infrastructure/Storage/SqliteQuadrantRepository.cs`
+- `Tests/Quadrant.Infrastructure.Tests/SqliteStorageTests.cs`
 - `STATUS.md`
 
 ## Architecture decisions / deviations
@@ -90,6 +102,10 @@
 - Core remains ordinary C# on `net10.0`; it does not reference WPF, Windows App SDK, WinForms, SQLite, or Win32.
 - `DateTimeOffset` is used for all task timestamps; Today compares local calendar dates and Overdue compares the instant against the injected clock.
 - Reminder preset calculation is intentionally minimal; detailed scheduling validation belongs to Stage 09.
+- Schema version is fixed at `1`; migration 001 creates `schema_version`, `quadrants`, `tasks`, and the three task indexes.
+- Database time values use ISO-8601 round-trip (`O`) text with `DateTimeOffset.Parse` using invariant culture and round-trip styles.
+- Each opened connection enables `PRAGMA foreign_keys = ON` and sets `PRAGMA busy_timeout = 5000`.
+- Current Microsoft.Data.Sqlite async transaction factory exposed `DbTransaction`; implementation uses synchronous `BeginTransaction()` to obtain the concrete `SqliteTransaction` required by `SqliteCommand.Transaction`.
 - No architecture deviations recorded.
 
 ## Tests run + results
@@ -106,6 +122,10 @@
 - `dotnet build Quadrant.sln -c Debug --no-restore` — passed; 0 warnings, 0 errors.
 - `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed; 15 tests passed, 0 failed.
 - Core project boundary inspection — passed; `net10.0`, no Windows-only or SQLite implementation dependency.
+- `dotnet test .\Tests\Quadrant.Infrastructure.Tests\Quadrant.Infrastructure.Tests.csproj -c Debug --no-restore` — passed; 4 tests passed, 0 failed.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed; 18 tests passed, 0 failed.
+- SQL parameterization inspection — passed; user values are bound parameters, not interpolated SQL.
 
 ## Manual tests pending
 
@@ -129,12 +149,18 @@
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/control-styles-and-templates — checked 2026-08-20; WPF style/template guidance.
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/wpf-brushes-overview — checked 2026-08-20; WPF brush/resource guidance.
 - No version-sensitive external API was required for Stage 03; CommunityToolkit.Mvvm remains pinned from Stage 00 and is not used by the Core domain model.
+- https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/ — checked 2026-08-20; Microsoft.Data.Sqlite ADO.NET usage.
+- https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/connection-strings — checked 2026-08-20; connection configuration.
+- https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/parameters — checked 2026-08-20; parameter binding.
+- https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/transactions — checked 2026-08-20; transaction usage.
+- https://www.sqlite.org/foreignkeys.html — checked 2026-08-20; SQLite foreign key behavior.
 
 ## Known issues
 
 - Working product name `Quadrant` remains provisional.
 - GUI manual acceptance is pending because this environment did not expose a usable Windows UI automation session.
+- Stage 04 does not yet compose the database into the WPF app; UI integration is intentionally deferred to Stage 05.
 
 ## Next stage
 
-`stages/STAGE_04_SQLITE_STORAGE.md`
+`stages/STAGE_05_MAIN_QUADRANT_VIEW.md`
