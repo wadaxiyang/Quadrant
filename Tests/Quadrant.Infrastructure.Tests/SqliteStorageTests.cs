@@ -192,6 +192,51 @@ public sealed class SqliteStorageTests
     }
 
     [Fact]
+    public async Task Inbox_and_home_queries_are_exclusive_and_classification_preserves_metadata()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var now = new DateTimeOffset(2026, 8, 21, 9, 0, 0, TimeSpan.FromHours(8));
+        var inbox = await database.Tasks.CreateAsync(
+            new TaskDraft("Inbox", null, now.AddDays(1), now.AddHours(2), "note", new DateOnly(2026, 8, 22), 30), now);
+        var home = await database.Tasks.CreateAsync(new TaskDraft("Home", 1), now.AddMinutes(1));
+        await database.Tasks.CompleteWithSnapshotAsync(inbox.Id, now.AddMinutes(2));
+
+        Assert.Equal([home.Id], (await database.Tasks.GetActiveAsync()).Select(task => task.Id));
+        Assert.Empty(await database.Tasks.GetInboxAsync());
+
+        var reopened = await database.Tasks.ReopenWithSnapshotRevertedAsync(inbox.Id, now.AddMinutes(3));
+        var assigned = await database.Tasks.AssignQuadrantAsync(inbox.Id, 3, now.AddMinutes(4));
+        var unchanged = await database.Tasks.AssignQuadrantAsync(inbox.Id, 3, now.AddMinutes(5));
+        var movedToInbox = await database.Tasks.MoveToInboxAsync(inbox.Id, now.AddMinutes(6));
+
+        Assert.False(reopened.IsCompleted);
+        Assert.Equal(3, assigned.QuadrantId);
+        Assert.Equal(inbox.DueAt, assigned.DueAt);
+        Assert.Equal(inbox.ReminderAt, assigned.ReminderAt);
+        Assert.Equal(inbox.PlannedDate, assigned.PlannedDate);
+        Assert.Equal(inbox.EstimatedMinutes, assigned.EstimatedMinutes);
+        Assert.Equal(assigned.UpdatedAt, unchanged.UpdatedAt);
+        Assert.Null(movedToInbox.QuadrantId);
+        Assert.Equal([home.Id], (await database.Tasks.GetActiveAsync()).Select(task => task.Id));
+        Assert.Equal([inbox.Id], (await database.Tasks.GetInboxAsync()).Select(task => task.Id));
+        Assert.Equal([inbox.Id], (await database.Tasks.GetInboxAsync(limit: 1)).Select(task => task.Id));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5)]
+    public async Task Inbox_repository_rejects_invalid_quadrants_and_completed_tasks(int quadrantId)
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var inbox = await database.Tasks.CreateAsync(new TaskDraft("Inbox", null), DateTimeOffset.UtcNow);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => database.Tasks.AssignQuadrantAsync(inbox.Id, quadrantId, DateTimeOffset.UtcNow));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => database.Tasks.AssignQuadrantAsync(999, 1, DateTimeOffset.UtcNow));
+        await database.Tasks.CompleteWithSnapshotAsync(inbox.Id, DateTimeOffset.UtcNow);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => database.Tasks.MoveToInboxAsync(inbox.Id, DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
     public async Task Completion_event_and_focus_session_round_trip_with_long_task_id()
     {
         await using var database = await TestDatabase.CreateAsync();

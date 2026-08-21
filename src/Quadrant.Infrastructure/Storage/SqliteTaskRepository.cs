@@ -17,6 +17,19 @@ public sealed class SqliteTaskRepository : ITaskRepository
     public async Task<IReadOnlyList<TaskItem>> GetActiveAsync(CancellationToken cancellationToken = default) =>
         await GetManyAsync("SELECT * FROM tasks WHERE is_completed = 0 AND quadrant_id IS NOT NULL ORDER BY quadrant_id, created_at, id;", cancellationToken);
 
+    public async Task<IReadOnlyList<TaskItem>> GetInboxAsync(int? limit = null, CancellationToken cancellationToken = default)
+    {
+        if (limit is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit), "Inbox limit must be positive.");
+        }
+
+        var commandText = limit is null
+            ? "SELECT * FROM tasks WHERE is_completed = 0 AND quadrant_id IS NULL ORDER BY created_at, id;"
+            : "SELECT * FROM tasks WHERE is_completed = 0 AND quadrant_id IS NULL ORDER BY created_at, id LIMIT $limit;";
+        return await GetManyAsync(commandText, limit, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<TaskItem>> GetCompletedAsync(CancellationToken cancellationToken = default) =>
         await GetManyAsync("SELECT * FROM tasks WHERE is_completed = 1 ORDER BY completed_at DESC, id DESC;", cancellationToken);
 
@@ -73,6 +86,19 @@ public sealed class SqliteTaskRepository : ITaskRepository
 
         return MapTask(reader);
     }
+
+    public async Task<TaskItem> AssignQuadrantAsync(long id, int quadrantId, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        if (quadrantId is < 1 or > 4)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quadrantId), "Quadrant ID must be between 1 and 4.");
+        }
+
+        return await UpdateQuadrantAsync(id, quadrantId, now, cancellationToken);
+    }
+
+    public Task<TaskItem> MoveToInboxAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default) =>
+        UpdateQuadrantAsync(id, null, now, cancellationToken);
 
     public async Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
@@ -131,11 +157,46 @@ public sealed class SqliteTaskRepository : ITaskRepository
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private async Task<IReadOnlyList<TaskItem>> GetManyAsync(string commandText, CancellationToken cancellationToken)
+    private async Task<TaskItem> UpdateQuadrantAsync(long id, int? quadrantId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+        var task = await ReadTaskAsync(connection, transaction, id, cancellationToken)
+            ?? throw new InvalidOperationException($"Task {id} was not found.");
+        if (task.IsCompleted)
+        {
+            throw new InvalidOperationException("Completed tasks cannot be classified.");
+        }
+
+        if (task.QuadrantId == quadrantId)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return task;
+        }
+
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "UPDATE tasks SET quadrant_id=$quadrant, updated_at=$updated WHERE id=$id RETURNING *;";
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$quadrant", SqliteValueConverter.ToDbValue(quadrantId));
+        command.Parameters.AddWithValue("$updated", SqliteValueConverter.FormatUtc(now));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        await reader.ReadAsync(cancellationToken);
+        var updated = MapTask(reader);
+        await reader.DisposeAsync();
+        await transaction.CommitAsync(cancellationToken);
+        return updated;
+    }
+
+    private async Task<IReadOnlyList<TaskItem>> GetManyAsync(string commandText, int? limit, CancellationToken cancellationToken)
     {
         await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = commandText;
+        if (limit is not null)
+        {
+            command.Parameters.AddWithValue("$limit", limit.Value);
+        }
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var tasks = new List<TaskItem>();
         while (await reader.ReadAsync(cancellationToken))
@@ -145,6 +206,9 @@ public sealed class SqliteTaskRepository : ITaskRepository
 
         return tasks;
     }
+
+    private Task<IReadOnlyList<TaskItem>> GetManyAsync(string commandText, CancellationToken cancellationToken) =>
+        GetManyAsync(commandText, null, cancellationToken);
 
     private static async Task<TaskItem?> ReadTaskAsync(SqliteConnection connection, SqliteTransaction transaction, long id, CancellationToken cancellationToken)
     {

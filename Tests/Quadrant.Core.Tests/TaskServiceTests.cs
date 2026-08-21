@@ -1,4 +1,5 @@
 using Quadrant.Core.Interfaces;
+using Quadrant.Core.Enums;
 using Quadrant.Core.Models;
 using Quadrant.Core.Services;
 using Xunit;
@@ -177,6 +178,43 @@ public sealed class TaskServiceTests
         await Assert.ThrowsAsync<TaskValidationException>(() => service.MoveTaskAsync(1, targetQuadrantId));
     }
 
+    [Fact]
+    public async Task Inbox_classification_is_idempotent_and_preserves_task_metadata()
+    {
+        var now = new DateTimeOffset(2026, 8, 21, 9, 30, 0, TimeSpan.FromHours(8));
+        var source = new TaskItem(1, "Inbox", null, now.AddDays(1), now.AddHours(1), "note", false, null, now, now,
+            new DateOnly(2026, 8, 22), 60);
+        var repository = new FakeTaskRepository { CurrentTask = source };
+        var changes = new List<AppChange>();
+        var hub = new AppChangeHub();
+        using var subscription = hub.Subscribe(changes.Add);
+        var service = new TaskService(repository, new FakeReminderScheduler(), new FakeClock(now), appChangeHub: hub);
+
+        var assigned = await service.AssignQuadrantAsync(1, 2);
+        var unchanged = await service.AssignQuadrantAsync(1, 2);
+        var moved = await service.MoveToInboxAsync(1);
+
+        Assert.Equal(2, assigned.QuadrantId);
+        Assert.Equal(source.DueAt, assigned.DueAt);
+        Assert.Equal(source.ReminderAt, assigned.ReminderAt);
+        Assert.Equal(source.PlannedDate, assigned.PlannedDate);
+        Assert.Equal(source.EstimatedMinutes, assigned.EstimatedMinutes);
+        Assert.Same(assigned, unchanged);
+        Assert.Null(moved.QuadrantId);
+        Assert.Equal([AppChangeKind.TaskClassified, AppChangeKind.TaskClassified], changes.Select(change => change.Kind));
+    }
+
+    [Fact]
+    public async Task Completed_or_missing_tasks_cannot_be_classified()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var completed = new FakeTaskRepository { CurrentTask = new TaskItem(1, "Done", null, null, null, null, true, now, now, now) };
+        var service = new TaskService(completed, new FakeReminderScheduler(), new FakeClock(now));
+
+        await Assert.ThrowsAsync<TaskValidationException>(() => service.AssignQuadrantAsync(1, 1));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new TaskService(new FakeTaskRepository(), new FakeReminderScheduler(), new FakeClock(now)).MoveToInboxAsync(99));
+    }
+
     private sealed class FakeClock(DateTimeOffset now) : IClock
     {
         public DateTimeOffset Now { get; } = now;
@@ -188,11 +226,14 @@ public sealed class TaskServiceTests
 
         public TaskUpdate? LastUpdate { get; private set; }
 
-        public TaskItem? CurrentTask { get; init; }
+        public TaskItem? CurrentTask { get; set; }
 
         public DateTimeOffset LastNow { get; private set; }
 
         public Task<IReadOnlyList<TaskItem>> GetActiveAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<TaskItem>>([]);
+
+        public Task<IReadOnlyList<TaskItem>> GetInboxAsync(int? limit = null, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TaskItem>>([]);
 
         public Task<IReadOnlyList<TaskItem>> GetCompletedAsync(CancellationToken cancellationToken = default) =>
@@ -205,29 +246,49 @@ public sealed class TaskServiceTests
         {
             LastDraft = draft;
             LastNow = now;
-            return Task.FromResult(new TaskItem(1, draft.Title, draft.QuadrantId, draft.DueAt, draft.ReminderAt, draft.Note, false, null, now, now));
+            CurrentTask = new TaskItem(1, draft.Title, draft.QuadrantId, draft.DueAt, draft.ReminderAt, draft.Note, false, null, now, now);
+            return Task.FromResult(CurrentTask);
         }
 
         public Task<TaskItem> UpdateAsync(TaskUpdate update, DateTimeOffset now, CancellationToken cancellationToken = default)
         {
             LastUpdate = update;
-            return Task.FromResult(new TaskItem(update.Id, update.Title, update.QuadrantId, update.DueAt, update.ReminderAt, update.Note, false, null, now, now));
+            CurrentTask = new TaskItem(update.Id, update.Title, update.QuadrantId, update.DueAt, update.ReminderAt, update.Note, false, null, now, now,
+                update.PlannedDate, update.EstimatedMinutes, update.RecurrenceKind, update.RecurrenceInterval, update.RecurrenceSeriesId, update.RecurrenceAnchorDay);
+            return Task.FromResult(CurrentTask);
         }
+
+        public Task<TaskItem> AssignQuadrantAsync(long id, int quadrantId, DateTimeOffset now, CancellationToken cancellationToken = default) =>
+            SetQuadrantAsync(id, quadrantId, now);
+
+        public Task<TaskItem> MoveToInboxAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default) =>
+            SetQuadrantAsync(id, null, now);
 
         public Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, DateTimeOffset now, CancellationToken cancellationToken = default) =>
             Task.FromResult(new TaskItem(id, "Task", 1, null, null, null, isCompleted, isCompleted ? now : null, now, now));
 
         public Task<CompletedTaskMutationResult> CompleteWithSnapshotAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default)
         {
-            var task = new TaskItem(id, "Task", 1, null, null, null, true, now, now, now);
+            CurrentTask = new TaskItem(id, "Task", 1, null, null, null, true, now, now, now);
+            var task = CurrentTask;
             return Task.FromResult(new CompletedTaskMutationResult(task, null, false));
         }
 
-        public Task<TaskItem> ReopenWithSnapshotRevertedAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new TaskItem(id, "Task", 1, null, null, null, false, null, now, now));
+        public Task<TaskItem> ReopenWithSnapshotRevertedAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default)
+        {
+            CurrentTask = new TaskItem(id, "Task", 1, null, null, null, false, null, now, now);
+            return Task.FromResult(CurrentTask);
+        }
 
         public Task DeleteAsync(long id, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+
+        private Task<TaskItem> SetQuadrantAsync(long id, int? quadrantId, DateTimeOffset now)
+        {
+            var task = CurrentTask ?? throw new InvalidOperationException($"Task {id} was not found.");
+            CurrentTask = task with { QuadrantId = quadrantId, UpdatedAt = now };
+            return Task.FromResult(CurrentTask);
+        }
     }
 
     private sealed class FakeReminderScheduler : IReminderScheduler

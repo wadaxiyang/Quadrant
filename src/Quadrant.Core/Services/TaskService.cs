@@ -1,4 +1,5 @@
 using Quadrant.Core.Interfaces;
+using Quadrant.Core.Enums;
 using Quadrant.Core.Models;
 
 namespace Quadrant.Core.Services;
@@ -9,21 +10,27 @@ public sealed class TaskService : ITaskService
     private readonly IReminderScheduler reminderScheduler;
     private readonly IClock clock;
     private readonly IDiagnosticLogger? diagnosticLogger;
+    private readonly IAppChangeHub appChangeHub;
 
     public TaskService(
         ITaskRepository repository,
         IReminderScheduler reminderScheduler,
         IClock clock,
-        IDiagnosticLogger? diagnosticLogger = null)
+        IDiagnosticLogger? diagnosticLogger = null,
+        IAppChangeHub? appChangeHub = null)
     {
         this.repository = repository ?? throw new ArgumentNullException(nameof(repository));
         this.reminderScheduler = reminderScheduler ?? throw new ArgumentNullException(nameof(reminderScheduler));
         this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
         this.diagnosticLogger = diagnosticLogger;
+        this.appChangeHub = appChangeHub ?? new AppChangeHub(diagnosticLogger);
     }
 
     public Task<IReadOnlyList<TaskItem>> GetActiveAsync(CancellationToken cancellationToken = default) =>
         repository.GetActiveAsync(cancellationToken);
+
+    public Task<IReadOnlyList<TaskItem>> GetInboxAsync(int? limit = null, CancellationToken cancellationToken = default) =>
+        repository.GetInboxAsync(limit, cancellationToken);
 
     public Task<IReadOnlyList<TaskItem>> GetCompletedAsync(CancellationToken cancellationToken = default) =>
         repository.GetCompletedAsync(cancellationToken);
@@ -37,6 +44,7 @@ public sealed class TaskService : ITaskService
         var validatedDraft = TaskRules.Validate(draft);
         TaskRules.ValidateReminderAt(validatedDraft.ReminderAt, now);
         var task = await repository.CreateAsync(validatedDraft, now, cancellationToken);
+        Publish(task.Id, AppChangeKind.TaskCreated);
         await TrySyncReminderAsync(task, cancellationToken);
         return task;
     }
@@ -56,6 +64,7 @@ public sealed class TaskService : ITaskService
         }
 
         var task = await repository.UpdateAsync(validatedUpdate, now, cancellationToken);
+        Publish(task.Id, AppChangeKind.TaskUpdated);
         await TrySyncReminderAsync(task, cancellationToken);
         return task;
     }
@@ -79,10 +88,41 @@ public sealed class TaskService : ITaskService
         // Moving a task does not change its reminder. In particular, an already
         // delivered reminder may legitimately be in the past and must not block
         // quadrant movement or cause an unnecessary OS schedule rebuild.
-        return await repository.UpdateAsync(
-            new TaskUpdate(task.Id, task.Title, targetQuadrantId, task.DueAt, task.ReminderAt, task.Note),
+        var moved = await repository.UpdateAsync(
+            new TaskUpdate(task.Id, task.Title, targetQuadrantId, task.DueAt, task.ReminderAt, task.Note,
+                task.PlannedDate, task.EstimatedMinutes, task.RecurrenceKind, task.RecurrenceInterval,
+                task.RecurrenceSeriesId, task.RecurrenceAnchorDay),
             clock.Now,
             cancellationToken);
+        Publish(moved.Id, AppChangeKind.TaskClassified);
+        return moved;
+    }
+
+    public async Task<TaskItem> AssignQuadrantAsync(long id, int quadrantId, CancellationToken cancellationToken = default)
+    {
+        TaskRules.ValidateQuadrantId(quadrantId);
+        var existing = await GetActiveTaskForClassificationAsync(id, cancellationToken);
+        if (existing.QuadrantId == quadrantId)
+        {
+            return existing;
+        }
+
+        var task = await repository.AssignQuadrantAsync(id, quadrantId, clock.Now, cancellationToken);
+        Publish(task.Id, AppChangeKind.TaskClassified);
+        return task;
+    }
+
+    public async Task<TaskItem> MoveToInboxAsync(long id, CancellationToken cancellationToken = default)
+    {
+        var existing = await GetActiveTaskForClassificationAsync(id, cancellationToken);
+        if (existing.QuadrantId is null)
+        {
+            return existing;
+        }
+
+        var task = await repository.MoveToInboxAsync(id, clock.Now, cancellationToken);
+        Publish(task.Id, AppChangeKind.TaskClassified);
+        return task;
     }
 
     public async Task<TaskItem> SetCompletedAsync(
@@ -90,9 +130,21 @@ public sealed class TaskService : ITaskService
         bool isCompleted,
         CancellationToken cancellationToken = default)
     {
-        var task = isCompleted
-            ? (await repository.CompleteWithSnapshotAsync(id, clock.Now, cancellationToken)).Task
-            : await repository.ReopenWithSnapshotRevertedAsync(id, clock.Now, cancellationToken);
+        TaskItem task;
+        if (isCompleted)
+        {
+            var result = await repository.CompleteWithSnapshotAsync(id, clock.Now, cancellationToken);
+            task = result.Task;
+            if (!result.WasAlreadyCompleted)
+            {
+                Publish(task.Id, AppChangeKind.TaskCompleted);
+            }
+        }
+        else
+        {
+            task = await repository.ReopenWithSnapshotRevertedAsync(id, clock.Now, cancellationToken);
+            Publish(task.Id, AppChangeKind.TaskReopened);
+        }
         // Restoring a task never revives an old OS schedule. The DB value is
         // retained for in-app context and can be explicitly rescheduled later.
         await TryCancelReminderAsync(id, cancellationToken);
@@ -121,15 +173,36 @@ public sealed class TaskService : ITaskService
             new TaskUpdate(task.Id, task.Title, task.QuadrantId, task.DueAt, reminderAt, task.Note),
             clock.Now,
             cancellationToken);
+        Publish(updated.Id, AppChangeKind.TaskUpdated);
         await TryRescheduleReminderAsync(updated, cancellationToken);
         return updated;
     }
 
     public async Task DeleteAsync(long id, CancellationToken cancellationToken = default)
     {
+        if (await repository.GetByIdAsync(id, cancellationToken) is null)
+        {
+            return;
+        }
+
         await repository.DeleteAsync(id, cancellationToken);
+        Publish(id, AppChangeKind.TaskDeleted);
         await TryCancelReminderAsync(id, cancellationToken);
     }
+
+    private async Task<TaskItem> GetActiveTaskForClassificationAsync(long id, CancellationToken cancellationToken)
+    {
+        var task = await repository.GetByIdAsync(id, cancellationToken)
+            ?? throw new InvalidOperationException($"Task {id} was not found.");
+        if (task.IsCompleted)
+        {
+            throw new TaskValidationException("Completed tasks cannot be classified.");
+        }
+
+        return task;
+    }
+
+    private void Publish(long taskId, AppChangeKind kind) => appChangeHub.Publish(new AppChange(taskId, kind));
 
     private async Task TrySyncReminderAsync(TaskItem task, CancellationToken cancellationToken)
     {

@@ -78,11 +78,13 @@ public partial class App : System.Windows.Application
 
         var taskRepository = new Quadrant.Infrastructure.Storage.SqliteTaskRepository(connectionFactory);
         var quadrantRepository = new Quadrant.Infrastructure.Storage.SqliteQuadrantRepository(connectionFactory);
+        var appChangeHub = new Quadrant.Core.Services.AppChangeHub(diagnosticLogger);
         var taskService = new Quadrant.Core.Services.TaskService(
             taskRepository,
             reminderScheduler,
             new Quadrant.Infrastructure.Windows.SystemClock(),
-            diagnosticLogger);
+            diagnosticLogger,
+            appChangeHub);
         var clock = new Quadrant.Infrastructure.Windows.SystemClock();
         var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock);
         try

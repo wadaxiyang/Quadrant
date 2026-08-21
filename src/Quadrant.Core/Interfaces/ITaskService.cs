@@ -6,6 +6,8 @@ public interface ITaskService
 {
     Task<IReadOnlyList<TaskItem>> GetActiveAsync(CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<TaskItem>> GetInboxAsync(int? limit = null, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<TaskItem>> GetCompletedAsync(CancellationToken cancellationToken = default);
 
     Task<TaskItem?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
@@ -15,6 +17,10 @@ public interface ITaskService
     Task<TaskItem> UpdateAsync(TaskUpdate update, CancellationToken cancellationToken = default);
 
     Task<TaskItem?> MoveTaskAsync(long id, int targetQuadrantId, CancellationToken cancellationToken = default);
+
+    Task<TaskItem> AssignQuadrantAsync(long id, int quadrantId, CancellationToken cancellationToken = default);
+
+    Task<TaskItem> MoveToInboxAsync(long id, CancellationToken cancellationToken = default);
 
     Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, CancellationToken cancellationToken = default);
 
