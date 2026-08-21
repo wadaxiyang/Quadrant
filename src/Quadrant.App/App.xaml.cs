@@ -86,6 +86,7 @@ public partial class App : System.Windows.Application
             appChangeHub);
         var clock = new Quadrant.Infrastructure.Windows.SystemClock();
         var todayQueryService = new Quadrant.Core.Services.TodayQueryService(taskRepository, clock);
+        var reviewQueryService = new Quadrant.Infrastructure.Storage.SqliteReviewQueryService(connectionFactory, clock);
         var focusRepository = new Quadrant.Infrastructure.Storage.SqliteFocusSessionRepository(connectionFactory);
         var focusSessionService = new Quadrant.Core.Services.FocusSessionService(focusRepository, taskRepository, clock, appChangeHub);
         var focusTimerService = new Quadrant.Core.Services.FocusTimerService(focusSessionService, clock);
@@ -95,7 +96,7 @@ public partial class App : System.Windows.Application
             try { notificationService.ShowFocusCompleted(session, pomodoroTimerService.SuggestedNextKind); }
             catch (Exception exception) { diagnosticLogger.Warning("Focus completion notification failed; session remains completed.", exception); }
         };
-        var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock, appChangeHub, todayQueryService, focusTimerService, pomodoroTimerService, focusSessionService);
+        var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock, appChangeHub, todayQueryService, focusTimerService, pomodoroTimerService, focusSessionService, reviewQueryService);
         try
         {
             await viewModel.LoadAsync();

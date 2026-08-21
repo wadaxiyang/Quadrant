@@ -42,6 +42,10 @@
                                        NavigationCacheMode="Disabled"
                                        TargetPageType="{x:Type pages:FocusPage}"
                                        Icon="{ui:SymbolIcon Timer24}" />
+                <ui:NavigationViewItem Content="Review"
+                                       NavigationCacheMode="Disabled"
+                                       TargetPageType="{x:Type pages:ReviewPage}"
+                                       Icon="{ui:SymbolIcon DataTrending24}" />
             </ui:NavigationView.MenuItems>
             <ui:NavigationView.FooterMenuItems>
                 <ui:NavigationViewItem Content="已完成" Click="Completed_Click" Icon="{ui:SymbolIcon History24}" />

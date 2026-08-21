@@ -18,7 +18,7 @@ public partial class MainViewModel : ObservableObject
     private readonly Dictionary<long, TaskCardViewModel> taskCards = [];
     private IReadOnlyList<QuadrantDefinition> loadedDefinitions = [];
 
-    public MainViewModel(ITaskService taskService, IQuadrantRepository quadrantRepository, IClock clock, IAppChangeHub appChangeHub, ITodayQueryService todayQueryService, IFocusTimerService? focusTimerService = null, PomodoroTimerService? pomodoroTimerService = null, IFocusSessionService? focusSessionService = null)
+    public MainViewModel(ITaskService taskService, IQuadrantRepository quadrantRepository, IClock clock, IAppChangeHub appChangeHub, ITodayQueryService todayQueryService, IFocusTimerService? focusTimerService = null, PomodoroTimerService? pomodoroTimerService = null, IFocusSessionService? focusSessionService = null, IReviewQueryService? reviewQueryService = null)
     {
         this.taskService = taskService ?? throw new ArgumentNullException(nameof(taskService));
         this.quadrantRepository = quadrantRepository ?? throw new ArgumentNullException(nameof(quadrantRepository));
@@ -28,6 +28,7 @@ public partial class MainViewModel : ObservableObject
         FocusTimerService = focusTimerService ?? throw new ArgumentNullException(nameof(focusTimerService));
         PomodoroTimerService = pomodoroTimerService ?? throw new ArgumentNullException(nameof(pomodoroTimerService));
         FocusSessionService = focusSessionService ?? throw new ArgumentNullException(nameof(focusSessionService));
+        ReviewQueryService = reviewQueryService;
     }
 
     [ObservableProperty]
@@ -65,6 +66,7 @@ public partial class MainViewModel : ObservableObject
     public IFocusTimerService FocusTimerService { get; }
     public PomodoroTimerService PomodoroTimerService { get; }
     public IFocusSessionService FocusSessionService { get; }
+    public IReviewQueryService? ReviewQueryService { get; }
 
     public event EventHandler? NewTaskRequested;
     public event EventHandler<TaskItem>? EditTaskRequested;
