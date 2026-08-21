@@ -49,3 +49,15 @@ V1 明确不做：账号、云同步、AI、团队协作、复杂项目管理、
 - CommunityToolkit.Mvvm 与 Microsoft.Data.Sqlite 均有稳定 .NET 10 可用版本。
 
 所有版本敏感信息仍必须在实际开发阶段重新联网确认。
+
+## 当前应用
+
+Quadrant 当前包含四象限任务、Due/Reminder、Today/Overdue、搜索、已完成列表、Quick Add、全局热键、Windows 通知、托盘、开机启动和 Light/Dark/System 主题。
+
+开发运行：
+
+```powershell
+dotnet run --project .\src\Quadrant.App\Quadrant.App.csproj
+```
+
+发布与运行前置条件见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。

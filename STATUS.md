@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_17_PERFORMANCE_RESILIENCE` — implementation complete; release performance GUI checks pending
+`STAGE_18_RELEASE_PACKAGING` — 0.9.0 release candidate published; V1.0 interactive/clean-machine blockers remain
 
 ## Completed
 
@@ -97,6 +97,9 @@
 - Added Stage 17 rolling diagnostic logging under `%LOCALAPPDATA%\\Quadrant\\logs\\`, with 1 MB rotation and three retained files.
 - Added fail-closed database initialization handling with a visible data path and diagnostic log when migration/open/settings loading fails.
 - Added 1000-task SQLite load coverage and recorded real startup, idle CPU, Working Set, and Private Memory measurements in `docs/V1_PERFORMANCE.md`.
+- Added `0.9.0` version metadata and reproducible `Quadrant-win-x64` Release publish profile.
+- Added `docs/DEPLOYMENT.md` and `docs/V1_RELEASE_CHECKLIST.md`.
+- Added README build/run and deployment links.
 
 ## Files changed
 
@@ -136,6 +139,11 @@
 - `src/Quadrant.Infrastructure/Logging/DiagnosticLogger.cs`
 - `Tests/Quadrant.Infrastructure.Tests/DiagnosticLoggerTests.cs`
 - `docs/V1_PERFORMANCE.md`
+- `src/Quadrant.App/Quadrant.App.csproj`
+- `src/Quadrant.App/Properties/PublishProfiles/Quadrant-win-x64.pubxml`
+- `docs/DEPLOYMENT.md`
+- `docs/V1_RELEASE_CHECKLIST.md`
+- `README.md`
 - `src/Quadrant.Infrastructure/Windows/GlobalHotkeyService.cs`
 - `src/Quadrant.App/Views/QuickAddWindow.xaml`
 - `src/Quadrant.App/Views/QuickAddWindow.xaml.cs`
@@ -345,6 +353,7 @@
 - Stage 15 manual checks remain pending: restart persistence, Light/Dark/System visual changes, HKCU Run enable/disable and Task Manager visibility, background startup focus behavior, quadrant rename with unchanged task IDs, and invalid hotkey feedback.
 - Stage 16 manual checks remain pending: 100/125/150/200% DPI, 920x620 minimum window, DatePicker/ComboBox clipping, live keyboard traversal, screen-reader/UI Automation inspection, and High Contrast rendering. The checklist is recorded in `docs/V1_UI_ACCEPTANCE.md`.
 - Stage 17 manual checks remain pending: tray-only idle sample, interactive 1000-task scroll/filter/search/drag-drop, managed heap counters, Release-like profiling, and SQLite corruption/locked-file drills. See `docs/V1_PERFORMANCE.md`.
+- Stage 18 manual checks remain pending: clean Windows 11 deployment, notification activation with app closed, scheduled notification delivery, tray click/exit, global hotkey, theme visuals, DPI/accessibility, and startup persistence. See `docs/V1_RELEASE_CHECKLIST.md`.
 
 ## Sources checked
 
@@ -413,6 +422,10 @@
 - https://learn.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-counters — checked 2026-08-21; official counter collection/monitoring guidance.
 - https://learn.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-trace — checked 2026-08-21; official EventPipe trace guidance.
 - https://learn.microsoft.com/en-us/windows-hardware/test/wpt/ — checked 2026-08-21; official WPR/WPA toolkit guidance.
+- https://learn.microsoft.com/en-us/dotnet/core/deploying/ — checked 2026-08-21; framework-dependent/self-contained publishing and RID guidance.
+- https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/deploy-unpackaged-apps — checked 2026-08-21; unpackaged WPF prerequisites and Windows App SDK runtime deployment.
+- https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview — checked 2026-08-21; single-file support and platform-specific constraints.
+- https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/deploy-self-contained — checked 2026-08-21; current requested path returned 404 in Learn routing; no self-contained Windows App SDK property was invented.
 
 ## Known issues
 
@@ -444,7 +457,9 @@
 - Stage 16 keeps WPF defaults and existing Fluent/system resources; no new theme, animation, or third-party accessibility dependency was added.
 - Stage 17 uses a small in-house logger instead of adding a logging package; logging is local-only, warning/error-focused, and bounded by file rotation.
 - Stage 17 has no known build or automated-test issues. The measured visible-idle CPU sample is not sufficient to claim the SPEC <0.2% target; release sign-off still needs counters/WPR and interactive tray/GUI measurements.
+- Stage 18 Release build, Release tests, RID restore, publish, normal launch smoke, and `--background` launch smoke passed. V1 is not marked ready because target-machine interactive and clean-machine acceptance remains outstanding.
+- Stage 18 selects `win-x64` framework-dependent folder publishing as the V1 release candidate profile. It requires .NET 10 x64, Windows App Runtime 2.4.0 x64, and VC++ Redistributable. Single-file, trimming, ReadyToRun, MSIX, and updater work are excluded.
 
 ## Next stage
 
-`stages/STAGE_18_RELEASE_PACKAGING.md`
+No further numbered stage is defined. Resolve the recorded V1 release blockers before declaring `1.0.0`; do not start V1.1 without a new approved scope.
