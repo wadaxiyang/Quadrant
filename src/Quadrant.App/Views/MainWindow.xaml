@@ -34,6 +34,10 @@
                                        NavigationCacheMode="Disabled"
                                        TargetPageType="{x:Type pages:InboxPage}"
                                        Icon="{ui:SymbolIcon Archive32}" />
+                <ui:NavigationViewItem Content="Today"
+                                       NavigationCacheMode="Disabled"
+                                       TargetPageType="{x:Type pages:TodayPage}"
+                                       Icon="{ui:SymbolIcon CalendarClock24}" />
             </ui:NavigationView.MenuItems>
             <ui:NavigationView.FooterMenuItems>
                 <ui:NavigationViewItem Content="已完成" Click="Completed_Click" Icon="{ui:SymbolIcon History24}" />

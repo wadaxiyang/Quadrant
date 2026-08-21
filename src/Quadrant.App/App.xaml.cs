@@ -85,7 +85,8 @@ public partial class App : System.Windows.Application
             diagnosticLogger,
             appChangeHub);
         var clock = new Quadrant.Infrastructure.Windows.SystemClock();
-        var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock, appChangeHub);
+        var todayQueryService = new Quadrant.Core.Services.TodayQueryService(taskRepository, clock);
+        var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock, appChangeHub, todayQueryService);
         try
         {
             await viewModel.LoadAsync();

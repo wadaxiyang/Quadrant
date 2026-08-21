@@ -18,12 +18,13 @@ public partial class MainViewModel : ObservableObject
     private readonly Dictionary<long, TaskCardViewModel> taskCards = [];
     private IReadOnlyList<QuadrantDefinition> loadedDefinitions = [];
 
-    public MainViewModel(ITaskService taskService, IQuadrantRepository quadrantRepository, IClock clock, IAppChangeHub appChangeHub)
+    public MainViewModel(ITaskService taskService, IQuadrantRepository quadrantRepository, IClock clock, IAppChangeHub appChangeHub, ITodayQueryService todayQueryService)
     {
         this.taskService = taskService ?? throw new ArgumentNullException(nameof(taskService));
         this.quadrantRepository = quadrantRepository ?? throw new ArgumentNullException(nameof(quadrantRepository));
         this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
         this.appChangeHub = appChangeHub ?? throw new ArgumentNullException(nameof(appChangeHub));
+        TodayQueryService = todayQueryService ?? throw new ArgumentNullException(nameof(todayQueryService));
     }
 
     [ObservableProperty]
@@ -56,6 +57,8 @@ public partial class MainViewModel : ObservableObject
     public ITaskService TaskService => taskService;
 
     public IAppChangeHub AppChangeHub => appChangeHub;
+
+    public ITodayQueryService TodayQueryService { get; }
 
     public event EventHandler? NewTaskRequested;
     public event EventHandler<TaskItem>? EditTaskRequested;
@@ -169,6 +172,18 @@ public partial class MainViewModel : ObservableObject
         {
             EditTaskRequested?.Invoke(this, task);
         }
+    }
+
+    public async Task RefreshActiveTaskAsync(long id, CancellationToken cancellationToken = default)
+    {
+        var task = await taskService.GetByIdAsync(id, cancellationToken);
+        if (task is null || task.IsCompleted || task.QuadrantId is null)
+        {
+            RemoveActiveTask(id);
+            return;
+        }
+
+        UpsertActiveTask(task);
     }
 
     public async Task CompleteFromNotificationAsync(long id, CancellationToken cancellationToken = default)
