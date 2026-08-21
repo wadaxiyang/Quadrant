@@ -4,7 +4,7 @@ namespace Quadrant.Infrastructure.Storage;
 
 public sealed class SqliteDatabaseInitializer
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     private readonly SqliteConnectionFactory connectionFactory;
 
@@ -59,6 +59,13 @@ public sealed class SqliteDatabaseInitializer
             await EnsureForeignKeysValidAsync(connection, transaction, cancellationToken);
             await ExecuteAsync(connection, transaction, "UPDATE schema_version SET version = $version;", cancellationToken, ("$version", 3));
             version = 3;
+        }
+
+        if (version == 3)
+        {
+            await ApplyMigration004Async(connection, transaction, cancellationToken);
+            await ExecuteAsync(connection, transaction, "UPDATE schema_version SET version = $version;", cancellationToken, ("$version", 4));
+            version = 4;
         }
 
         await transaction.CommitAsync(cancellationToken);
@@ -202,6 +209,9 @@ public sealed class SqliteDatabaseInitializer
             CREATE INDEX ix_focus_task ON focus_sessions(task_id);
             CREATE INDEX ix_focus_status_started ON focus_sessions(status, started_at_utc);
             """, cancellationToken);
+
+    private static Task ApplyMigration004Async(SqliteConnection connection, SqliteTransaction transaction, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, "CREATE INDEX ix_focus_review_local_date_status ON focus_sessions(status, created_local_date, mode, pomodoro_kind);", cancellationToken);
 
     private static async Task EnsureForeignKeysValidAsync(SqliteConnection connection, SqliteTransaction transaction, CancellationToken cancellationToken)
     {

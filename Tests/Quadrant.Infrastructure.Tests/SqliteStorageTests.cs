@@ -26,7 +26,7 @@ public sealed class SqliteStorageTests
         Assert.Equal(4, quadrants.Count);
         Assert.Equal(new[] { 1, 2, 3, 4 }, quadrants.Select(q => q.Id));
         Assert.Equal(quadrants, secondRead);
-        Assert.Equal(3, await database.ReadSchemaVersionAsync());
+        Assert.Equal(4, await database.ReadSchemaVersionAsync());
     }
 
     [Fact]
@@ -180,7 +180,7 @@ public sealed class SqliteStorageTests
             var active = await repository.GetActiveAsync();
             var completed = await repository.GetCompletedAsync();
 
-            Assert.Equal(3, await ReadSchemaVersionAsync(factory));
+            Assert.Equal(4, await ReadSchemaVersionAsync(factory));
             Assert.Equal(2, active.Count);
             Assert.Single(completed);
             Assert.Contains(active, task => task.Id == 101 && task.Title == "中文活动任务" && task.DueAt is not null && task.ReminderAt is not null && task.Note == "含中文与提醒");
@@ -414,10 +414,10 @@ public sealed class SqliteStorageTests
     public async Task Future_schema_version_is_rejected_without_mutation()
     {
         await using var database = await TestDatabase.CreateAsync();
-        await SetSchemaVersionAsync(database.Factory, 4);
+        await SetSchemaVersionAsync(database.Factory, 5);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => database.Initializer.InitializeAsync());
-        Assert.Equal(4, await ReadSchemaVersionAsync(database.Factory));
+        Assert.Equal(5, await ReadSchemaVersionAsync(database.Factory));
     }
 
     [Fact]
