@@ -86,7 +86,11 @@ public partial class App : System.Windows.Application
             appChangeHub);
         var clock = new Quadrant.Infrastructure.Windows.SystemClock();
         var todayQueryService = new Quadrant.Core.Services.TodayQueryService(taskRepository, clock);
-        var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock, appChangeHub, todayQueryService);
+        var focusRepository = new Quadrant.Infrastructure.Storage.SqliteFocusSessionRepository(connectionFactory);
+        var focusSessionService = new Quadrant.Core.Services.FocusSessionService(focusRepository, taskRepository, clock, appChangeHub);
+        var focusTimerService = new Quadrant.Core.Services.FocusTimerService(focusSessionService, clock);
+        var pomodoroTimerService = new Quadrant.Core.Services.PomodoroTimerService(focusSessionService, clock, new Quadrant.Core.Services.SystemFocusCompletionScheduler());
+        var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock, appChangeHub, todayQueryService, focusTimerService, pomodoroTimerService, focusSessionService);
         try
         {
             await viewModel.LoadAsync();

@@ -38,6 +38,10 @@
                                        NavigationCacheMode="Disabled"
                                        TargetPageType="{x:Type pages:TodayPage}"
                                        Icon="{ui:SymbolIcon CalendarClock24}" />
+                <ui:NavigationViewItem Content="Focus"
+                                       NavigationCacheMode="Disabled"
+                                       TargetPageType="{x:Type pages:FocusPage}"
+                                       Icon="{ui:SymbolIcon Timer24}" />
             </ui:NavigationView.MenuItems>
             <ui:NavigationView.FooterMenuItems>
                 <ui:NavigationViewItem Content="已完成" Click="Completed_Click" Icon="{ui:SymbolIcon History24}" />

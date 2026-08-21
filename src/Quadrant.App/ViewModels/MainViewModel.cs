@@ -18,13 +18,16 @@ public partial class MainViewModel : ObservableObject
     private readonly Dictionary<long, TaskCardViewModel> taskCards = [];
     private IReadOnlyList<QuadrantDefinition> loadedDefinitions = [];
 
-    public MainViewModel(ITaskService taskService, IQuadrantRepository quadrantRepository, IClock clock, IAppChangeHub appChangeHub, ITodayQueryService todayQueryService)
+    public MainViewModel(ITaskService taskService, IQuadrantRepository quadrantRepository, IClock clock, IAppChangeHub appChangeHub, ITodayQueryService todayQueryService, IFocusTimerService? focusTimerService = null, PomodoroTimerService? pomodoroTimerService = null, IFocusSessionService? focusSessionService = null)
     {
         this.taskService = taskService ?? throw new ArgumentNullException(nameof(taskService));
         this.quadrantRepository = quadrantRepository ?? throw new ArgumentNullException(nameof(quadrantRepository));
         this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
         this.appChangeHub = appChangeHub ?? throw new ArgumentNullException(nameof(appChangeHub));
         TodayQueryService = todayQueryService ?? throw new ArgumentNullException(nameof(todayQueryService));
+        FocusTimerService = focusTimerService ?? throw new ArgumentNullException(nameof(focusTimerService));
+        PomodoroTimerService = pomodoroTimerService ?? throw new ArgumentNullException(nameof(pomodoroTimerService));
+        FocusSessionService = focusSessionService ?? throw new ArgumentNullException(nameof(focusSessionService));
     }
 
     [ObservableProperty]
@@ -59,6 +62,9 @@ public partial class MainViewModel : ObservableObject
     public IAppChangeHub AppChangeHub => appChangeHub;
 
     public ITodayQueryService TodayQueryService { get; }
+    public IFocusTimerService FocusTimerService { get; }
+    public PomodoroTimerService PomodoroTimerService { get; }
+    public IFocusSessionService FocusSessionService { get; }
 
     public event EventHandler? NewTaskRequested;
     public event EventHandler<TaskItem>? EditTaskRequested;
