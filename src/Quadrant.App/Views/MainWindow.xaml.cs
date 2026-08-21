@@ -116,7 +116,14 @@ public partial class MainWindow : System.Windows.Window
             return;
         }
 
-        await ((MainViewModel)DataContext).ConfirmedDeleteAsync(id);
+        try
+        {
+            await ((MainViewModel)DataContext).ConfirmedDeleteAsync(id);
+        }
+        catch (Exception exception)
+        {
+            ShowRecoverableError("任务删除失败", exception);
+        }
     }
 
     private static QuadrantDefinition ToDefinition(QuadrantViewModel quadrant) =>

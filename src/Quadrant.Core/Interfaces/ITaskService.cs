@@ -18,5 +18,7 @@ public interface ITaskService
 
     Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, CancellationToken cancellationToken = default);
 
+    Task<TaskItem?> SnoozeAsync(long id, TimeSpan duration, CancellationToken cancellationToken = default);
+
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
 }

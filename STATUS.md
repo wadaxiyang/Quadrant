@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_11_APP_NOTIFICATIONS_SINGLE_INSTANCE` — implementation complete; manual GUI/Toast checks pending
+`STAGE_12_SCHEDULED_REMINDERS` — implementation complete; manual scheduled notification checks pending
 
 ## Completed
 
@@ -74,6 +74,11 @@
 - Added strict notification activation parsing and unit tests for action/task id validation.
 - Added AppInstance-based single-instance registration, second-launch redirection, and WPF Dispatcher activation routing.
 - Added cold-start notification activation handling; Complete updates data without forcing the main window, Open activates the window and opens the task editor.
+- Implemented `WindowsReminderScheduler` with scheduled notification payloads, stable tags, Complete/Snooze/Open buttons, cancellation, and rescheduling.
+- Added `TaskService.SnoozeAsync` and startup reconciliation for future and missed reminders without replaying expired Toasts.
+- Added the in-app possibly-missed reminder banner and tests for snooze, activation support, and schedule tag stability.
+- Fixed Stage 12 regression: Windows scheduler failures no longer block database create/update/complete/delete/snooze operations; scheduler errors are diagnostic-only derived-state failures.
+- Protected delete event handling and startup reminder reconciliation from escaping `async void`/startup boundaries and terminating the app.
 
 ## Files changed
 
@@ -112,6 +117,8 @@
 - `src/Quadrant.Infrastructure/Notifications/WindowsAppNotificationService.cs`
 - `src/Quadrant.Infrastructure/Windows/SingleInstanceService.cs`
 - `Tests/Quadrant.Infrastructure.Tests/NotificationActivationParserTests.cs`
+- `src/Quadrant.Infrastructure/Notifications/WindowsReminderScheduler.cs`
+- `Tests/Quadrant.Infrastructure.Tests/WindowsReminderSchedulerTests.cs`
 - `src/Quadrant.App/Views/TaskEditorWindow.xaml.cs`
 - `src/Quadrant.App/ViewModels/TaskEditorViewModel.cs`
 - `src/Quadrant.App/Views/MainWindow.xaml.cs`
@@ -250,6 +257,13 @@
 - `dotnet build Quadrant.sln -c Debug --no-restore` — passed after Stage 11; 0 warnings, 0 errors.
 - `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after Stage 11; 26 Core tests and 12 Infrastructure tests passed, 0 failed.
 - Direct `Quadrant.App.exe` launch smoke check — passed; process remained alive for 6 seconds after notification/single-instance startup wiring.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed after Stage 12; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after Stage 12; 27 Core tests and 16 Infrastructure tests passed, 0 failed.
+- Direct `Quadrant.App.exe` launch smoke check — passed after Stage 12 XAML fix; process remained alive for 6 seconds.
+- `git diff --check` — passed; no whitespace errors.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed after scheduler failure fix; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after scheduler failure fix; 28 Core tests and 16 Infrastructure tests passed, 0 failed.
+- Direct `Quadrant.App.exe` launch smoke check — passed after scheduler failure fix; process remained alive for 7 seconds.
 
 ## Manual tests pending
 
@@ -258,6 +272,7 @@
 - The reported regression is covered by the input-change fix; interactive GUI confirmation remains pending in this environment.
 - Stage 10 manual GUI/runtime checks remain pending: DEBUG output should be inspected from an IDE/debug listener to confirm the probe prints the installed 2.4.0 runtime string.
 - Stage 11 manual checks remain pending: immediate Toast display, Complete/Open button behavior, closed-app activation, second-launch redirection, and Dispatcher deadlock check require an interactive Windows desktop session.
+- Stage 12 manual checks remain pending: 2-minute scheduled reminder with app closed, Complete/Open/Snooze actions, edit-time cancellation, completion cancellation, and sleep/wake missed-reminder banner.
 
 ## Sources checked
 
@@ -305,8 +320,16 @@
 - https://learn.microsoft.com/en-us/windows/apps/develop/notifications/app-notifications/app-notifications-content — checked 2026-08-21; `AppNotificationBuilder` and `AppNotificationButton` argument construction.
 - https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/applifecycle/applifecycle-single-instance — checked 2026-08-21; `FindOrRegisterForKey`, `RedirectActivationToAsync`, and activation event handling.
 - https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.windows.applifecycle.appactivationarguments.data — checked 2026-08-21; activation `Data` object payload and notification activation argument type.
+- https://learn.microsoft.com/en-us/windows/apps/develop/notifications/app-notifications/app-notifications-scheduled — checked 2026-08-21; scheduled notifications, five-minute window, Tag/Group, AddToSchedule, enumeration, and cancellation.
+- https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.scheduledtoastnotification — checked 2026-08-21; scheduled toast object API.
+- https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.toastnotifier.addtoschedule — checked 2026-08-21; schedule API.
+- https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.toastnotifier.getscheduledtoastnotifications — checked 2026-08-21; enumeration API.
+- https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.toastnotifier.removefromschedule — checked 2026-08-21; removal API.
 
 ## Known issues
+
+- Stage 12 scheduled Toast and sleep/wake behavior cannot be verified without an interactive Windows notification session; automated build, unit tests, and startup smoke check pass.
+- Reproduced scheduler failure behavior with a fake throwing scheduler; database create/delete now complete successfully and the failure is logged to Debug output.
 
 - Working product name `Quadrant` remains provisional.
 - Stage 05 GUI manual acceptance is pending because this environment did not expose a usable Windows UI automation session.
@@ -323,4 +346,4 @@
 
 ## Next stage
 
-`stages/STAGE_12_SCHEDULED_REMINDERS_MISSED.md`
+`stages/STAGE_13_GLOBAL_HOTKEY_QUICK_ADD.md`

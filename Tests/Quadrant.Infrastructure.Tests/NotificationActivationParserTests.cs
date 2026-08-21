@@ -8,6 +8,7 @@ public sealed class NotificationActivationParserTests
     [Theory]
     [InlineData("action=complete&taskId=42", "complete", 42)]
     [InlineData("taskId=7&action=open", "open", 7)]
+    [InlineData("action=snooze10&taskId=9", "snooze10", 9)]
     public void Parses_supported_activation(string argument, string action, long taskId)
     {
         Assert.True(NotificationActivationParser.TryParse(argument, out var activation));

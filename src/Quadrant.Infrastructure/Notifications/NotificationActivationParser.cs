@@ -29,7 +29,7 @@ public static class NotificationActivationParser
         }
 
         if (!values.TryGetValue("action", out var action) ||
-            action is not ("complete" or "open") ||
+            action is not ("complete" or "open" or "snooze10") ||
             !values.TryGetValue("taskId", out var taskIdText) ||
             !long.TryParse(taskIdText, NumberStyles.None, CultureInfo.InvariantCulture, out var taskId) ||
             taskId <= 0)

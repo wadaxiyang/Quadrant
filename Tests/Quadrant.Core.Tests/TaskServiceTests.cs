@@ -51,6 +51,40 @@ public sealed class TaskServiceTests
     }
 
     [Fact]
+    public async Task Snooze_moves_reminder_by_requested_duration_and_reschedules()
+    {
+        var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));
+        var reminder = now.AddMinutes(1);
+        var repository = new FakeTaskRepository
+        {
+            CurrentTask = new TaskItem(1, "Task", 1, null, reminder, null, false, null, now, now)
+        };
+        var scheduler = new FakeReminderScheduler();
+        var service = new TaskService(repository, scheduler, new FakeClock(now));
+
+        var snoozed = await service.SnoozeAsync(1, TimeSpan.FromMinutes(10));
+
+        Assert.Equal(now.AddMinutes(10), snoozed?.ReminderAt);
+        Assert.Equal(now.AddMinutes(10), repository.LastUpdate?.ReminderAt);
+        Assert.Contains(1, scheduler.RescheduledTaskIds);
+    }
+
+    [Fact]
+    public async Task Reminder_scheduler_failure_does_not_fail_database_create_or_delete()
+    {
+        var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));
+        var repository = new FakeTaskRepository();
+        var scheduler = new FakeReminderScheduler { ThrowOnOperations = true };
+        var service = new TaskService(repository, scheduler, new FakeClock(now));
+
+        var created = await service.CreateAsync(new TaskDraft("Task", 1));
+        await service.DeleteAsync(created.Id);
+
+        Assert.Equal("Task", repository.LastDraft?.Title);
+        Assert.True(scheduler.OperationCount >= 2);
+    }
+
+    [Fact]
     public async Task Restore_cancels_old_schedule_instead_of_rescheduling_it()
     {
         var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));
@@ -157,6 +191,10 @@ public sealed class TaskServiceTests
 
         public List<long> RescheduledTaskIds { get; } = [];
 
+        public bool ThrowOnOperations { get; init; }
+
+        public int OperationCount { get; private set; }
+
         public Task ScheduleAsync(TaskItem task, CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
@@ -164,13 +202,25 @@ public sealed class TaskServiceTests
 
         public Task CancelAsync(long taskId, CancellationToken cancellationToken = default)
         {
+            OperationCount++;
             CancelledTaskIds.Add(taskId);
+            if (ThrowOnOperations)
+            {
+                throw new InvalidOperationException("simulated scheduler failure");
+            }
+
             return Task.CompletedTask;
         }
 
         public Task RescheduleAsync(TaskItem task, CancellationToken cancellationToken = default)
         {
+            OperationCount++;
             RescheduledTaskIds.Add(task.Id);
+            if (ThrowOnOperations)
+            {
+                throw new InvalidOperationException("simulated scheduler failure");
+            }
+
             return Task.CompletedTask;
         }
     }

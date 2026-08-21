@@ -3,6 +3,7 @@ namespace Quadrant.App;
 public partial class App : System.Windows.Application
 {
     private readonly Quadrant.Infrastructure.Notifications.WindowsAppNotificationService notificationService = new();
+    private readonly Quadrant.Infrastructure.Notifications.WindowsReminderScheduler reminderScheduler = new();
     private readonly Quadrant.Infrastructure.Windows.SingleInstanceService singleInstanceService = new();
     private Quadrant.Infrastructure.Notifications.NotificationActivation? pendingActivation;
 
@@ -48,11 +49,20 @@ public partial class App : System.Windows.Application
         var quadrantRepository = new Quadrant.Infrastructure.Storage.SqliteQuadrantRepository(connectionFactory);
         var taskService = new Quadrant.Core.Services.TaskService(
             taskRepository,
-            new Quadrant.Infrastructure.Notifications.NoOpReminderScheduler(),
+            reminderScheduler,
             new Quadrant.Infrastructure.Windows.SystemClock());
         var clock = new Quadrant.Infrastructure.Windows.SystemClock();
         var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock);
         await viewModel.LoadAsync();
+        try
+        {
+            var reconciliation = await reminderScheduler.ReconcileAsync(await taskService.GetActiveAsync(), clock.Now);
+            viewModel.SetPossiblyMissedReminders(reconciliation.Tasks);
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"Reminder reconciliation failed: {exception}");
+        }
 
         var mainWindow = new Views.MainWindow
         {
@@ -112,6 +122,10 @@ public partial class App : System.Windows.Application
             if (activation.Action == "complete")
             {
                 await viewModel.CompleteFromNotificationAsync(activation.TaskId);
+            }
+            else if (activation.Action == "snooze10")
+            {
+                await viewModel.SnoozeFromNotificationAsync(activation.TaskId);
             }
             else
             {

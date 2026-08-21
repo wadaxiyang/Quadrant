@@ -40,6 +40,11 @@ public partial class MainViewModel : ObservableObject
 
     public ObservableCollection<CompletedTaskViewModel> CompletedTasks { get; } = [];
 
+    [ObservableProperty]
+    public partial string PossiblyMissedReminderText { get; private set; } = string.Empty;
+
+    public bool HasPossiblyMissedReminders => PossiblyMissedReminderText.Length > 0;
+
     public string SearchPlaceholder => "搜索标题或备注";
 
     public IClock Clock => clock;
@@ -53,6 +58,8 @@ public partial class MainViewModel : ObservableObject
     partial void OnSelectedFilterChanged(TaskFilter value) => RebuildQuadrants();
 
     partial void OnSearchTextChanged(string value) => RebuildQuadrants();
+
+    partial void OnPossiblyMissedReminderTextChanged(string value) => OnPropertyChanged(nameof(HasPossiblyMissedReminders));
 
     [RelayCommand]
     private void SelectFilter(TaskFilter filter) => SelectedFilter = filter;
@@ -121,6 +128,20 @@ public partial class MainViewModel : ObservableObject
     {
         await taskService.SetCompletedAsync(id, true, cancellationToken);
         await LoadAsync(cancellationToken);
+    }
+
+    public async Task SnoozeFromNotificationAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await taskService.SnoozeAsync(id, TimeSpan.FromMinutes(10), cancellationToken);
+        await LoadAsync(cancellationToken);
+    }
+
+    public void SetPossiblyMissedReminders(IEnumerable<TaskItem> tasks)
+    {
+        var titles = tasks.Select(task => task.Title).Where(title => !string.IsNullOrWhiteSpace(title)).ToArray();
+        PossiblyMissedReminderText = titles.Length == 0
+            ? string.Empty
+            : $"可能错过 {titles.Length} 条提醒：{string.Join("、", titles)}";
     }
 
     private void EditTaskTask(TaskItem task) => EditTaskRequested?.Invoke(this, task);

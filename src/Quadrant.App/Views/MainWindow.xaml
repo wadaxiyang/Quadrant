@@ -38,6 +38,14 @@
 
         <Grid Grid.Row="1">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Margin="{StaticResource QuadrantHeaderBottomMargin}" Padding="{StaticResource InsetM}" Background="{DynamicResource SystemControlBackgroundAltHighBrush}" Visibility="{Binding HasPossiblyMissedReminders, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Style="{StaticResource CaptionTextStyle}" Text="{Binding PossiblyMissedReminderText}" TextWrapping="Wrap" />
+            </Border>
+            <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
@@ -138,6 +146,7 @@
                     </Grid>
                 </Grid>
             </Border>
+            </Grid>
         </Grid>
     </Grid>
 </Window>

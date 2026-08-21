@@ -33,7 +33,7 @@ public sealed class TaskService : ITaskService
         var validatedDraft = TaskRules.Validate(draft);
         TaskRules.ValidateReminderAt(validatedDraft.ReminderAt, clock.Now);
         var task = await repository.CreateAsync(validatedDraft, clock.Now, cancellationToken);
-        await SyncReminderAsync(task, cancellationToken);
+        await TrySyncReminderAsync(task, cancellationToken);
         return task;
     }
 
@@ -42,7 +42,7 @@ public sealed class TaskService : ITaskService
         var validatedUpdate = TaskRules.Validate(update);
         TaskRules.ValidateReminderAt(validatedUpdate.ReminderAt, clock.Now);
         var task = await repository.UpdateAsync(validatedUpdate, clock.Now, cancellationToken);
-        await SyncReminderAsync(task, cancellationToken);
+        await TrySyncReminderAsync(task, cancellationToken);
         return task;
     }
 
@@ -73,34 +73,95 @@ public sealed class TaskService : ITaskService
         CancellationToken cancellationToken = default)
     {
         var task = await repository.SetCompletedAsync(id, isCompleted, clock.Now, cancellationToken);
-        if (isCompleted)
-        {
-            await reminderScheduler.CancelAsync(id, cancellationToken);
-        }
-        else
-        {
-            // Restoring a task never revives an old OS schedule. The DB value is
-            // retained for in-app context and can be explicitly rescheduled later.
-            await reminderScheduler.CancelAsync(id, cancellationToken);
-        }
+        // Restoring a task never revives an old OS schedule. The DB value is
+        // retained for in-app context and can be explicitly rescheduled later.
+        await TryCancelReminderAsync(id, cancellationToken);
 
         return task;
+    }
+
+    public async Task<TaskItem?> SnoozeAsync(
+        long id,
+        TimeSpan duration,
+        CancellationToken cancellationToken = default)
+    {
+        if (duration <= TimeSpan.Zero)
+        {
+            throw new TaskValidationException("Snooze duration must be positive.");
+        }
+
+        var task = await repository.GetByIdAsync(id, cancellationToken);
+        if (task is null || task.IsCompleted)
+        {
+            return task;
+        }
+
+        var reminderAt = clock.Now.Add(duration);
+        var updated = await repository.UpdateAsync(
+            new TaskUpdate(task.Id, task.Title, task.QuadrantId, task.DueAt, reminderAt, task.Note),
+            clock.Now,
+            cancellationToken);
+        await TryRescheduleReminderAsync(updated, cancellationToken);
+        return updated;
     }
 
     public async Task DeleteAsync(long id, CancellationToken cancellationToken = default)
     {
         await repository.DeleteAsync(id, cancellationToken);
-        await reminderScheduler.CancelAsync(id, cancellationToken);
+        await TryCancelReminderAsync(id, cancellationToken);
     }
 
-    private async Task SyncReminderAsync(TaskItem task, CancellationToken cancellationToken)
+    private async Task TrySyncReminderAsync(TaskItem task, CancellationToken cancellationToken)
     {
-        if (task.ReminderAt is null)
+        try
         {
-            await reminderScheduler.CancelAsync(task.Id, cancellationToken);
-            return;
-        }
+            if (task.ReminderAt is null)
+            {
+                await reminderScheduler.CancelAsync(task.Id, cancellationToken);
+                return;
+            }
 
-        await reminderScheduler.RescheduleAsync(task, cancellationToken);
+            await reminderScheduler.RescheduleAsync(task, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"Reminder synchronization failed for task {task.Id}: {exception}");
+        }
+    }
+
+    private async Task TryRescheduleReminderAsync(TaskItem task, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await reminderScheduler.RescheduleAsync(task, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"Reminder rescheduling failed for task {task.Id}: {exception}");
+        }
+    }
+
+    private async Task TryCancelReminderAsync(long taskId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await reminderScheduler.CancelAsync(taskId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"Reminder cancellation failed for task {taskId}: {exception}");
+        }
     }
 }
