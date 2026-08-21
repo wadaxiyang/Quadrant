@@ -295,7 +295,7 @@ public partial class MainWindow : FluentWindow
         await ShowDialogAsync(title, exception.Message, "知道了", ControlAppearance.Primary, closeButtonText: null);
     }
 
-    private async Task<ContentDialogResult> ShowDialogAsync(
+    public async Task<ContentDialogResult> ShowDialogAsync(
         string title,
         string message,
         string primaryButtonText,

@@ -26,6 +26,12 @@ public partial class QuickAddWindow : Wpf.Ui.Controls.FluentWindow
         {
             var viewModel = (TaskEditorViewModel)DataContext;
             viewModel.QuadrantId = string.Equals(tag, "Inbox", StringComparison.Ordinal) ? null : int.TryParse(tag, out var id) ? id : viewModel.QuadrantId;
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            {
+                // Destination is mandatory: clicking the current choice must not
+                // leave Quick Capture with no selected destination.
+                toggleButton.IsChecked = true;
+            }
         }
     }
 

@@ -30,6 +30,10 @@
                                        NavigationCacheMode="Disabled"
                                        TargetPageType="{x:Type pages:QuadrantsPage}"
                                        Icon="{ui:SymbolIcon Grid24}" />
+                <ui:NavigationViewItem Content="Inbox"
+                                       NavigationCacheMode="Disabled"
+                                       TargetPageType="{x:Type pages:InboxPage}"
+                                       Icon="{ui:SymbolIcon Archive32}" />
             </ui:NavigationView.MenuItems>
             <ui:NavigationView.FooterMenuItems>
                 <ui:NavigationViewItem Content="已完成" Click="Completed_Click" Icon="{ui:SymbolIcon History24}" />

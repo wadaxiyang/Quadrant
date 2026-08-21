@@ -74,7 +74,6 @@ public partial class App : System.Windows.Application
             return;
         }
         startupService = new Quadrant.Infrastructure.Windows.RegistryStartupService();
-        ApplyTheme(currentSettings.Theme);
 
         var taskRepository = new Quadrant.Infrastructure.Storage.SqliteTaskRepository(connectionFactory);
         var quadrantRepository = new Quadrant.Infrastructure.Storage.SqliteQuadrantRepository(connectionFactory);
@@ -86,7 +85,7 @@ public partial class App : System.Windows.Application
             diagnosticLogger,
             appChangeHub);
         var clock = new Quadrant.Infrastructure.Windows.SystemClock();
-        var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock);
+        var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock, appChangeHub);
         try
         {
             await viewModel.LoadAsync();
@@ -143,6 +142,11 @@ public partial class App : System.Windows.Application
         // the managed window visible, so background startup can register the global
         // hotkey without flashing or stealing foreground focus.
         _ = new System.Windows.Interop.WindowInteropHelper(mainWindow).EnsureHandle();
+        // WPF UI updates the main window's theme resources and backdrop when a theme
+        // is applied. Do this only after the persisted-theme window has an HWND;
+        // applying it before MainWindow/its handle exists leaves some dynamic text
+        // resources at the initial Light values until the user changes theme again.
+        ApplyTheme(currentSettings.Theme);
         ConfigureSystemThemeWatcher(mainWindow, currentSettings.Theme);
         if (!startInBackground && !currentSettings.StartMinimized)
         {

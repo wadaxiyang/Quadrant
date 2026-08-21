@@ -13,15 +13,17 @@ public partial class MainViewModel : ObservableObject
     private readonly ITaskService taskService;
     private readonly IQuadrantRepository quadrantRepository;
     private readonly IClock clock;
+    private readonly IAppChangeHub appChangeHub;
     private readonly Dictionary<long, TaskItem> loadedTasks = [];
     private readonly Dictionary<long, TaskCardViewModel> taskCards = [];
     private IReadOnlyList<QuadrantDefinition> loadedDefinitions = [];
 
-    public MainViewModel(ITaskService taskService, IQuadrantRepository quadrantRepository, IClock clock)
+    public MainViewModel(ITaskService taskService, IQuadrantRepository quadrantRepository, IClock clock, IAppChangeHub appChangeHub)
     {
         this.taskService = taskService ?? throw new ArgumentNullException(nameof(taskService));
         this.quadrantRepository = quadrantRepository ?? throw new ArgumentNullException(nameof(quadrantRepository));
         this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        this.appChangeHub = appChangeHub ?? throw new ArgumentNullException(nameof(appChangeHub));
     }
 
     [ObservableProperty]
@@ -50,6 +52,10 @@ public partial class MainViewModel : ObservableObject
     public string SearchPlaceholder => "搜索标题或备注";
 
     public IClock Clock => clock;
+
+    public ITaskService TaskService => taskService;
+
+    public IAppChangeHub AppChangeHub => appChangeHub;
 
     public event EventHandler? NewTaskRequested;
     public event EventHandler<TaskItem>? EditTaskRequested;

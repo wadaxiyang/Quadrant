@@ -11,6 +11,7 @@
             <converters:ReminderPresetToCustomEnabledConverter x:Key="ReminderPresetToCustomEnabledConverter" />
             <converters:ReminderPresetDisplayConverter x:Key="ReminderPresetDisplayConverter" />
             <converters:TaskFilterToBooleanConverter x:Key="TaskFilterToBooleanConverter" />
+            <converters:QuickCaptureDestinationToBooleanConverter x:Key="QuickCaptureDestinationToBooleanConverter" />
             <ResourceDictionary.MergedDictionaries>
                 <ui:ThemesDictionary Theme="Light" />
                 <ui:ControlsDictionary />

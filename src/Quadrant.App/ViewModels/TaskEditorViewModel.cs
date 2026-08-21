@@ -31,7 +31,9 @@ public partial class TaskEditorViewModel : ObservableObject
         IsEdit = task is not null;
         Id = task?.Id;
         Title = task?.Title ?? string.Empty;
-        QuadrantId = task?.QuadrantId ?? (allowInbox ? null : Quadrants.FirstOrDefault()?.Id ?? 1);
+        QuadrantId = task is not null
+            ? task.QuadrantId
+            : allowInbox ? null : Quadrants.FirstOrDefault()?.Id ?? 1;
         Note = task?.Note ?? string.Empty;
 
         if (task?.DueAt is { } due)
