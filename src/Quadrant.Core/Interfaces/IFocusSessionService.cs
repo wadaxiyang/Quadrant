@@ -8,6 +8,7 @@ public interface IFocusSessionService
     Task<FocusSession> StartAsync(FocusSessionStartRequest request, CancellationToken cancellationToken = default);
     Task<FocusSession> PauseAsync(string id, int durationSeconds, DateTimeOffset at, CancellationToken cancellationToken = default);
     Task<FocusSession> ResumeAsync(string id, DateTimeOffset at, CancellationToken cancellationToken = default);
+    Task<FocusSession> ResumeAsync(string id, DateTimeOffset at, DateTimeOffset? targetEndAtUtc, CancellationToken cancellationToken = default) => ResumeAsync(id, at, cancellationToken);
     Task<FocusSession> CompleteAsync(string id, int durationSeconds, DateTimeOffset at, CancellationToken cancellationToken = default);
     Task<FocusSession> InterruptAsync(string id, int durationSeconds, DateTimeOffset at, CancellationToken cancellationToken = default);
     Task<FocusSession> CancelAsync(string id, int durationSeconds, DateTimeOffset at, CancellationToken cancellationToken = default);

@@ -49,17 +49,18 @@ public sealed class FocusSessionService : IFocusSessionService
     public Task<IReadOnlyList<FocusSession>> GetRecentAsync(int limit = 5, CancellationToken cancellationToken = default) => repository.GetRecentAsync(limit, cancellationToken);
 
     public Task<FocusSession> PauseAsync(string id, int durationSeconds, DateTimeOffset at, CancellationToken cancellationToken = default) =>
-        TransitionAsync(id, FocusStatus.Running, FocusStatus.Paused, durationSeconds, at, cancellationToken);
-    public Task<FocusSession> ResumeAsync(string id, DateTimeOffset at, CancellationToken cancellationToken = default) =>
-        TransitionAsync(id, FocusStatus.Paused, FocusStatus.Running, null, at, cancellationToken);
+        TransitionAsync(id, FocusStatus.Running, FocusStatus.Paused, durationSeconds, at, null, cancellationToken);
+    public Task<FocusSession> ResumeAsync(string id, DateTimeOffset at, CancellationToken cancellationToken = default) => ResumeAsync(id, at, null, cancellationToken);
+    public Task<FocusSession> ResumeAsync(string id, DateTimeOffset at, DateTimeOffset? targetEndAtUtc, CancellationToken cancellationToken = default) =>
+        TransitionAsync(id, FocusStatus.Paused, FocusStatus.Running, null, at, targetEndAtUtc, cancellationToken);
     public Task<FocusSession> CompleteAsync(string id, int durationSeconds, DateTimeOffset at, CancellationToken cancellationToken = default) =>
-        TransitionAsync(id, null, FocusStatus.Completed, durationSeconds, at, cancellationToken);
+        TransitionAsync(id, null, FocusStatus.Completed, durationSeconds, at, null, cancellationToken);
     public Task<FocusSession> InterruptAsync(string id, int durationSeconds, DateTimeOffset at, CancellationToken cancellationToken = default) =>
-        TransitionAsync(id, null, FocusStatus.Interrupted, durationSeconds, at, cancellationToken);
+        TransitionAsync(id, null, FocusStatus.Interrupted, durationSeconds, at, null, cancellationToken);
     public Task<FocusSession> CancelAsync(string id, int durationSeconds, DateTimeOffset at, CancellationToken cancellationToken = default) =>
-        TransitionAsync(id, null, FocusStatus.Cancelled, durationSeconds, at, cancellationToken);
+        TransitionAsync(id, null, FocusStatus.Cancelled, durationSeconds, at, null, cancellationToken);
 
-    private async Task<FocusSession> TransitionAsync(string id, FocusStatus? expectedStatus, FocusStatus targetStatus, int? durationSeconds, DateTimeOffset at, CancellationToken cancellationToken)
+    private async Task<FocusSession> TransitionAsync(string id, FocusStatus? expectedStatus, FocusStatus targetStatus, int? durationSeconds, DateTimeOffset at, DateTimeOffset? targetEndAtUtc, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("Session ID is required.", nameof(id));
         if (durationSeconds is { } duration) FocusSessionRules.ValidateDuration(duration);
@@ -74,7 +75,7 @@ public sealed class FocusSessionService : IFocusSessionService
         var updated = targetStatus switch
         {
             FocusStatus.Paused => current with { Status = targetStatus, DurationSeconds = durationSeconds!.Value, ActiveSegmentStartedAtUtc = null },
-            FocusStatus.Running => current with { Status = targetStatus, ActiveSegmentStartedAtUtc = instant },
+            FocusStatus.Running => current with { Status = targetStatus, ActiveSegmentStartedAtUtc = instant, TargetEndAtUtc = targetEndAtUtc?.ToUniversalTime() ?? current.TargetEndAtUtc },
             _ => current with { Status = targetStatus, DurationSeconds = durationSeconds!.Value, ActiveSegmentStartedAtUtc = null, EndedAtUtc = instant }
         };
         var result = await repository.TransitionAsync(updated, expected, cancellationToken)

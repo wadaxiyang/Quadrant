@@ -18,7 +18,7 @@ public sealed class FocusTimerService : IFocusTimerService
     public async Task<FocusTimerSnapshot> PauseCurrentAsync(CancellationToken ct=default)
     { var session=Require(FocusStatus.Running); accumulated=Elapsed(); current=await sessions.PauseAsync(session.Id,accumulated,clock.UtcNow,ct); return Snapshot(accumulated); }
     public async Task<FocusTimerSnapshot> ResumeCurrentAsync(CancellationToken ct=default)
-    { var session=Require(FocusStatus.Paused); current=await sessions.ResumeAsync(session.Id,clock.UtcNow,ct); segmentTimestamp=clock.GetTimestamp(); return Snapshot(accumulated); }
+    { var session=Require(FocusStatus.Paused); current=await sessions.ResumeAsync(session.Id,clock.UtcNow,cancellationToken:ct); segmentTimestamp=clock.GetTimestamp(); return Snapshot(accumulated); }
     public async Task<FocusSession> StopCurrentAsync(CancellationToken ct=default)
     { var session=Require(FocusStatus.Running,FocusStatus.Paused); var total=Elapsed(); var result=await sessions.CompleteAsync(session.Id,total,clock.UtcNow,ct); current=null;return result; }
     public async Task<FocusSession> CancelCurrentAsync(CancellationToken ct=default)
