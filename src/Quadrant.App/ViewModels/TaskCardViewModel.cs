@@ -21,7 +21,7 @@ public sealed class TaskCardViewModel
 
     public long Id { get; }
 
-    public int QuadrantId { get; }
+    public int? QuadrantId { get; }
 
     public string Title { get; }
 

@@ -15,7 +15,7 @@ public sealed class SqliteTaskRepository : ITaskRepository
     }
 
     public async Task<IReadOnlyList<TaskItem>> GetActiveAsync(CancellationToken cancellationToken = default) =>
-        await GetManyAsync("SELECT * FROM tasks WHERE is_completed = 0 ORDER BY quadrant_id, created_at, id;", cancellationToken);
+        await GetManyAsync("SELECT * FROM tasks WHERE is_completed = 0 AND quadrant_id IS NOT NULL ORDER BY quadrant_id, created_at, id;", cancellationToken);
 
     public async Task<IReadOnlyList<TaskItem>> GetCompletedAsync(CancellationToken cancellationToken = default) =>
         await GetManyAsync("SELECT * FROM tasks WHERE is_completed = 1 ORDER BY completed_at DESC, id DESC;", cancellationToken);
@@ -37,14 +37,17 @@ public sealed class SqliteTaskRepository : ITaskRepository
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            INSERT INTO tasks (title, quadrant_id, due_at, reminder_at, note, is_completed, completed_at, created_at, updated_at)
-            VALUES ($title, $quadrant_id, $due_at, $reminder_at, $note, 0, NULL, $created_at, $updated_at);
+            INSERT INTO tasks (title, quadrant_id, due_at, reminder_at, note, is_completed, completed_at, created_at, updated_at,
+                planned_date, estimated_minutes, recurrence_kind, recurrence_interval, recurrence_series_id, recurrence_anchor_day)
+            VALUES ($title, $quadrant_id, $due_at, $reminder_at, $note, 0, NULL, $created_at, $updated_at,
+                $planned_date, $estimated_minutes, $recurrence_kind, $recurrence_interval, $recurrence_series_id, $recurrence_anchor_day);
             SELECT last_insert_rowid();
             """;
-        AddTaskParameters(command, draft.Title, draft.QuadrantId, draft.DueAt, draft.ReminderAt, draft.Note, now, now);
+        AddTaskParameters(command, draft, now, now);
         var id = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture);
         await transaction.CommitAsync(cancellationToken);
-        return new TaskItem(id, draft.Title, draft.QuadrantId, draft.DueAt, draft.ReminderAt, draft.Note, false, null, now, now);
+        return new TaskItem(id, draft.Title, draft.QuadrantId, draft.DueAt, draft.ReminderAt, draft.Note, false, null, now, now,
+            draft.PlannedDate, draft.EstimatedMinutes, draft.RecurrenceKind, draft.RecurrenceInterval, draft.RecurrenceSeriesId, draft.RecurrenceAnchorDay);
     }
 
     public async Task<TaskItem> UpdateAsync(TaskUpdate update, DateTimeOffset now, CancellationToken cancellationToken = default)
@@ -54,12 +57,14 @@ public sealed class SqliteTaskRepository : ITaskRepository
         command.CommandText = """
             UPDATE tasks
             SET title = $title, quadrant_id = $quadrant_id, due_at = $due_at, reminder_at = $reminder_at,
-                note = $note, updated_at = $updated_at
+                note = $note, planned_date = $planned_date, estimated_minutes = $estimated_minutes,
+                recurrence_kind = $recurrence_kind, recurrence_interval = $recurrence_interval,
+                recurrence_series_id = $recurrence_series_id, recurrence_anchor_day = $recurrence_anchor_day, updated_at = $updated_at
             WHERE id = $id
             RETURNING *;
             """;
         command.Parameters.AddWithValue("$id", update.Id);
-        AddTaskParameters(command, update.Title, update.QuadrantId, update.DueAt, update.ReminderAt, update.Note, now, now, includeCreatedAt: false);
+        AddTaskParameters(command, update, now, now, includeCreatedAt: false);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
@@ -136,14 +141,20 @@ public sealed class SqliteTaskRepository : ITaskRepository
         new(
             reader.GetInt64(reader.GetOrdinal("id")),
             reader.GetString(reader.GetOrdinal("title")),
-            reader.GetInt32(reader.GetOrdinal("quadrant_id")),
+            ReadNullableInt32(reader, "quadrant_id"),
             ReadNullableDateTimeOffset(reader, "due_at"),
             ReadNullableDateTimeOffset(reader, "reminder_at"),
             ReadNullableString(reader, "note"),
             reader.GetInt32(reader.GetOrdinal("is_completed")) != 0,
             ReadNullableDateTimeOffset(reader, "completed_at"),
             SqliteValueConverter.ParseDateTimeOffset(reader["created_at"]),
-            SqliteValueConverter.ParseDateTimeOffset(reader["updated_at"]));
+            SqliteValueConverter.ParseDateTimeOffset(reader["updated_at"]),
+            ReadNullableDateOnly(reader, "planned_date"),
+            ReadNullableInt32(reader, "estimated_minutes"),
+            (Quadrant.Core.Enums.RecurrenceKind)reader.GetInt32(reader.GetOrdinal("recurrence_kind")),
+            reader.GetInt32(reader.GetOrdinal("recurrence_interval")),
+            ReadNullableString(reader, "recurrence_series_id"),
+            ReadNullableInt32(reader, "recurrence_anchor_day"));
 
     private static DateTimeOffset? ReadNullableDateTimeOffset(SqliteDataReader reader, string name) =>
         reader[name] is DBNull ? null : SqliteValueConverter.ParseDateTimeOffset(reader[name]);
@@ -151,22 +162,30 @@ public sealed class SqliteTaskRepository : ITaskRepository
     private static string? ReadNullableString(SqliteDataReader reader, string name) =>
         reader[name] is DBNull ? null : Convert.ToString(reader[name], CultureInfo.InvariantCulture);
 
+    private static int? ReadNullableInt32(SqliteDataReader reader, string name) =>
+        reader[name] is DBNull ? null : Convert.ToInt32(reader[name], CultureInfo.InvariantCulture);
+
+    private static DateOnly? ReadNullableDateOnly(SqliteDataReader reader, string name) =>
+        reader[name] is DBNull ? null : SqliteValueConverter.ParseDateOnly(reader[name]);
+
     private static void AddTaskParameters(
         SqliteCommand command,
-        string title,
-        int quadrantId,
-        DateTimeOffset? dueAt,
-        DateTimeOffset? reminderAt,
-        string? note,
+        TaskDraft draft,
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
         bool includeCreatedAt = true)
     {
-        command.Parameters.AddWithValue("$title", title);
-        command.Parameters.AddWithValue("$quadrant_id", quadrantId);
-        command.Parameters.AddWithValue("$due_at", SqliteValueConverter.ToDbValue(dueAt));
-        command.Parameters.AddWithValue("$reminder_at", SqliteValueConverter.ToDbValue(reminderAt));
-        command.Parameters.AddWithValue("$note", SqliteValueConverter.ToDbValue(note));
+        command.Parameters.AddWithValue("$title", draft.Title);
+        command.Parameters.AddWithValue("$quadrant_id", SqliteValueConverter.ToDbValue(draft.QuadrantId));
+        command.Parameters.AddWithValue("$due_at", SqliteValueConverter.ToDbValue(draft.DueAt));
+        command.Parameters.AddWithValue("$reminder_at", SqliteValueConverter.ToDbValue(draft.ReminderAt));
+        command.Parameters.AddWithValue("$note", SqliteValueConverter.ToDbValue(draft.Note));
+        command.Parameters.AddWithValue("$planned_date", SqliteValueConverter.ToDbValue(draft.PlannedDate));
+        command.Parameters.AddWithValue("$estimated_minutes", SqliteValueConverter.ToDbValue(draft.EstimatedMinutes));
+        command.Parameters.AddWithValue("$recurrence_kind", (int)draft.RecurrenceKind);
+        command.Parameters.AddWithValue("$recurrence_interval", draft.RecurrenceInterval);
+        command.Parameters.AddWithValue("$recurrence_series_id", SqliteValueConverter.ToDbValue(draft.RecurrenceSeriesId));
+        command.Parameters.AddWithValue("$recurrence_anchor_day", SqliteValueConverter.ToDbValue(draft.RecurrenceAnchorDay));
         if (includeCreatedAt)
         {
             command.Parameters.AddWithValue("$created_at", SqliteValueConverter.Format(createdAt));
@@ -174,4 +193,8 @@ public sealed class SqliteTaskRepository : ITaskRepository
 
         command.Parameters.AddWithValue("$updated_at", SqliteValueConverter.Format(updatedAt));
     }
+
+    private static void AddTaskParameters(SqliteCommand command, TaskUpdate update, DateTimeOffset createdAt, DateTimeOffset updatedAt, bool includeCreatedAt = true) =>
+        AddTaskParameters(command, new TaskDraft(update.Title, update.QuadrantId, update.DueAt, update.ReminderAt, update.Note, update.PlannedDate,
+            update.EstimatedMinutes, update.RecurrenceKind, update.RecurrenceInterval, update.RecurrenceSeriesId, update.RecurrenceAnchorDay), createdAt, updatedAt, includeCreatedAt);
 }

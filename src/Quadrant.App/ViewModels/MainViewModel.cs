@@ -281,9 +281,10 @@ public partial class MainViewModel : ObservableObject
         }
 
         var tasksByQuadrant = query
+            .Where(task => task.QuadrantId is not null)
             .GroupBy(task => task.QuadrantId)
             .ToDictionary(
-                group => group.Key,
+                group => group.Key!.Value,
                 group => (IReadOnlyList<TaskCardViewModel>)group
                     .OrderBy(task => task.DueAt is null)
                     .ThenBy(task => task.DueAt)

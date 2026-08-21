@@ -18,9 +18,9 @@ public static class TaskRules
         return normalized;
     }
 
-    public static void ValidateQuadrantId(int quadrantId)
+    public static void ValidateQuadrantId(int? quadrantId)
     {
-        if (quadrantId is < 1 or > 4)
+        if (quadrantId is not null && quadrantId is < 1 or > 4)
         {
             throw new TaskValidationException("Quadrant ID must be between 1 and 4.");
         }
@@ -30,6 +30,7 @@ public static class TaskRules
     {
         ArgumentNullException.ThrowIfNull(draft);
         ValidateQuadrantId(draft.QuadrantId);
+        ValidateSchedule(draft.EstimatedMinutes, draft.RecurrenceKind, draft.RecurrenceInterval, draft.RecurrenceAnchorDay);
 
         return draft with
         {
@@ -42,6 +43,7 @@ public static class TaskRules
     {
         ArgumentNullException.ThrowIfNull(update);
         ValidateQuadrantId(update.QuadrantId);
+        ValidateSchedule(update.EstimatedMinutes, update.RecurrenceKind, update.RecurrenceInterval, update.RecurrenceAnchorDay);
 
         return update with
         {
@@ -104,5 +106,13 @@ public static class TaskRules
     {
         var normalized = note?.Trim();
         return string.IsNullOrEmpty(normalized) ? null : normalized;
+    }
+
+    private static void ValidateSchedule(int? estimatedMinutes, RecurrenceKind recurrenceKind, int recurrenceInterval, int? recurrenceAnchorDay)
+    {
+        if (estimatedMinutes is < 1 or > 1440 || !Enum.IsDefined(recurrenceKind) || recurrenceInterval < 1 || recurrenceAnchorDay is < 1 or > 31)
+        {
+            throw new TaskValidationException("Task scheduling metadata is invalid.");
+        }
     }
 }

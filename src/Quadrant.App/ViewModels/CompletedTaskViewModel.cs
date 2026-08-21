@@ -19,7 +19,7 @@ public sealed class CompletedTaskViewModel
 
     public long Id { get; }
     public string Title { get; }
-    public int QuadrantId { get; }
+    public int? QuadrantId { get; }
     public string CompletedText { get; }
     public ICommand RestoreCommand { get; }
     public ICommand DeleteCommand { get; }

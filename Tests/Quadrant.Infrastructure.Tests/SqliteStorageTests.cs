@@ -26,7 +26,7 @@ public sealed class SqliteStorageTests
         Assert.Equal(4, quadrants.Count);
         Assert.Equal(new[] { 1, 2, 3, 4 }, quadrants.Select(q => q.Id));
         Assert.Equal(quadrants, secondRead);
-        Assert.Equal(2, await database.ReadSchemaVersionAsync());
+        Assert.Equal(3, await database.ReadSchemaVersionAsync());
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public sealed class SqliteStorageTests
         var reminderAt = createdAt.AddDays(1);
 
         var created = await database.Tasks.CreateAsync(
-            new TaskDraft("Review 'important' note", 2, dueAt, reminderAt, "Plain note"),
+            new TaskDraft("Review 'important' note", 2, dueAt, reminderAt, "Plain note", new DateOnly(2026, 8, 25), 90, Quadrant.Core.Enums.RecurrenceKind.Monthly, 1, "series-1", 31),
             createdAt);
         var loaded = await database.Tasks.GetByIdAsync(created.Id);
 
@@ -48,6 +48,11 @@ public sealed class SqliteStorageTests
         Assert.Equal(dueAt, loaded.DueAt);
         Assert.Equal(reminderAt, loaded.ReminderAt);
         Assert.Equal("Review 'important' note", loaded.Title);
+        Assert.Equal(new DateOnly(2026, 8, 25), loaded.PlannedDate);
+        Assert.Equal(90, loaded.EstimatedMinutes);
+        Assert.Equal(Quadrant.Core.Enums.RecurrenceKind.Monthly, loaded.RecurrenceKind);
+        Assert.Equal("series-1", loaded.RecurrenceSeriesId);
+        Assert.Equal(31, loaded.RecurrenceAnchorDay);
 
         var updatedAt = createdAt.AddHours(2);
         var updated = await database.Tasks.UpdateAsync(
@@ -156,6 +161,7 @@ public sealed class SqliteStorageTests
             var active = await repository.GetActiveAsync();
             var completed = await repository.GetCompletedAsync();
 
+            Assert.Equal(3, await ReadSchemaVersionAsync(factory));
             Assert.Equal(2, active.Count);
             Assert.Single(completed);
             Assert.Contains(active, task => task.Id == 101 && task.Title == "中文活动任务" && task.DueAt is not null && task.ReminderAt is not null && task.Note == "含中文与提醒");
@@ -173,6 +179,104 @@ public sealed class SqliteStorageTests
             {
             }
         }
+    }
+
+    [Fact]
+    public async Task Inbox_task_round_trips_without_entering_the_home_active_query()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var created = await database.Tasks.CreateAsync(new TaskDraft("Inbox", null), DateTimeOffset.UtcNow);
+
+        Assert.Null((await database.Tasks.GetByIdAsync(created.Id))!.QuadrantId);
+        Assert.Empty(await database.Tasks.GetActiveAsync());
+    }
+
+    [Fact]
+    public async Task Completion_event_and_focus_session_round_trip_with_long_task_id()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var task = await database.Tasks.CreateAsync(new TaskDraft("History", 1), DateTimeOffset.UtcNow);
+        var events = new SqliteCompletionEventRepository(database.Factory);
+        var sessions = new SqliteFocusSessionRepository(database.Factory);
+        var localDate = new DateOnly(2026, 8, 21);
+        await events.CreateAsync(new Quadrant.Core.Models.CompletionEvent("event-1", task.Id, DateTimeOffset.UtcNow, localDate, 1, "History", null, null, null, false));
+        await sessions.CreateAsync(new Quadrant.Core.Models.FocusSession("session-1", task.Id, Quadrant.Core.Enums.FocusMode.Stopwatch, DateTimeOffset.UtcNow, null, null, null, 0, Quadrant.Core.Enums.FocusStatus.Paused, null, localDate, "History", 1));
+
+        Assert.Equal(task.Id, (await events.GetByIdAsync("event-1"))!.TaskId);
+        Assert.Equal(task.Id, (await sessions.GetByIdAsync("session-1"))!.TaskId);
+    }
+
+    [Fact]
+    public async Task Future_schema_version_is_rejected_without_mutation()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        await SetSchemaVersionAsync(database.Factory, 4);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => database.Initializer.InitializeAsync());
+        Assert.Equal(4, await ReadSchemaVersionAsync(database.Factory));
+    }
+
+    [Fact]
+    public async Task Failed_v2_to_v3_migration_rolls_back_to_intact_v2_schema()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "QuadrantTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "v2.db");
+        try
+        {
+            await V1Schema2Fixture.CreateAsync(path);
+            var factory = new SqliteConnectionFactory(path, pooling: false);
+            await using (var connection = factory.CreateConnection())
+            {
+                await connection.OpenAsync();
+                await SqliteDatabaseInitializer.ConfigureConnectionAsync(connection, default);
+                await using var command = connection.CreateCommand();
+                command.CommandText = "CREATE INDEX ix_tasks_active_planned ON settings(value);";
+                await command.ExecuteNonQueryAsync();
+            }
+
+            var initializer = new SqliteDatabaseInitializer(factory);
+            await Assert.ThrowsAsync<SqliteException>(() => initializer.InitializeAsync());
+
+            Assert.Equal(2, await ReadSchemaVersionAsync(factory));
+            Assert.Equal(3, await ReadScalarAsync(factory, "SELECT COUNT(*) FROM tasks;"));
+            Assert.Equal(0, await ReadScalarAsync(factory, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('tasks_v3', 'task_completion_events', 'focus_sessions');"));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static async Task<int> ReadSchemaVersionAsync(SqliteConnectionFactory factory)
+    {
+        await using var connection = factory.CreateConnection();
+        await connection.OpenAsync();
+        await SqliteDatabaseInitializer.ConfigureConnectionAsync(connection, default);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT version FROM schema_version;";
+        return Convert.ToInt32(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+    }
+
+    private static async Task SetSchemaVersionAsync(SqliteConnectionFactory factory, int version)
+    {
+        await using var connection = factory.CreateConnection();
+        await connection.OpenAsync();
+        await SqliteDatabaseInitializer.ConfigureConnectionAsync(connection, default);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE schema_version SET version = $version;";
+        command.Parameters.AddWithValue("$version", version);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task<int> ReadScalarAsync(SqliteConnectionFactory factory, string sql)
+    {
+        await using var connection = factory.CreateConnection();
+        await connection.OpenAsync();
+        await SqliteDatabaseInitializer.ConfigureConnectionAsync(connection, default);
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        return Convert.ToInt32(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
     }
 
     private sealed class TestDatabase : IAsyncDisposable
@@ -219,6 +323,7 @@ public sealed class SqliteStorageTests
             command.CommandText = "SELECT version FROM schema_version;";
             return Convert.ToInt32(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
         }
+
 
         public ValueTask DisposeAsync()
         {
