@@ -90,7 +90,9 @@ public sealed class TaskService : ITaskService
         bool isCompleted,
         CancellationToken cancellationToken = default)
     {
-        var task = await repository.SetCompletedAsync(id, isCompleted, clock.Now, cancellationToken);
+        var task = isCompleted
+            ? (await repository.CompleteWithSnapshotAsync(id, clock.Now, cancellationToken)).Task
+            : await repository.ReopenWithSnapshotRevertedAsync(id, clock.Now, cancellationToken);
         // Restoring a task never revives an old OS schedule. The DB value is
         // retained for in-app context and can be explicitly rescheduled later.
         await TryCancelReminderAsync(id, cancellationToken);

@@ -217,6 +217,15 @@ public sealed class TaskServiceTests
         public Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, DateTimeOffset now, CancellationToken cancellationToken = default) =>
             Task.FromResult(new TaskItem(id, "Task", 1, null, null, null, isCompleted, isCompleted ? now : null, now, now));
 
+        public Task<CompletedTaskMutationResult> CompleteWithSnapshotAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default)
+        {
+            var task = new TaskItem(id, "Task", 1, null, null, null, true, now, now, now);
+            return Task.FromResult(new CompletedTaskMutationResult(task, null, false));
+        }
+
+        public Task<TaskItem> ReopenWithSnapshotRevertedAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TaskItem(id, "Task", 1, null, null, null, false, null, now, now));
+
         public Task DeleteAsync(long id, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
     }

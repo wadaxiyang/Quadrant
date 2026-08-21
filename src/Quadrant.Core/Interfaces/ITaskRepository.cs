@@ -16,5 +16,9 @@ public interface ITaskRepository
 
     Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, DateTimeOffset now, CancellationToken cancellationToken = default);
 
+    Task<CompletedTaskMutationResult> CompleteWithSnapshotAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    Task<TaskItem> ReopenWithSnapshotRevertedAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default);
+
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
 }

@@ -76,25 +76,50 @@ public sealed class SqliteTaskRepository : ITaskRepository
 
     public async Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
+        return isCompleted
+            ? (await CompleteWithSnapshotAsync(id, now, cancellationToken)).Task
+            : await ReopenWithSnapshotRevertedAsync(id, now, cancellationToken);
+    }
+
+    public async Task<CompletedTaskMutationResult> CompleteWithSnapshotAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        await using var command = connection.CreateCommand();
-        command.CommandText = """
-            UPDATE tasks
-            SET is_completed = $is_completed, completed_at = $completed_at, updated_at = $updated_at
-            WHERE id = $id
-            RETURNING *;
-            """;
-        command.Parameters.AddWithValue("$id", id);
-        command.Parameters.AddWithValue("$is_completed", isCompleted ? 1 : 0);
-        command.Parameters.AddWithValue("$completed_at", isCompleted ? SqliteValueConverter.Format(now) : DBNull.Value);
-        command.Parameters.AddWithValue("$updated_at", SqliteValueConverter.Format(now));
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
+        await using var transaction = connection.BeginTransaction();
+        var task = await ReadTaskAsync(connection, transaction, id, cancellationToken)
+            ?? throw new InvalidOperationException($"Task {id} was not found.");
+        if (task.IsCompleted)
         {
-            throw new InvalidOperationException($"Task {id} was not found.");
+            await transaction.CommitAsync(cancellationToken);
+            return new CompletedTaskMutationResult(task, null, true);
         }
 
-        return MapTask(reader);
+        var completedUtc = now.ToUniversalTime();
+        await using var update = connection.CreateCommand();
+        update.Transaction = transaction;
+        update.CommandText = "UPDATE tasks SET is_completed=1, completed_at=$completed, updated_at=$updated WHERE id=$id RETURNING *;";
+        update.Parameters.AddWithValue("$id", id); update.Parameters.AddWithValue("$completed", SqliteValueConverter.FormatUtc(completedUtc)); update.Parameters.AddWithValue("$updated", SqliteValueConverter.FormatUtc(completedUtc));
+        await using var reader = await update.ExecuteReaderAsync(cancellationToken);
+        await reader.ReadAsync(cancellationToken);
+        var completedTask = MapTask(reader);
+        var completionEvent = new CompletionEvent(Guid.NewGuid().ToString("N"), id, completedUtc, DateOnly.FromDateTime(now.LocalDateTime), task.QuadrantId, task.Title, task.DueAt?.ToUniversalTime(), task.PlannedDate, task.EstimatedMinutes, task.DueAt is { } due && due < now);
+        await reader.DisposeAsync();
+        await InsertCompletionEventAsync(connection, transaction, completionEvent, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new CompletedTaskMutationResult(completedTask, completionEvent, false);
+    }
+
+    public async Task<TaskItem> ReopenWithSnapshotRevertedAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+        var task = await ReadTaskAsync(connection, transaction, id, cancellationToken)
+            ?? throw new InvalidOperationException($"Task {id} was not found.");
+        await using var update = connection.CreateCommand(); update.Transaction = transaction;
+        update.CommandText = "UPDATE tasks SET is_completed=0, completed_at=NULL, updated_at=$updated WHERE id=$id RETURNING *;";
+        update.Parameters.AddWithValue("$id", id); update.Parameters.AddWithValue("$updated", SqliteValueConverter.FormatUtc(now));
+        await using var reader = await update.ExecuteReaderAsync(cancellationToken); await reader.ReadAsync(cancellationToken); var reopened = MapTask(reader); await reader.DisposeAsync();
+        await SqliteDatabaseInitializer.ExecuteAsync(connection, transaction, "UPDATE task_completion_events SET reverted_at_utc=$now WHERE id=(SELECT id FROM task_completion_events WHERE task_id=$id AND reverted_at_utc IS NULL ORDER BY completed_at_utc DESC LIMIT 1);", cancellationToken, ("$now", SqliteValueConverter.FormatUtc(now)), ("$id", id));
+        await transaction.CommitAsync(cancellationToken); return reopened;
     }
 
     public async Task DeleteAsync(long id, CancellationToken cancellationToken = default)
@@ -119,6 +144,20 @@ public sealed class SqliteTaskRepository : ITaskRepository
         }
 
         return tasks;
+    }
+
+    private static async Task<TaskItem?> ReadTaskAsync(SqliteConnection connection, SqliteTransaction transaction, long id, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand(); command.Transaction = transaction; command.CommandText = "SELECT * FROM tasks WHERE id=$id;"; command.Parameters.AddWithValue("$id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken); return await reader.ReadAsync(cancellationToken) ? MapTask(reader) : null;
+    }
+
+    private static async Task InsertCompletionEventAsync(SqliteConnection connection, SqliteTransaction transaction, CompletionEvent value, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand(); command.Transaction = transaction;
+        command.CommandText = """INSERT INTO task_completion_events (id,task_id,completed_at_utc,completed_local_date,quadrant_snapshot,task_title_snapshot,due_at_utc_snapshot,planned_date_snapshot,estimated_minutes_snapshot,was_overdue,reverted_at_utc) VALUES ($id,$task,$completed,$date,$quadrant,$title,$due,$planned,$estimate,$overdue,NULL);""";
+        command.Parameters.AddWithValue("$id", value.Id); command.Parameters.AddWithValue("$task", value.TaskId!); command.Parameters.AddWithValue("$completed", SqliteValueConverter.FormatUtc(value.CompletedAtUtc)); command.Parameters.AddWithValue("$date", SqliteValueConverter.FormatDateOnly(value.CompletedLocalDate)); command.Parameters.AddWithValue("$quadrant", SqliteValueConverter.ToDbValue(value.QuadrantSnapshot)); command.Parameters.AddWithValue("$title", value.TaskTitleSnapshot); command.Parameters.AddWithValue("$due", SqliteValueConverter.ToDbValue(value.DueAtUtcSnapshot)); command.Parameters.AddWithValue("$planned", SqliteValueConverter.ToDbValue(value.PlannedDateSnapshot)); command.Parameters.AddWithValue("$estimate", SqliteValueConverter.ToDbValue(value.EstimatedMinutesSnapshot)); command.Parameters.AddWithValue("$overdue", value.WasOverdue ? 1 : 0);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)

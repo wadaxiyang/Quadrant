@@ -207,6 +207,103 @@ public sealed class SqliteStorageTests
     }
 
     [Fact]
+    public async Task Atomic_completion_snapshots_before_state_and_is_idempotent()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var now = new DateTimeOffset(2026, 8, 21, 9, 30, 0, TimeSpan.FromHours(8));
+        var task = await database.Tasks.CreateAsync(
+            new TaskDraft("Snapshot", 2, now.AddHours(-1), null, "note", new DateOnly(2026, 8, 22), 45), now.AddDays(-1));
+        var events = new SqliteCompletionEventRepository(database.Factory);
+
+        var first = await database.Tasks.CompleteWithSnapshotAsync(task.Id, now);
+        var second = await database.Tasks.CompleteWithSnapshotAsync(task.Id, now.AddMinutes(1));
+        var snapshot = await events.GetByIdAsync(first.Event!.Id);
+
+        Assert.True(first.Task.IsCompleted);
+        Assert.Equal(now.ToUniversalTime(), first.Task.CompletedAt);
+        Assert.False(first.WasAlreadyCompleted);
+        Assert.NotNull(snapshot);
+        Assert.Equal(task.Id, snapshot!.TaskId);
+        Assert.Equal("Snapshot", snapshot.TaskTitleSnapshot);
+        Assert.Equal(2, snapshot.QuadrantSnapshot);
+        Assert.Equal(now.AddHours(-1).ToUniversalTime(), snapshot.DueAtUtcSnapshot);
+        Assert.Equal(new DateOnly(2026, 8, 22), snapshot.PlannedDateSnapshot);
+        Assert.Equal(45, snapshot.EstimatedMinutesSnapshot);
+        Assert.True(snapshot.WasOverdue);
+        Assert.Equal(new DateOnly(2026, 8, 21), snapshot.CompletedLocalDate);
+        Assert.True(second.WasAlreadyCompleted);
+        Assert.Null(second.Event);
+        Assert.Equal(1, await ReadScalarAsync(database.Factory, "SELECT COUNT(*) FROM task_completion_events;"));
+    }
+
+    [Fact]
+    public async Task Reopen_reverts_latest_event_and_recompletion_creates_a_new_event()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var task = await database.Tasks.CreateAsync(new TaskDraft("Repeat", 1), DateTimeOffset.UtcNow);
+        var events = new SqliteCompletionEventRepository(database.Factory);
+        var first = await database.Tasks.CompleteWithSnapshotAsync(task.Id, DateTimeOffset.UtcNow);
+
+        var reopened = await database.Tasks.ReopenWithSnapshotRevertedAsync(task.Id, DateTimeOffset.UtcNow.AddMinutes(1));
+        var second = await database.Tasks.CompleteWithSnapshotAsync(task.Id, DateTimeOffset.UtcNow.AddMinutes(2));
+
+        Assert.False(reopened.IsCompleted);
+        Assert.NotNull((await events.GetByIdAsync(first.Event!.Id))!.RevertedAtUtc);
+        Assert.NotEqual(first.Event.Id, second.Event!.Id);
+        Assert.Equal(2, await ReadScalarAsync(database.Factory, "SELECT COUNT(*) FROM task_completion_events;"));
+        Assert.Equal(1, await ReadScalarAsync(database.Factory, "SELECT COUNT(*) FROM task_completion_events WHERE reverted_at_utc IS NULL;"));
+    }
+
+    [Fact]
+    public async Task Completion_event_insert_failure_rolls_back_task_update()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var task = await database.Tasks.CreateAsync(new TaskDraft("Atomic", 1), DateTimeOffset.UtcNow);
+        var events = new SqliteCompletionEventRepository(database.Factory);
+        await events.CreateAsync(new CompletionEvent("existing", task.Id, DateTimeOffset.UtcNow, DateOnly.FromDateTime(DateTime.Now), 1, "Atomic", null, null, null, false));
+
+        await Assert.ThrowsAsync<SqliteException>(() => database.Tasks.CompleteWithSnapshotAsync(task.Id, DateTimeOffset.UtcNow));
+
+        var loaded = await database.Tasks.GetByIdAsync(task.Id);
+        Assert.False(loaded!.IsCompleted);
+        Assert.Null(loaded.CompletedAt);
+        Assert.Equal(1, await ReadScalarAsync(database.Factory, "SELECT COUNT(*) FROM task_completion_events;"));
+    }
+
+    [Fact]
+    public async Task Missing_task_completion_does_not_create_an_event()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            database.Tasks.CompleteWithSnapshotAsync(999, DateTimeOffset.UtcNow));
+
+        Assert.Equal("Task 999 was not found.", error.Message);
+        Assert.Equal(0, await ReadScalarAsync(database.Factory, "SELECT COUNT(*) FROM task_completion_events;"));
+    }
+
+    [Fact]
+    public async Task Legacy_completion_reopens_without_inventing_history_and_delete_preserves_snapshot()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var task = await database.Tasks.CreateAsync(new TaskDraft("Legacy", 1), DateTimeOffset.UtcNow);
+        await ExecuteAsync(database.Factory, "UPDATE tasks SET is_completed = 1, completed_at = $completed;", ("$completed", SqliteValueConverter.FormatUtc(DateTimeOffset.UtcNow)));
+
+        var reopened = await database.Tasks.ReopenWithSnapshotRevertedAsync(task.Id, DateTimeOffset.UtcNow.AddMinutes(1));
+        Assert.False(reopened.IsCompleted);
+        Assert.Equal(0, await ReadScalarAsync(database.Factory, "SELECT COUNT(*) FROM task_completion_events;"));
+
+        var completed = await database.Tasks.CompleteWithSnapshotAsync(task.Id, DateTimeOffset.UtcNow.AddMinutes(2));
+        var events = new SqliteCompletionEventRepository(database.Factory);
+        await database.Tasks.DeleteAsync(task.Id);
+        var snapshot = await events.GetByIdAsync(completed.Event!.Id);
+
+        Assert.NotNull(snapshot);
+        Assert.Null(snapshot!.TaskId);
+        Assert.Equal("Legacy", snapshot.TaskTitleSnapshot);
+    }
+
+    [Fact]
     public async Task Future_schema_version_is_rejected_without_mutation()
     {
         await using var database = await TestDatabase.CreateAsync();
@@ -277,6 +374,21 @@ public sealed class SqliteStorageTests
         await using var command = connection.CreateCommand();
         command.CommandText = sql;
         return Convert.ToInt32(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+    }
+
+    private static async Task ExecuteAsync(SqliteConnectionFactory factory, string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var connection = factory.CreateConnection();
+        await connection.OpenAsync();
+        await SqliteDatabaseInitializer.ConfigureConnectionAsync(connection, default);
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        await command.ExecuteNonQueryAsync();
     }
 
     private sealed class TestDatabase : IAsyncDisposable
