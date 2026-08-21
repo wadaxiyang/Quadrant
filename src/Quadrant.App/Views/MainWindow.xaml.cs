@@ -230,7 +230,7 @@ public partial class MainWindow : FluentWindow
         var viewModel = (MainViewModel)DataContext;
         try
         {
-            var editor = new QuickAddWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock))
+            var editor = new QuickAddWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock, allowInbox: true))
             {
                 Owner = IsVisible ? this : null
             };
@@ -240,7 +240,14 @@ public partial class MainWindow : FluentWindow
                 await viewModel.CreateAsync(draft);
                 if (IsVisible)
                 {
-                    ShowFeedback("任务已添加", draft.Title);
+                    if (draft.QuadrantId is null)
+                    {
+                        ShowFeedback("已收集到 Inbox", "可稍后在 Inbox 中分类。", ControlAppearance.Success, SymbolRegular.Archive32);
+                    }
+                    else
+                    {
+                        ShowFeedback("任务已添加", draft.Title);
+                    }
                 }
             }
         }

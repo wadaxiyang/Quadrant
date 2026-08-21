@@ -20,11 +20,12 @@ public partial class QuickAddWindow : Wpf.Ui.Controls.FluentWindow
 
     public TaskDraft? DraftResult { get; private set; }
 
-    private void Quadrant_Click(object sender, RoutedEventArgs e)
+    private void Destination_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is System.Windows.Controls.Button { Tag: string tag } && int.TryParse(tag, out var id))
+        if (sender is System.Windows.Controls.Button { Tag: string tag })
         {
-            ((TaskEditorViewModel)DataContext).QuadrantId = id;
+            var viewModel = (TaskEditorViewModel)DataContext;
+            viewModel.QuadrantId = string.Equals(tag, "Inbox", StringComparison.Ordinal) ? null : int.TryParse(tag, out var id) ? id : viewModel.QuadrantId;
         }
     }
 

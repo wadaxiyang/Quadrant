@@ -14,21 +14,24 @@ public partial class TaskEditorViewModel : ObservableObject
     private readonly IClock clock;
     private readonly TimeZoneInfo timeZone;
     private readonly DateTimeOffset? originalReminderAt;
+    private readonly bool allowInbox;
 
     public TaskEditorViewModel(
         IEnumerable<QuadrantDefinition> quadrants,
         IClock clock,
         TaskItem? task = null,
-        TimeZoneInfo? timeZone = null)
+        TimeZoneInfo? timeZone = null,
+        bool allowInbox = false)
     {
         Quadrants = quadrants.OrderBy(quadrant => quadrant.Id).ToArray();
         this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
         this.timeZone = timeZone ?? TimeZoneInfo.Local;
+        this.allowInbox = allowInbox;
         originalReminderAt = task?.ReminderAt;
         IsEdit = task is not null;
         Id = task?.Id;
         Title = task?.Title ?? string.Empty;
-        QuadrantId = task?.QuadrantId ?? Quadrants.FirstOrDefault()?.Id ?? 1;
+        QuadrantId = task?.QuadrantId ?? (allowInbox ? null : Quadrants.FirstOrDefault()?.Id ?? 1);
         Note = task?.Note ?? string.Empty;
 
         if (task?.DueAt is { } due)
@@ -64,7 +67,9 @@ public partial class TaskEditorViewModel : ObservableObject
 
     public IReadOnlyList<QuadrantDefinition> Quadrants { get; }
 
-    public string QuadrantLabel => Quadrants.FirstOrDefault(quadrant => quadrant.Id == QuadrantId)?.Name ?? $"Q{QuadrantId}";
+    public string QuadrantLabel => QuadrantId is null
+        ? "Inbox（未分类）"
+        : Quadrants.FirstOrDefault(quadrant => quadrant.Id == QuadrantId)?.Name ?? $"Q{QuadrantId}";
 
     public bool IsEdit { get; }
 
@@ -76,7 +81,7 @@ public partial class TaskEditorViewModel : ObservableObject
     public partial string Title { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial int QuadrantId { get; set; }
+    public partial int? QuadrantId { get; set; }
 
     [ObservableProperty]
     public partial DateTime? DueDate { get; set; }
@@ -127,13 +132,21 @@ public partial class TaskEditorViewModel : ObservableObject
         }
     }
 
-    partial void OnQuadrantIdChanged(int value) => OnPropertyChanged(nameof(QuadrantLabel));
+    partial void OnQuadrantIdChanged(int? value) => OnPropertyChanged(nameof(QuadrantLabel));
 
     public bool TryBuildDraft(out TaskDraft draft)
     {
         TitleError = string.IsNullOrWhiteSpace(Title) ? "任务名称不能为空。" : null;
         DueTimeError = null;
         ReminderError = null;
+        if (QuadrantId is < 1 or > 4)
+        {
+            TitleError ??= "请选择有效象限。";
+        }
+        else if (!allowInbox && QuadrantId is null)
+        {
+            TitleError ??= "请选择象限。";
+        }
 
         DateTimeOffset? dueAt = null;
         if (DueDate is { } date)

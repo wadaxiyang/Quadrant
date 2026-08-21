@@ -32,12 +32,13 @@
                 </StackPanel>
 
                 <StackPanel Grid.Row="2" Margin="0,16,0,0">
-                    <TextBlock Style="{StaticResource CaptionTextStyle}" Text="象限（Ctrl + 1…4）" />
-                    <UniformGrid Margin="0,4,0,0" Columns="4">
-                        <ui:Button Margin="0,0,4,0" Click="Quadrant_Click" Tag="1" Content="Q1" AutomationProperties.Name="选择 Q1 象限" />
-                        <ui:Button Margin="4,0" Click="Quadrant_Click" Tag="2" Content="Q2" AutomationProperties.Name="选择 Q2 象限" />
-                        <ui:Button Margin="4,0" Click="Quadrant_Click" Tag="3" Content="Q3" AutomationProperties.Name="选择 Q3 象限" />
-                        <ui:Button Margin="4,0,0,0" Click="Quadrant_Click" Tag="4" Content="Q4" AutomationProperties.Name="选择 Q4 象限" />
+                    <TextBlock Style="{StaticResource CaptionTextStyle}" Text="保存位置（Ctrl + 1…4 选择象限）" />
+                    <UniformGrid Margin="0,4,0,0" Columns="5">
+                        <ui:Button Margin="0,0,4,0" Click="Destination_Click" Tag="Inbox" Content="Inbox" AutomationProperties.Name="选择 Inbox，稍后分类" />
+                        <ui:Button Margin="4,0" Click="Destination_Click" Tag="1" Content="Q1" AutomationProperties.Name="选择 Q1 象限" />
+                        <ui:Button Margin="4,0" Click="Destination_Click" Tag="2" Content="Q2" AutomationProperties.Name="选择 Q2 象限" />
+                        <ui:Button Margin="4,0" Click="Destination_Click" Tag="3" Content="Q3" AutomationProperties.Name="选择 Q3 象限" />
+                        <ui:Button Margin="4,0,0,0" Click="Destination_Click" Tag="4" Content="Q4" AutomationProperties.Name="选择 Q4 象限" />
                     </UniformGrid>
                     <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding QuadrantLabel}" />
                 </StackPanel>

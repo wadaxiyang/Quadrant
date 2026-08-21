@@ -118,7 +118,10 @@ public partial class MainViewModel : ObservableObject
     public async Task CreateAsync(TaskDraft draft)
     {
         var task = await taskService.CreateAsync(draft);
-        UpsertActiveTask(task);
+        if (task.QuadrantId is not null)
+        {
+            UpsertActiveTask(task);
+        }
     }
 
     public async Task UpdateAsync(TaskUpdate update)
