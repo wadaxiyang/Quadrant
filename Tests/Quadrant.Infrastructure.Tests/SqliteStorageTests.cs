@@ -3,11 +3,16 @@ using Microsoft.Data.Sqlite;
 using Quadrant.Core.Models;
 using Quadrant.Infrastructure.Storage;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Quadrant.Infrastructure.Tests;
 
 public sealed class SqliteStorageTests
 {
+    private readonly ITestOutputHelper output;
+
+    public SqliteStorageTests(ITestOutputHelper output) => this.output = output;
+
     [Fact]
     public async Task Fresh_database_migrates_with_default_quadrants_and_is_idempotent()
     {
@@ -87,6 +92,24 @@ public sealed class SqliteStorageTests
         command.CommandText = "PRAGMA foreign_keys;";
 
         Assert.Equal(1L, await command.ExecuteScalarAsync());
+    }
+
+    [Fact]
+    public async Task One_thousand_active_tasks_load_within_a_measurable_baseline()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var seed = DateTimeOffset.UtcNow;
+        for (var index = 0; index < 1000; index++)
+        {
+            await database.Tasks.CreateAsync(new TaskDraft($"Synthetic task {index}", index % 4 + 1), seed.AddSeconds(index));
+        }
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var tasks = await database.Tasks.GetActiveAsync();
+        stopwatch.Stop();
+
+        output.WriteLine($"1000-task SQLite active load: {stopwatch.ElapsedMilliseconds} ms; rows={tasks.Count}");
+        Assert.Equal(1000, tasks.Count);
     }
 
     private sealed class TestDatabase : IAsyncDisposable

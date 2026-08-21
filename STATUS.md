@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_16_ACCESSIBILITY_POLISH` — implementation complete; DPI and interactive accessibility checks pending
+`STAGE_17_PERFORMANCE_RESILIENCE` — implementation complete; release performance GUI checks pending
 
 ## Completed
 
@@ -94,6 +94,9 @@
 - Applied WPF native `ThemeMode` immediately from persisted settings without adding a custom palette.
 - Added Stage 16 accessibility and visual polish: content-driven toolbar sizing, scrollable task editors capped to the work area, task-card UI Automation names containing title/due/status, explicit AutomationProperties names and tooltips, Quick Add numpad shortcuts, and keyboard completion for focused task cards.
 - Added `docs/V1_UI_ACCEPTANCE.md` with an explicit acceptance record.
+- Added Stage 17 rolling diagnostic logging under `%LOCALAPPDATA%\\Quadrant\\logs\\`, with 1 MB rotation and three retained files.
+- Added fail-closed database initialization handling with a visible data path and diagnostic log when migration/open/settings loading fails.
+- Added 1000-task SQLite load coverage and recorded real startup, idle CPU, Working Set, and Private Memory measurements in `docs/V1_PERFORMANCE.md`.
 
 ## Files changed
 
@@ -129,6 +132,10 @@
 - `src/Quadrant.App/ViewModels/TaskEditorViewModel.cs`
 - `src/Quadrant.App/Resources/UiStrings.xaml`
 - `docs/V1_UI_ACCEPTANCE.md`
+- `src/Quadrant.Core/Interfaces/IDiagnosticLogger.cs`
+- `src/Quadrant.Infrastructure/Logging/DiagnosticLogger.cs`
+- `Tests/Quadrant.Infrastructure.Tests/DiagnosticLoggerTests.cs`
+- `docs/V1_PERFORMANCE.md`
 - `src/Quadrant.Infrastructure/Windows/GlobalHotkeyService.cs`
 - `src/Quadrant.App/Views/QuickAddWindow.xaml`
 - `src/Quadrant.App/Views/QuickAddWindow.xaml.cs`
@@ -317,6 +324,13 @@
 - `dotnet build Quadrant.sln -c Debug --no-restore` — passed after Stage 16; 0 warnings, 0 errors.
 - `dotnet test Quadrant.sln -c Debug --no-restore` — passed after Stage 16; 28 Core tests and 19 Infrastructure tests passed, 0 failed.
 - `git diff --check` — passed; only normal line-ending notices were reported.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed after Stage 17; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-restore --logger "console;verbosity=detailed"` — passed; 28 Core and 21 Infrastructure tests passed.
+- `dotnet-counters --version` / `dotnet-trace --version` — not available on this machine; measurements used PowerShell process sampling.
+- 1000-task SQLite benchmark — passed; 4 ms to load 1000 active rows.
+- Cold-start measurement — passed; first main window observed after 1062 ms.
+- 60-second visible-idle process sample — completed; results recorded in `docs/V1_PERFORMANCE.md`.
+- `git diff --check` — passed; only normal line-ending notices were reported.
 
 ## Manual tests pending
 
@@ -330,6 +344,7 @@
 - Stage 14 manual checks remain pending: close-to-tray taskbar disappearance, tray icon visibility, double-click restore, tray Quick Add, tray Exit process termination, hotkey release after exit, and single tray icon after restart.
 - Stage 15 manual checks remain pending: restart persistence, Light/Dark/System visual changes, HKCU Run enable/disable and Task Manager visibility, background startup focus behavior, quadrant rename with unchanged task IDs, and invalid hotkey feedback.
 - Stage 16 manual checks remain pending: 100/125/150/200% DPI, 920x620 minimum window, DatePicker/ComboBox clipping, live keyboard traversal, screen-reader/UI Automation inspection, and High Contrast rendering. The checklist is recorded in `docs/V1_UI_ACCEPTANCE.md`.
+- Stage 17 manual checks remain pending: tray-only idle sample, interactive 1000-task scroll/filter/search/drag-drop, managed heap counters, Release-like profiling, and SQLite corruption/locked-file drills. See `docs/V1_PERFORMANCE.md`.
 
 ## Sources checked
 
@@ -395,6 +410,9 @@
 - https://learn.microsoft.com/en-us/search/index?search=WPF%20accessibility%20AutomationProperties.Name — checked 2026-08-21; current Microsoft Learn search for WPF accessibility and AutomationProperties guidance.
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/accessibility — checked 2026-08-21; current requested path returned 404 in Learn routing.
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/automation-overview — checked 2026-08-21; current requested path returned 404 in Learn routing.
+- https://learn.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-counters — checked 2026-08-21; official counter collection/monitoring guidance.
+- https://learn.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-trace — checked 2026-08-21; official EventPipe trace guidance.
+- https://learn.microsoft.com/en-us/windows-hardware/test/wpt/ — checked 2026-08-21; official WPR/WPA toolkit guidance.
 
 ## Known issues
 
@@ -424,7 +442,9 @@
 - Stage 15 uses `ThemeMode` despite the .NET 10 reference warning that the API is evaluation-only; WPF0001 is explicitly suppressed and the official current WPF guidance was checked.
 - Stage 16 has no known build or automated-test issues; interactive DPI, High Contrast, screen-reader, and visual acceptance remain environment-limited.
 - Stage 16 keeps WPF defaults and existing Fluent/system resources; no new theme, animation, or third-party accessibility dependency was added.
+- Stage 17 uses a small in-house logger instead of adding a logging package; logging is local-only, warning/error-focused, and bounded by file rotation.
+- Stage 17 has no known build or automated-test issues. The measured visible-idle CPU sample is not sufficient to claim the SPEC <0.2% target; release sign-off still needs counters/WPR and interactive tray/GUI measurements.
 
 ## Next stage
 
-`stages/STAGE_17_PERFORMANCE_RESILIENCE.md`
+`stages/STAGE_18_RELEASE_PACKAGING.md`

@@ -37,7 +37,7 @@ public sealed class TrayService : IDisposable
             ContextMenuStrip = menu,
             Visible = true
         };
-        notifyIcon.DoubleClick += NotifyIcon_DoubleClick;
+        notifyIcon.MouseClick += NotifyIcon_MouseClick;
     }
 
     public void Dispose()
@@ -49,7 +49,7 @@ public sealed class TrayService : IDisposable
 
         if (notifyIcon is not null)
         {
-            notifyIcon.DoubleClick -= NotifyIcon_DoubleClick;
+            notifyIcon.MouseClick -= NotifyIcon_MouseClick;
             notifyIcon.Visible = false;
             notifyIcon.Dispose();
             notifyIcon = null;
@@ -58,5 +58,11 @@ public sealed class TrayService : IDisposable
         isDisposed = true;
     }
 
-    private void NotifyIcon_DoubleClick(object? sender, EventArgs e) => ShowRequested?.Invoke(this, e);
+    private void NotifyIcon_MouseClick(object? sender, Forms.MouseEventArgs e)
+    {
+        if (e.Button == Forms.MouseButtons.Left)
+        {
+            ShowRequested?.Invoke(this, e);
+        }
+    }
 }

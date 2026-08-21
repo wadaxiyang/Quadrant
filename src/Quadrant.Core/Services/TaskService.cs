@@ -8,15 +8,18 @@ public sealed class TaskService : ITaskService
     private readonly ITaskRepository repository;
     private readonly IReminderScheduler reminderScheduler;
     private readonly IClock clock;
+    private readonly IDiagnosticLogger? diagnosticLogger;
 
     public TaskService(
         ITaskRepository repository,
         IReminderScheduler reminderScheduler,
-        IClock clock)
+        IClock clock,
+        IDiagnosticLogger? diagnosticLogger = null)
     {
         this.repository = repository ?? throw new ArgumentNullException(nameof(repository));
         this.reminderScheduler = reminderScheduler ?? throw new ArgumentNullException(nameof(reminderScheduler));
         this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        this.diagnosticLogger = diagnosticLogger;
     }
 
     public Task<IReadOnlyList<TaskItem>> GetActiveAsync(CancellationToken cancellationToken = default) =>
@@ -129,7 +132,7 @@ public sealed class TaskService : ITaskService
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Debug.WriteLine($"Reminder synchronization failed for task {task.Id}: {exception}");
+            diagnosticLogger?.Warning($"Reminder synchronization failed for task {task.Id}.", exception);
         }
     }
 
@@ -145,7 +148,7 @@ public sealed class TaskService : ITaskService
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Debug.WriteLine($"Reminder rescheduling failed for task {task.Id}: {exception}");
+            diagnosticLogger?.Warning($"Reminder rescheduling failed for task {task.Id}.", exception);
         }
     }
 
@@ -161,7 +164,7 @@ public sealed class TaskService : ITaskService
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Debug.WriteLine($"Reminder cancellation failed for task {taskId}: {exception}");
+            diagnosticLogger?.Warning($"Reminder cancellation failed for task {taskId}.", exception);
         }
     }
 }

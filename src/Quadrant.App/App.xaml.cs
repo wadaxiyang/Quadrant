@@ -2,6 +2,8 @@ namespace Quadrant.App;
 
 public partial class App : System.Windows.Application
 {
+    private readonly Quadrant.Infrastructure.Logging.DiagnosticLogger diagnosticLogger =
+        new(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
     private readonly Quadrant.Infrastructure.Notifications.WindowsAppNotificationService notificationService = new();
     private readonly Quadrant.Infrastructure.Notifications.WindowsReminderScheduler reminderScheduler = new();
     private readonly Quadrant.Infrastructure.Windows.SingleInstanceService singleInstanceService = new();
@@ -16,6 +18,7 @@ public partial class App : System.Windows.Application
 
     private async void OnStartup(object sender, System.Windows.StartupEventArgs e)
     {
+        var startupTimer = System.Diagnostics.Stopwatch.StartNew();
         ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
         var startInBackground = e.Args.Any(argument => string.Equals(argument, "--background", StringComparison.OrdinalIgnoreCase));
         notificationService.ActivationReceived += NotificationService_ActivationReceived;
@@ -25,7 +28,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Debug.WriteLine($"App notification registration failed: {exception}");
+            diagnosticLogger.Warning("App notification registration failed; continuing without immediate notification registration.", exception);
         }
 
         var activationArgs = Microsoft.Windows.AppLifecycle.AppInstance.GetCurrent().GetActivatedEventArgs();
@@ -52,9 +55,23 @@ public partial class App : System.Windows.Application
         var pathProvider = new Quadrant.Infrastructure.Storage.LocalAppDataPathProvider();
         var connectionFactory = new Quadrant.Infrastructure.Storage.SqliteConnectionFactory(pathProvider.DatabasePath);
         var initializer = new Quadrant.Infrastructure.Storage.SqliteDatabaseInitializer(connectionFactory);
-        await initializer.InitializeAsync();
-        settingsRepository = new Quadrant.Infrastructure.Storage.SqliteSettingsRepository(connectionFactory);
-        currentSettings = await settingsRepository.GetAsync();
+        try
+        {
+            await initializer.InitializeAsync();
+            settingsRepository = new Quadrant.Infrastructure.Storage.SqliteSettingsRepository(connectionFactory);
+            currentSettings = await settingsRepository.GetAsync();
+        }
+        catch (Exception exception)
+        {
+            diagnosticLogger.Error($"Database initialization or settings load failed. Database path: {pathProvider.DatabasePath}", exception);
+            System.Windows.MessageBox.Show(
+                $"数据库初始化失败，应用无法继续写入。\n数据文件：{pathProvider.DatabasePath}\n\n{exception.Message}",
+                "数据库不可用",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Error);
+            Shutdown();
+            return;
+        }
         startupService = new Quadrant.Infrastructure.Windows.RegistryStartupService();
         ApplyTheme(currentSettings.Theme);
 
@@ -63,7 +80,8 @@ public partial class App : System.Windows.Application
         var taskService = new Quadrant.Core.Services.TaskService(
             taskRepository,
             reminderScheduler,
-            new Quadrant.Infrastructure.Windows.SystemClock());
+            new Quadrant.Infrastructure.Windows.SystemClock(),
+            diagnosticLogger);
         var clock = new Quadrant.Infrastructure.Windows.SystemClock();
         var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock);
         await viewModel.LoadAsync();
@@ -74,7 +92,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Debug.WriteLine($"Reminder reconciliation failed: {exception}");
+            diagnosticLogger.Warning("Reminder reconciliation failed; the database remains available.", exception);
         }
 
         var mainWindow = new Views.MainWindow
@@ -97,11 +115,13 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Debug.WriteLine($"Tray initialization failed: {exception}");
+            diagnosticLogger.Warning("Tray initialization failed; continuing without a tray icon.", exception);
             trayIcon?.Dispose();
             trayIcon = null;
         }
         mainWindow.Show();
+        startupTimer.Stop();
+        System.Diagnostics.Debug.WriteLine($"Cold start completed in {startupTimer.ElapsedMilliseconds} ms.");
         mainWindow.IsCloseToTray = currentSettings.CloseToTray;
         if (startInBackground || currentSettings.StartMinimized)
         {
@@ -167,6 +187,7 @@ public partial class App : System.Windows.Application
             }
             catch (Exception exception)
             {
+                diagnosticLogger.Warning("Applying settings failed; keeping the current session alive.", exception);
                 System.Windows.MessageBox.Show(exception.Message, "设置应用失败", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
             }
         }
@@ -215,7 +236,7 @@ public partial class App : System.Windows.Application
                 }
                 catch (Exception exception)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Quick Add failed: {exception}");
+                    diagnosticLogger.Warning("Quick Add failed.", exception);
                 }
             });
         }
@@ -278,7 +299,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Debug.WriteLine($"Notification activation failed: {exception}");
+            diagnosticLogger.Warning("Notification activation failed.", exception);
         }
     }
 
