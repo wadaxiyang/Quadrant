@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_13_QUICK_ADD_HOTKEY` — implementation complete; manual global hotkey and Quick Add checks pending
+`STAGE_14_TRAY_LIFECYCLE` — implementation complete; manual tray and lifecycle checks pending
 
 ## Completed
 
@@ -83,6 +83,10 @@
 - Added MainWindow HWND lifecycle hook for the default `Ctrl+Alt+Q` hotkey and cleanup on close/exit.
 - Added Quick Add with title autofocus, Q1-Q4 selection, Ctrl+1..4, Enter/Esc behavior, expandable date/time/reminder controls, and reuse of existing task validation/persistence.
 - Prevented repeated hotkey activation from opening multiple Quick Add windows.
+- Enabled WinForms interop for WPF and added the embedded tray icon resource.
+- Added `TrayService` with double-click restore and New Task, Show, and Exit menu commands.
+- Added explicit `ShutdownMode.OnExplicitShutdown`, close-to-tray behavior, and unified exit cleanup through `ShutdownCoordinator`.
+- MainWindow can be hidden and restored repeatedly without disposing hotkey, notification, or tray resources.
 
 ## Files changed
 
@@ -122,6 +126,11 @@
 - `src/Quadrant.App/Views/MainWindow.xaml.cs`
 - `src/Quadrant.App/App.xaml.cs`
 - `Tests/Quadrant.Infrastructure.Tests/GlobalHotkeyServiceTests.cs`
+- `src/Quadrant.Infrastructure/Windows/TrayService.cs`
+- `src/Quadrant.App/ShutdownCoordinator.cs`
+- `src/Quadrant.App/Resources/Quadrant.ico`
+- `src/Quadrant.App/Quadrant.App.csproj`
+- `src/Quadrant.Infrastructure/Quadrant.Infrastructure.csproj`
 - `STATUS.md`
 - `src/Quadrant.App/Views/TaskEditorWindow.xaml`
 - `src/Quadrant.Infrastructure/Notifications/NotificationActivationParser.cs`
@@ -279,6 +288,10 @@
 - `dotnet test Quadrant.sln -c Debug --no-restore` — passed after Stage 13; 28 Core tests and 19 Infrastructure tests passed, 0 failed.
 - `git diff --check` — passed; no whitespace errors.
 - Direct `Quadrant.App.exe` launch smoke check — passed; process remained alive for 6 seconds.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed after Stage 14; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-restore` — passed after Stage 14; 28 Core tests and 19 Infrastructure tests passed, 0 failed.
+- `git diff --check` — passed; no whitespace errors.
+- Direct `Quadrant.App.exe` launch smoke check — passed after Stage 14; process remained alive for 6 seconds.
 
 ## Manual tests pending
 
@@ -289,6 +302,7 @@
 - Stage 11 manual checks remain pending: immediate Toast display, Complete/Open button behavior, closed-app activation, second-launch redirection, and Dispatcher deadlock check require an interactive Windows desktop session.
 - Stage 12 manual checks remain pending: 2-minute scheduled reminder with app closed, Complete/Open/Snooze actions, edit-time cancellation, completion cancellation, and sleep/wake missed-reminder banner.
 - Stage 13 manual checks remain pending: Word/Edge/VS Code foreground activation, hotkey conflict handling, Chinese IME input, Ctrl+1..4 selection, Enter/Esc, duplicate-window prevention, background main-window activation, and immediate quadrant refresh after save.
+- Stage 14 manual checks remain pending: close-to-tray taskbar disappearance, tray icon visibility, double-click restore, tray Quick Add, tray Exit process termination, hotkey release after exit, and single tray icon after restart.
 
 ## Sources checked
 
@@ -346,6 +360,8 @@
 - https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-hotkey — checked 2026-08-21; message and `wParam` id behavior.
 - https://learn.microsoft.com/en-us/dotnet/api/system.windows.interop.hwndsource.addhook — checked 2026-08-21; WPF HWND message hook.
 - https://learn.microsoft.com/en-us/dotnet/api/system.windows.interop.windowinterophelper.ensurehandle — checked 2026-08-21; WPF HWND acquisition.
+- https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.notifyicon — checked 2026-08-21; WinForms tray icon lifecycle and events.
+- https://learn.microsoft.com/en-us/dotnet/core/project-sdk/msbuild-props-desktop — checked 2026-08-21; `UseWindowsForms` project property.
 
 ## Known issues
 
@@ -367,7 +383,8 @@
 - Official documentation states elevated/admin apps cannot send or receive App Notifications; this remains a documented support limitation.
 - Stage 11 GUI and Toast acceptance is not verifiable in the current environment; automated parser/build/startup checks pass.
 - Stage 13 has no known build or automated-test issues; full cross-application hotkey and IME behavior still requires an interactive Windows desktop session.
+- Stage 14 has no known build or automated-test issues; tray shell behavior requires an interactive Windows desktop session.
 
 ## Next stage
 
-`stages/STAGE_14_TRAY_LIFECYCLE.md`
+`stages/STAGE_15_SETTINGS_STARTUP.md`

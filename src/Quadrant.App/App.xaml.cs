@@ -6,10 +6,14 @@ public partial class App : System.Windows.Application
     private readonly Quadrant.Infrastructure.Notifications.WindowsReminderScheduler reminderScheduler = new();
     private readonly Quadrant.Infrastructure.Windows.SingleInstanceService singleInstanceService = new();
     private readonly Quadrant.Infrastructure.Windows.GlobalHotkeyService globalHotkeyService = new();
+    private readonly Quadrant.Infrastructure.Windows.TrayService trayService = new();
+    private readonly ShutdownCoordinator shutdownCoordinator = new();
+    private System.Drawing.Icon? trayIcon;
     private Quadrant.Infrastructure.Notifications.NotificationActivation? pendingActivation;
 
     private async void OnStartup(object sender, System.Windows.StartupEventArgs e)
     {
+        ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
         notificationService.ActivationReceived += NotificationService_ActivationReceived;
         try
         {
@@ -74,6 +78,20 @@ public partial class App : System.Windows.Application
         mainWindow.ConfigureGlobalHotkey(globalHotkeyService);
         mainWindow.GlobalHotkeyPressed += GlobalHotkeyService_HotkeyPressed;
         globalHotkeyService.RegistrationFailed += GlobalHotkeyService_RegistrationFailed;
+        trayService.ShowRequested += TrayService_ShowRequested;
+        trayService.QuickAddRequested += TrayService_QuickAddRequested;
+        trayService.ExitRequested += TrayService_ExitRequested;
+        try
+        {
+            trayIcon = LoadTrayIcon();
+            trayService.Initialize(trayIcon);
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"Tray initialization failed: {exception}");
+            trayIcon?.Dispose();
+            trayIcon = null;
+        }
         mainWindow.Show();
 
         if (pendingActivation is not null)
@@ -85,10 +103,58 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(System.Windows.ExitEventArgs e)
     {
+        trayService.Dispose();
+        trayIcon?.Dispose();
+        trayIcon = null;
         globalHotkeyService.Dispose();
         notificationService.Dispose();
         singleInstanceService.Dispose();
         base.OnExit(e);
+    }
+
+    private void TrayService_ShowRequested(object? sender, EventArgs e)
+    {
+        if (MainWindow is Views.MainWindow mainWindow)
+        {
+            mainWindow.ShowFromTray();
+        }
+    }
+
+    private void TrayService_QuickAddRequested(object? sender, EventArgs e)
+    {
+        if (MainWindow is Views.MainWindow mainWindow)
+        {
+            _ = Dispatcher.InvokeAsync(() => mainWindow.ShowQuickAddAsync());
+        }
+    }
+
+    private void TrayService_ExitRequested(object? sender, EventArgs e) => ExitApplication();
+
+    private void ExitApplication()
+    {
+        if (shutdownCoordinator.IsExiting)
+        {
+            return;
+        }
+
+        shutdownCoordinator.BeginExit();
+        if (MainWindow is Views.MainWindow mainWindow)
+        {
+            mainWindow.IsCloseToTray = false;
+            mainWindow.Close();
+        }
+
+        Shutdown();
+    }
+
+    private static System.Drawing.Icon LoadTrayIcon()
+    {
+        var resource = typeof(App).Assembly.GetManifestResourceStream("Quadrant.App.Resources.Quadrant.ico")
+            ?? throw new InvalidOperationException("托盘图标资源缺失。");
+        using (resource)
+        {
+            return new System.Drawing.Icon(resource);
+        }
     }
 
     private void GlobalHotkeyService_HotkeyPressed(object? sender, EventArgs e)

@@ -17,5 +17,5 @@ public sealed class ReminderPresetDisplayConverter : IValueConverter
         _ => value?.ToString() ?? string.Empty
     };
 
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => System.Windows.Data.Binding.DoNothing;
 }

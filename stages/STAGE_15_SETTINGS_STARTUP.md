@@ -2,7 +2,7 @@
 
 ## Goal
 
-加入少量真正必要设置，不做“设置中心”。
+加入少量真正必要设置，设置中心。
 
 ## Before coding — MUST browse
 

@@ -11,7 +11,7 @@ namespace Quadrant.App.Views;
 public partial class MainWindow : System.Windows.Window
 {
     private const string TaskIdFormat = "Quadrant.TaskId";
-    private Point dragStartPoint;
+    private System.Windows.Point dragStartPoint;
     private Border? highlightedQuadrant;
     private Quadrant.Infrastructure.Windows.GlobalHotkeyService? globalHotkeyService;
     private HwndSource? windowSource;
@@ -23,11 +23,14 @@ public partial class MainWindow : System.Windows.Window
         Loaded += MainWindow_Loaded;
         SourceInitialized += MainWindow_SourceInitialized;
         Closed += MainWindow_Closed;
+        Closing += MainWindow_Closing;
         AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(TaskCard_MouseLeftButtonDown));
-        AddHandler(UIElement.PreviewMouseMoveEvent, new MouseEventHandler(TaskCard_MouseMove));
+        AddHandler(UIElement.PreviewMouseMoveEvent, new System.Windows.Input.MouseEventHandler(TaskCard_MouseMove));
     }
 
     public event EventHandler? GlobalHotkeyPressed;
+
+    public bool IsCloseToTray { get; set; } = true;
 
     public void ConfigureGlobalHotkey(Quadrant.Infrastructure.Windows.GlobalHotkeyService service)
     {
@@ -54,6 +57,27 @@ public partial class MainWindow : System.Windows.Window
         }
 
         globalHotkeyService?.Unregister(new WindowInteropHelper(this).Handle);
+    }
+
+    private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (IsCloseToTray)
+        {
+            e.Cancel = true;
+            Hide();
+        }
+    }
+
+    public void ShowFromTray()
+    {
+        Show();
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        Activate();
+        Focus();
     }
 
     private IntPtr WindowSourceHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -86,7 +110,7 @@ public partial class MainWindow : System.Windows.Window
         window.ShowDialog();
     }
 
-    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
         {
@@ -141,7 +165,7 @@ public partial class MainWindow : System.Windows.Window
 
     private void ShowRecoverableError(string title, Exception exception)
     {
-        MessageBox.Show($"{title}。\n{exception.Message}", title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        System.Windows.MessageBox.Show($"{title}。\n{exception.Message}", title, System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
     }
 
     public async Task ActivateAndOpenTaskAsync(long id)
@@ -184,7 +208,7 @@ public partial class MainWindow : System.Windows.Window
 
     private async void DeleteTaskRequested(object? sender, long id)
     {
-        if (MessageBox.Show("确定删除此任务吗？", "删除任务", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
+        if (System.Windows.MessageBox.Show("确定删除此任务吗？", "删除任务", System.Windows.MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning) != System.Windows.MessageBoxResult.OK)
         {
             return;
         }
@@ -210,7 +234,7 @@ public partial class MainWindow : System.Windows.Window
         }
     }
 
-    private void TaskCard_MouseMove(object sender, MouseEventArgs e)
+    private void TaskCard_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
         if (e.LeftButton != MouseButtonState.Pressed || FindTaskCard(e.OriginalSource as DependencyObject) is not Border card)
         {
@@ -229,26 +253,26 @@ public partial class MainWindow : System.Windows.Window
             return;
         }
 
-        var data = new DataObject(TaskIdFormat, task.Id);
-        DragDrop.DoDragDrop(card, data, DragDropEffects.Move);
+        var data = new System.Windows.DataObject(TaskIdFormat, task.Id);
+        System.Windows.DragDrop.DoDragDrop(card, data, System.Windows.DragDropEffects.Move);
         ClearQuadrantFeedback();
     }
 
-    private void Quadrant_DragOver(object sender, DragEventArgs e)
+    private void Quadrant_DragOver(object sender, System.Windows.DragEventArgs e)
     {
         if (!e.Data.GetDataPresent(TaskIdFormat) || sender is not Border target)
         {
-            e.Effects = DragDropEffects.None;
+            e.Effects = System.Windows.DragDropEffects.None;
             e.Handled = true;
             return;
         }
 
-        e.Effects = DragDropEffects.Move;
+        e.Effects = System.Windows.DragDropEffects.Move;
         SetQuadrantFeedback(target);
         e.Handled = true;
     }
 
-    private async void Quadrant_Drop(object sender, DragEventArgs e)
+    private async void Quadrant_Drop(object sender, System.Windows.DragEventArgs e)
     {
         ClearQuadrantFeedback();
         if (sender is not Border target || !e.Data.GetDataPresent(TaskIdFormat) || e.Data.GetData(TaskIdFormat) is not long taskId || target.Tag is not string targetText || !int.TryParse(targetText, out var targetQuadrantId))
@@ -266,12 +290,12 @@ public partial class MainWindow : System.Windows.Window
         }
         catch (Exception)
         {
-            MessageBox.Show("任务移动失败，原位置未改变。", "移动任务", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show("任务移动失败，原位置未改变。", "移动任务", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
         }
         e.Handled = true;
     }
 
-    private void Quadrant_DragLeave(object sender, DragEventArgs e)
+    private void Quadrant_DragLeave(object sender, System.Windows.DragEventArgs e)
     {
         if (e.OriginalSource is Border target)
         {
