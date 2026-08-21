@@ -10,7 +10,12 @@ public partial class TaskEditorWindow : Window
     {
         InitializeComponent();
         DataContext = viewModel;
-        Loaded += (_, _) => TitleBox.Focus();
+        Loaded += (_, _) =>
+        {
+            MaxHeight = SystemParameters.WorkArea.Height;
+            MaxWidth = SystemParameters.WorkArea.Width;
+            TitleBox.Focus();
+        };
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)

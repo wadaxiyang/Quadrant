@@ -16,6 +16,7 @@
                 <ResourceDictionary Source="Resources/QuadrantColors.xaml" />
                 <ResourceDictionary Source="Resources/ControlStyles.xaml" />
                 <ResourceDictionary Source="Resources/TaskCardTemplate.xaml" />
+                <ResourceDictionary Source="Resources/UiStrings.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

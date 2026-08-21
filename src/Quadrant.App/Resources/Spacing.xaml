@@ -22,6 +22,7 @@
     <CornerRadius x:Key="RadiusMedium">8</CornerRadius>
 
     <Thickness x:Key="WindowMargin">16</Thickness>
+    <GridLength x:Key="ToolbarHeight">Auto</GridLength>
     <Thickness x:Key="ToolbarSecondaryMargin">16,0,0,0</Thickness>
     <Thickness x:Key="QuadrantTopLeftMargin">0,0,8,8</Thickness>
     <Thickness x:Key="QuadrantTopRightMargin">8,0,0,8</Thickness>

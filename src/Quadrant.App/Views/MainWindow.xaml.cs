@@ -26,6 +26,7 @@ public partial class MainWindow : System.Windows.Window
         Closing += MainWindow_Closing;
         AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(TaskCard_MouseLeftButtonDown));
         AddHandler(UIElement.PreviewMouseMoveEvent, new System.Windows.Input.MouseEventHandler(TaskCard_MouseMove));
+        AddHandler(UIElement.PreviewKeyDownEvent, new System.Windows.Input.KeyEventHandler(TaskCard_PreviewKeyDown));
     }
 
     public event EventHandler? GlobalHotkeyPressed;
@@ -126,6 +127,20 @@ public partial class MainWindow : System.Windows.Window
             SearchBox.Clear();
             ((MainViewModel)DataContext).SelectedFilter = Quadrant.Core.Enums.TaskFilter.All;
             Keyboard.ClearFocus();
+            e.Handled = true;
+        }
+    }
+
+    private void TaskCard_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key is not (Key.Enter or Key.Space) || e.OriginalSource is System.Windows.Controls.Button || FindTaskCard(e.OriginalSource as DependencyObject)?.DataContext is not TaskCardViewModel task)
+        {
+            return;
+        }
+
+        if (task.CompleteCommand.CanExecute(task.Id))
+        {
+            task.CompleteCommand.Execute(task.Id);
             e.Handled = true;
         }
     }

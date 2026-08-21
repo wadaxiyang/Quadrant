@@ -39,9 +39,9 @@ public partial class QuickAddWindow : Window
 
     private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (Keyboard.Modifiers == ModifierKeys.Control && e.Key is >= Key.D1 and <= Key.D4)
+        if (Keyboard.Modifiers == ModifierKeys.Control && (e.Key is >= Key.D1 and <= Key.D4 || e.Key is >= Key.NumPad1 and <= Key.NumPad4))
         {
-            ((TaskEditorViewModel)DataContext).QuadrantId = e.Key - Key.D0;
+            ((TaskEditorViewModel)DataContext).QuadrantId = e.Key is >= Key.NumPad1 and <= Key.NumPad4 ? e.Key - Key.NumPad0 : e.Key - Key.D0;
             e.Handled = true;
         }
     }

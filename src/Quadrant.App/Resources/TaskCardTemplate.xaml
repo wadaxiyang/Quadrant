@@ -5,6 +5,13 @@
 
     <DataTemplate x:Key="TaskCardTemplate">
         <Border Style="{StaticResource TaskCardStyle}" Margin="{StaticResource TaskCardBottomMargin}">
+            <AutomationProperties.Name>
+                <MultiBinding StringFormat="{}{0}；{1}；{2}">
+                    <Binding Path="Title" />
+                    <Binding Path="DueText" />
+                    <Binding Path="DueStatusText" />
+                </MultiBinding>
+            </AutomationProperties.Name>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -17,9 +24,9 @@
                     <TextBlock Style="{StaticResource CaptionTextStyle}" Margin="{StaticResource CaptionTopMargin}" Opacity="0.72" Text="{Binding ReminderText}" Visibility="{Binding ReminderText, Converter={StaticResource TaskCardStringToVisibilityConverter}}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Command="{Binding CompleteCommand}" CommandParameter="{Binding Id}" Content="完成" />
-                    <Button Margin="{StaticResource ButtonGap}" Command="{Binding EditCommand}" CommandParameter="{Binding Id}" Content="编辑" />
-                    <Button Margin="{StaticResource ButtonGap}" Command="{Binding DeleteCommand}" CommandParameter="{Binding Id}" Content="删除" />
+                    <Button Command="{Binding CompleteCommand}" CommandParameter="{Binding Id}" Content="{DynamicResource CompleteText}" AutomationProperties.Name="标记任务完成" ToolTip="完成任务" />
+                    <Button Margin="{StaticResource ButtonGap}" Command="{Binding EditCommand}" CommandParameter="{Binding Id}" Content="{DynamicResource EditText}" AutomationProperties.Name="编辑任务" ToolTip="编辑任务" />
+                    <Button Margin="{StaticResource ButtonGap}" Command="{Binding DeleteCommand}" CommandParameter="{Binding Id}" Content="{DynamicResource DeleteText}" AutomationProperties.Name="删除任务" ToolTip="删除任务" />
                 </StackPanel>
             </Grid>
         </Border>

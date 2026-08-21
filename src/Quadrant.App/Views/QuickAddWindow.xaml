@@ -9,6 +9,7 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         PreviewKeyDown="Window_PreviewKeyDown">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <Grid Margin="{StaticResource WindowMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -29,10 +30,10 @@
         <StackPanel Grid.Row="2" Margin="{StaticResource FieldTopMargin}">
             <TextBlock Style="{StaticResource CaptionTextStyle}" Text="象限" />
             <UniformGrid Margin="{StaticResource CaptionTopMargin}" Columns="4">
-                <Button Margin="{StaticResource ButtonGap}" Click="Quadrant_Click" Tag="1" Content="Q1" />
-                <Button Margin="{StaticResource ButtonGap}" Click="Quadrant_Click" Tag="2" Content="Q2" />
-                <Button Margin="{StaticResource ButtonGap}" Click="Quadrant_Click" Tag="3" Content="Q3" />
-                <Button Margin="{StaticResource ButtonGap}" Click="Quadrant_Click" Tag="4" Content="Q4" />
+                <Button Margin="{StaticResource ButtonGap}" Click="Quadrant_Click" Tag="1" Content="Q1" AutomationProperties.Name="选择 Q1 象限" />
+                <Button Margin="{StaticResource ButtonGap}" Click="Quadrant_Click" Tag="2" Content="Q2" AutomationProperties.Name="选择 Q2 象限" />
+                <Button Margin="{StaticResource ButtonGap}" Click="Quadrant_Click" Tag="3" Content="Q3" AutomationProperties.Name="选择 Q3 象限" />
+                <Button Margin="{StaticResource ButtonGap}" Click="Quadrant_Click" Tag="4" Content="Q4" AutomationProperties.Name="选择 Q4 象限" />
             </UniformGrid>
             <TextBlock Margin="{StaticResource CaptionTopMargin}" Style="{StaticResource CaptionTextStyle}" Text="{Binding QuadrantLabel}" />
         </StackPanel>
@@ -80,8 +81,9 @@
         </Expander>
 
         <StackPanel Grid.Row="4" Margin="{StaticResource FieldTopMargin}" HorizontalAlignment="Right" Orientation="Horizontal">
-            <Button IsCancel="True" MinWidth="80" Content="取消" />
-            <Button Margin="{StaticResource ButtonGap}" IsDefault="True" IsEnabled="{Binding IsValid}" MinWidth="80" Click="Save_Click" Content="保存" />
+            <Button IsCancel="True" MinWidth="80" Content="{DynamicResource CancelText}" AutomationProperties.Name="取消快速添加" />
+            <Button Margin="{StaticResource ButtonGap}" IsDefault="True" IsEnabled="{Binding IsValid}" MinWidth="80" Click="Save_Click" Content="{DynamicResource SaveText}" AutomationProperties.Name="保存任务" />
         </StackPanel>
     </Grid>
+    </ScrollViewer>
 </Window>

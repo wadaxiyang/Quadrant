@@ -7,6 +7,7 @@
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <Grid Margin="{StaticResource WindowMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -91,8 +92,9 @@
         </StackPanel>
 
         <StackPanel Grid.Row="6" Margin="{StaticResource FieldTopMargin}" HorizontalAlignment="Right" Orientation="Horizontal">
-            <Button IsCancel="True" MinWidth="80" Content="取消" />
-            <Button Margin="{StaticResource ButtonGap}" IsDefault="True" IsEnabled="{Binding IsValid}" MinWidth="80" Click="Save_Click" Content="保存" />
+            <Button IsCancel="True" MinWidth="80" Content="{DynamicResource CancelText}" AutomationProperties.Name="取消编辑" />
+            <Button Margin="{StaticResource ButtonGap}" IsDefault="True" IsEnabled="{Binding IsValid}" MinWidth="80" Click="Save_Click" Content="{DynamicResource SaveText}" AutomationProperties.Name="保存任务" />
         </StackPanel>
     </Grid>
+    </ScrollViewer>
 </Window>

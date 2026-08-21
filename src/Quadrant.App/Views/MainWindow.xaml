@@ -12,7 +12,7 @@
         PreviewKeyDown="MainWindow_PreviewKeyDown">
     <Grid Margin="{StaticResource WindowMargin}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="56" />
+            <RowDefinition Height="{StaticResource ToolbarHeight}" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -29,11 +29,12 @@
                      Width="220"
                      Margin="{StaticResource ToolbarSecondaryMargin}"
                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                     AutomationProperties.Name="搜索任务标题和备注"
                      ToolTip="{Binding SearchPlaceholder}" />
             <StackPanel DockPanel.Dock="Right" Margin="{StaticResource ToolbarSecondaryMargin}" Orientation="Horizontal">
-                <Button Command="{Binding SelectFilterCommand}" CommandParameter="{x:Static enums:TaskFilter.All}" Content="全部" />
-                <Button Margin="{StaticResource ButtonGap}" Command="{Binding SelectFilterCommand}" CommandParameter="{x:Static enums:TaskFilter.Today}" Content="今天" />
-                <Button Margin="{StaticResource ButtonGap}" Command="{Binding SelectFilterCommand}" CommandParameter="{x:Static enums:TaskFilter.Overdue}" Content="已逾期" />
+                <Button Command="{Binding SelectFilterCommand}" CommandParameter="{x:Static enums:TaskFilter.All}" Content="全部" AutomationProperties.Name="显示全部任务" />
+                <Button Margin="{StaticResource ButtonGap}" Command="{Binding SelectFilterCommand}" CommandParameter="{x:Static enums:TaskFilter.Today}" Content="今天" AutomationProperties.Name="显示今天到期的任务" />
+                <Button Margin="{StaticResource ButtonGap}" Command="{Binding SelectFilterCommand}" CommandParameter="{x:Static enums:TaskFilter.Overdue}" Content="已逾期" AutomationProperties.Name="显示已逾期任务" />
             </StackPanel>
         </DockPanel>
 

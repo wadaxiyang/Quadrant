@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_15_SETTINGS_STARTUP` — implementation complete; manual settings and startup checks pending
+`STAGE_16_ACCESSIBILITY_POLISH` — implementation complete; DPI and interactive accessibility checks pending
 
 ## Completed
 
@@ -92,6 +92,8 @@
 - Added user-level HKCU Run startup service with quoted executable path and optional `--background` argument.
 - Added background startup handling that initializes services and tray without showing MainWindow.
 - Applied WPF native `ThemeMode` immediately from persisted settings without adding a custom palette.
+- Added Stage 16 accessibility and visual polish: content-driven toolbar sizing, scrollable task editors capped to the work area, task-card UI Automation names containing title/due/status, explicit AutomationProperties names and tooltips, Quick Add numpad shortcuts, and keyboard completion for focused task cards.
+- Added `docs/V1_UI_ACCEPTANCE.md` with an explicit acceptance record.
 
 ## Files changed
 
@@ -125,6 +127,8 @@
 - `src/Quadrant.App/Views/CompletedWindow.xaml.cs`
 - `src/Quadrant.App/Views/MainWindow.xaml.cs`
 - `src/Quadrant.App/ViewModels/TaskEditorViewModel.cs`
+- `src/Quadrant.App/Resources/UiStrings.xaml`
+- `docs/V1_UI_ACCEPTANCE.md`
 - `src/Quadrant.Infrastructure/Windows/GlobalHotkeyService.cs`
 - `src/Quadrant.App/Views/QuickAddWindow.xaml`
 - `src/Quadrant.App/Views/QuickAddWindow.xaml.cs`
@@ -310,6 +314,9 @@
 - `dotnet test Quadrant.sln -c Debug --no-restore` — passed after Stage 15; 28 Core tests and 19 Infrastructure tests passed, 0 failed.
 - `git diff --check` — passed; no whitespace errors.
 - Direct `Quadrant.App.exe --background` smoke check — passed; process remained alive for 6 seconds.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed after Stage 16; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-restore` — passed after Stage 16; 28 Core tests and 19 Infrastructure tests passed, 0 failed.
+- `git diff --check` — passed; only normal line-ending notices were reported.
 
 ## Manual tests pending
 
@@ -322,6 +329,7 @@
 - Stage 13 manual checks remain pending: Word/Edge/VS Code foreground activation, hotkey conflict handling, Chinese IME input, Ctrl+1..4 selection, Enter/Esc, duplicate-window prevention, background main-window activation, and immediate quadrant refresh after save.
 - Stage 14 manual checks remain pending: close-to-tray taskbar disappearance, tray icon visibility, double-click restore, tray Quick Add, tray Exit process termination, hotkey release after exit, and single tray icon after restart.
 - Stage 15 manual checks remain pending: restart persistence, Light/Dark/System visual changes, HKCU Run enable/disable and Task Manager visibility, background startup focus behavior, quadrant rename with unchanged task IDs, and invalid hotkey feedback.
+- Stage 16 manual checks remain pending: 100/125/150/200% DPI, 920x620 minimum window, DatePicker/ComboBox clipping, live keyboard traversal, screen-reader/UI Automation inspection, and High Contrast rendering. The checklist is recorded in `docs/V1_UI_ACCEPTANCE.md`.
 
 ## Sources checked
 
@@ -384,6 +392,9 @@
 - https://learn.microsoft.com/en-us/dotnet/desktop/wpf/whats-new/net90 — checked 2026-08-21; WPF native Fluent `ThemeMode` property and supported values.
 - https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/deploy-unpackaged-apps — checked 2026-08-21; unpackaged desktop deployment guidance.
 - https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys — checked 2026-08-21; per-user Run key behavior.
+- https://learn.microsoft.com/en-us/search/index?search=WPF%20accessibility%20AutomationProperties.Name — checked 2026-08-21; current Microsoft Learn search for WPF accessibility and AutomationProperties guidance.
+- https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/accessibility — checked 2026-08-21; current requested path returned 404 in Learn routing.
+- https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/automation-overview — checked 2026-08-21; current requested path returned 404 in Learn routing.
 
 ## Known issues
 
@@ -411,7 +422,9 @@
 - Global hotkey persistence currently validates only the implemented `Ctrl+Alt+Q` chord; arbitrary chord registration remains deferred.
 - Stage 15 has no known build or automated-test issues; settings UI, theme visuals, registry startup behavior, and focus behavior require an interactive Windows desktop session.
 - Stage 15 uses `ThemeMode` despite the .NET 10 reference warning that the API is evaluation-only; WPF0001 is explicitly suppressed and the official current WPF guidance was checked.
+- Stage 16 has no known build or automated-test issues; interactive DPI, High Contrast, screen-reader, and visual acceptance remain environment-limited.
+- Stage 16 keeps WPF defaults and existing Fluent/system resources; no new theme, animation, or third-party accessibility dependency was added.
 
 ## Next stage
 
-`stages/STAGE_16_ACCESSIBILITY_POLISH.md`
+`stages/STAGE_17_PERFORMANCE_RESILIENCE.md`
