@@ -108,6 +108,23 @@ public partial class MainViewModel : ObservableObject
         await LoadAsync();
     }
 
+    public async Task OpenTaskAsync(long id, CancellationToken cancellationToken = default)
+    {
+        var task = await taskService.GetByIdAsync(id, cancellationToken);
+        if (task is not null && !task.IsCompleted)
+        {
+            EditTaskTask(task);
+        }
+    }
+
+    public async Task CompleteFromNotificationAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await taskService.SetCompletedAsync(id, true, cancellationToken);
+        await LoadAsync(cancellationToken);
+    }
+
+    private void EditTaskTask(TaskItem task) => EditTaskRequested?.Invoke(this, task);
+
     public async Task LoadCompletedAsync(CancellationToken cancellationToken = default)
     {
         var completed = await taskService.GetCompletedAsync(cancellationToken);

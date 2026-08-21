@@ -98,6 +98,17 @@ public partial class MainWindow : System.Windows.Window
         MessageBox.Show($"{title}。\n{exception.Message}", title, MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
+    public async Task ActivateAndOpenTaskAsync(long id)
+    {
+        Activate();
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        await ((MainViewModel)DataContext).OpenTaskAsync(id);
+    }
+
     private async void DeleteTaskRequested(object? sender, long id)
     {
         if (MessageBox.Show("确定删除此任务吗？", "删除任务", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)

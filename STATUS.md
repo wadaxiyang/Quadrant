@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_10_WINDOWS_NOTIFICATIONS` — implementation complete; manual GUI checks pending
+`STAGE_11_APP_NOTIFICATIONS_SINGLE_INSTANCE` — implementation complete; manual GUI/Toast checks pending
 
 ## Completed
 
@@ -70,6 +70,10 @@
 - Added diagnostic-only `WindowsAppSdkEnvironmentProbe` using official WinRT `ReleaseInfo`; DEBUG startup writes runtime availability/version without adding UI or notification behavior.
 - Verified the development machine has Windows App Runtime 2.4.0 installed for x64 and x86.
 - Migrated all App ViewModel `[ObservableProperty]` fields to generated `public partial` properties to remove MVVMTK0045 warnings while preserving existing property names and change callbacks.
+- Added immediate Windows App Notification service with Complete/Open buttons and optional due text.
+- Added strict notification activation parsing and unit tests for action/task id validation.
+- Added AppInstance-based single-instance registration, second-launch redirection, and WPF Dispatcher activation routing.
+- Added cold-start notification activation handling; Complete updates data without forcing the main window, Open activates the window and opens the task editor.
 
 ## Files changed
 
@@ -104,6 +108,10 @@
 - `src/Quadrant.App/Views/MainWindow.xaml.cs`
 - `src/Quadrant.App/ViewModels/TaskEditorViewModel.cs`
 - `src/Quadrant.App/Views/TaskEditorWindow.xaml`
+- `src/Quadrant.Infrastructure/Notifications/NotificationActivationParser.cs`
+- `src/Quadrant.Infrastructure/Notifications/WindowsAppNotificationService.cs`
+- `src/Quadrant.Infrastructure/Windows/SingleInstanceService.cs`
+- `Tests/Quadrant.Infrastructure.Tests/NotificationActivationParserTests.cs`
 - `src/Quadrant.App/Views/TaskEditorWindow.xaml.cs`
 - `src/Quadrant.App/ViewModels/TaskEditorViewModel.cs`
 - `src/Quadrant.App/Views/MainWindow.xaml.cs`
@@ -239,6 +247,9 @@
 - Direct `Quadrant.App.exe` launch smoke check — passed; process remained running for 8 seconds without SDK initialization/startup failure.
 - `dotnet build Quadrant.sln -c Debug --no-restore` — passed after MVVMTK0045 migration; 0 warnings, 0 errors.
 - `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after MVVMTK0045 migration; 30 tests passed, 0 failed.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed after Stage 11; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after Stage 11; 26 Core tests and 12 Infrastructure tests passed, 0 failed.
+- Direct `Quadrant.App.exe` launch smoke check — passed; process remained alive for 6 seconds after notification/single-instance startup wiring.
 
 ## Manual tests pending
 
@@ -246,6 +257,7 @@
 - Stage 09 GUI checks remain pending: preset enablement, custom reminder without Due, inline past-time validation, edit inference, and clear Due/Reminder separation.
 - The reported regression is covered by the input-change fix; interactive GUI confirmation remains pending in this environment.
 - Stage 10 manual GUI/runtime checks remain pending: DEBUG output should be inspected from an IDE/debug listener to confirm the probe prints the installed 2.4.0 runtime string.
+- Stage 11 manual checks remain pending: immediate Toast display, Complete/Open button behavior, closed-app activation, second-launch redirection, and Dispatcher deadlock check require an interactive Windows desktop session.
 
 ## Sources checked
 
@@ -289,6 +301,10 @@
 - https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.windows.applicationmodel.windowsappruntime.releaseinfo — checked 2026-08-20; `ReleaseInfo` probe API.
 - https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/generators/observableproperty — checked 2026-08-20; partial type/property requirements and generated property behavior.
 - https://aka.ms/mvvmtoolkit/errors/mvvmtk0045 — checked 2026-08-20; official migration from annotated fields to partial properties.
+- https://learn.microsoft.com/en-us/windows/apps/develop/notifications/app-notifications/app-notifications-dotnet?pivots=wpf — checked 2026-08-21; WPF notification registration order, activation handling, unpackaged registration, buttons, and elevated-app limitation.
+- https://learn.microsoft.com/en-us/windows/apps/develop/notifications/app-notifications/app-notifications-content — checked 2026-08-21; `AppNotificationBuilder` and `AppNotificationButton` argument construction.
+- https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/applifecycle/applifecycle-single-instance — checked 2026-08-21; `FindOrRegisterForKey`, `RedirectActivationToAsync`, and activation event handling.
+- https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.windows.applifecycle.appactivationarguments.data — checked 2026-08-21; activation `Data` object payload and notification activation argument type.
 
 ## Known issues
 
@@ -301,7 +317,10 @@
 - Stage 09 GUI manual acceptance is pending: reminder preset enablement, Custom without Due, future/past validation, and edit preset inference.
 - Stage 10 cannot validate the DEBUG probe through the xUnit test host because automatic initialization is generated for the App executable; direct App launch passed, while runtime version output remains an IDE/debug-listener check.
 - No known MVVMTK0045 warnings remain after the partial-property migration.
+- Stage 11 follows the official WPF startup order: register the notification handler, call `Register()`, then call `GetActivatedEventArgs()` and register the single instance. Scheduled notifications and snooze remain intentionally deferred to Stage 12.
+- Official documentation states elevated/admin apps cannot send or receive App Notifications; this remains a documented support limitation.
+- Stage 11 GUI and Toast acceptance is not verifiable in the current environment; automated parser/build/startup checks pass.
 
 ## Next stage
 
-`stages/STAGE_11_APP_NOTIFICATIONS_SINGLE_INSTANCE.md`
+`stages/STAGE_12_SCHEDULED_REMINDERS_MISSED.md`

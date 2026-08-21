@@ -2,9 +2,34 @@ namespace Quadrant.App;
 
 public partial class App : System.Windows.Application
 {
-    protected override async void OnStartup(System.Windows.StartupEventArgs e)
+    private readonly Quadrant.Infrastructure.Notifications.WindowsAppNotificationService notificationService = new();
+    private readonly Quadrant.Infrastructure.Windows.SingleInstanceService singleInstanceService = new();
+    private Quadrant.Infrastructure.Notifications.NotificationActivation? pendingActivation;
+
+    private async void OnStartup(object sender, System.Windows.StartupEventArgs e)
     {
-        base.OnStartup(e);
+        notificationService.ActivationReceived += NotificationService_ActivationReceived;
+        try
+        {
+            notificationService.Register();
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"App notification registration failed: {exception}");
+        }
+
+        var activationArgs = Microsoft.Windows.AppLifecycle.AppInstance.GetCurrent().GetActivatedEventArgs();
+        if (!singleInstanceService.RegisterCurrentInstance(SingleInstance_Activated))
+        {
+            await singleInstanceService.RedirectActivationAsync(activationArgs);
+            Shutdown();
+            return;
+        }
+
+        if (activationArgs.Kind != Microsoft.Windows.AppLifecycle.ExtendedActivationKind.Launch)
+        {
+            pendingActivation = ParseActivation(activationArgs);
+        }
 
 #if DEBUG
         var windowsAppSdkProbe = new Quadrant.Infrastructure.Windows.WindowsAppSdkEnvironmentProbe().Probe();
@@ -36,5 +61,76 @@ public partial class App : System.Windows.Application
 
         MainWindow = mainWindow;
         mainWindow.Show();
+
+        if (pendingActivation is not null)
+        {
+            await HandleActivationAsync(pendingActivation);
+            pendingActivation = null;
+        }
+    }
+
+    protected override void OnExit(System.Windows.ExitEventArgs e)
+    {
+        notificationService.Dispose();
+        singleInstanceService.Dispose();
+        base.OnExit(e);
+    }
+
+    private void NotificationService_ActivationReceived(
+        object? sender,
+        Quadrant.Infrastructure.Notifications.NotificationActivation activation)
+    {
+        _ = Dispatcher.InvokeAsync(() => HandleActivationAsync(activation));
+    }
+
+    private void SingleInstance_Activated(
+        object? sender,
+        Microsoft.Windows.AppLifecycle.AppActivationArguments arguments)
+    {
+        var activation = ParseActivation(arguments);
+        if (activation is not null)
+        {
+            _ = Dispatcher.InvokeAsync(() => HandleActivationAsync(activation));
+        }
+        else if (MainWindow is not null)
+        {
+            _ = Dispatcher.InvokeAsync(() => MainWindow.Activate());
+        }
+    }
+
+    private async Task HandleActivationAsync(
+        Quadrant.Infrastructure.Notifications.NotificationActivation activation)
+    {
+        if (MainWindow is not Views.MainWindow mainWindow || mainWindow.DataContext is not ViewModels.MainViewModel viewModel)
+        {
+            pendingActivation = activation;
+            return;
+        }
+
+        try
+        {
+            if (activation.Action == "complete")
+            {
+                await viewModel.CompleteFromNotificationAsync(activation.TaskId);
+            }
+            else
+            {
+                await mainWindow.ActivateAndOpenTaskAsync(activation.TaskId);
+            }
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"Notification activation failed: {exception}");
+        }
+    }
+
+    private static Quadrant.Infrastructure.Notifications.NotificationActivation? ParseActivation(
+        Microsoft.Windows.AppLifecycle.AppActivationArguments arguments)
+    {
+        return Quadrant.Infrastructure.Notifications.NotificationActivationParser.TryParse(
+            (arguments.Data as Microsoft.Windows.AppNotifications.AppNotificationActivatedEventArgs)?.Argument,
+            out var activation)
+            ? activation
+            : null;
     }
 }
