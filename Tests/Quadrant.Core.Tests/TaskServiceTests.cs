@@ -40,6 +40,24 @@ public sealed class TaskServiceTests
     }
 
     [Fact]
+    public async Task Complete_recurring_task_creates_and_schedules_exactly_one_next_instance()
+    {
+        var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));
+        var repository = new FakeTaskRepository
+        {
+            CurrentTask = new TaskItem(1, "Daily", null, now.AddDays(1), now.AddHours(1), null, false, null, now, now,
+                null, null, RecurrenceKind.Daily, 1, "series", null)
+        };
+        var scheduler = new FakeReminderScheduler();
+        var service = new TaskService(repository, scheduler, new FakeClock(now));
+
+        await service.SetCompletedAsync(1, true);
+
+        Assert.Contains(1, scheduler.CancelledTaskIds);
+        Assert.Contains(2, scheduler.RescheduledTaskIds);
+    }
+
+    [Fact]
     public async Task Create_without_reminder_cancels_any_existing_schedule()
     {
         var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));
@@ -309,11 +327,15 @@ public sealed class TaskServiceTests
         public Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, DateTimeOffset now, CancellationToken cancellationToken = default) =>
             Task.FromResult(new TaskItem(id, "Task", 1, null, null, null, isCompleted, isCompleted ? now : null, now, now));
 
-        public Task<CompletedTaskMutationResult> CompleteWithSnapshotAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default)
+        public Task<CompletedTaskMutationResult> CompleteWithSnapshotAsync(long id, DateTimeOffset now, Func<TaskItem, TaskDraft?>? nextDraftFactory = null, CancellationToken cancellationToken = default)
         {
-            CurrentTask = new TaskItem(id, "Task", 1, null, null, null, true, now, now, now);
-            var task = CurrentTask;
-            return Task.FromResult(new CompletedTaskMutationResult(task, null, false));
+            var source = CurrentTask ?? new TaskItem(id, "Task", 1, null, null, null, false, null, now, now);
+            var task = source with { IsCompleted = true, CompletedAt = now, UpdatedAt = now };
+            CurrentTask = task;
+            var nextTask = nextDraftFactory?.Invoke(source) is { } nextDraft
+                ? new TaskItem(id + 1, nextDraft.Title, nextDraft.QuadrantId, nextDraft.DueAt, nextDraft.ReminderAt, nextDraft.Note, false, null, now, now, nextDraft.PlannedDate, nextDraft.EstimatedMinutes, nextDraft.RecurrenceKind, nextDraft.RecurrenceInterval, nextDraft.RecurrenceSeriesId, nextDraft.RecurrenceAnchorDay)
+                : null;
+            return Task.FromResult(new CompletedTaskMutationResult(task, null, false, nextTask));
         }
 
         public Task<TaskItem> ReopenWithSnapshotRevertedAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default)

@@ -301,6 +301,29 @@ public sealed class SqliteStorageTests
     }
 
     [Fact]
+    public async Task Atomic_completion_creates_next_instance_once_and_keeps_inbox()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var now = new DateTimeOffset(2026, 8, 21, 9, 30, 0, TimeSpan.FromHours(8));
+        var source = await database.Tasks.CreateAsync(new TaskDraft("Recurring inbox", null, now.AddDays(1), null, "note", null, 30,
+            Quadrant.Core.Enums.RecurrenceKind.Daily, 1, "series", 22), now);
+        var nextDraft = new TaskDraft("Recurring inbox", null, now.AddDays(2), null, "note", null, 30,
+            Quadrant.Core.Enums.RecurrenceKind.Daily, 1, "series", 22);
+
+        var first = await database.Tasks.CompleteWithSnapshotAsync(source.Id, now, _ => nextDraft);
+        var second = await database.Tasks.CompleteWithSnapshotAsync(source.Id, now.AddMinutes(1), _ => nextDraft);
+
+        Assert.NotNull(first.NextTask);
+        Assert.Null(first.NextTask!.QuadrantId);
+        Assert.True(first.Task.IsCompleted);
+        Assert.True(second.WasAlreadyCompleted);
+        Assert.Null(second.NextTask);
+        Assert.Single(await database.Tasks.GetInboxAsync());
+        Assert.Equal(1, await ReadScalarAsync(database.Factory, "SELECT COUNT(*) FROM task_completion_events;"));
+        Assert.Equal(2, await ReadScalarAsync(database.Factory, "SELECT COUNT(*) FROM tasks;"));
+    }
+
+    [Fact]
     public async Task Reopen_reverts_latest_event_and_recompletion_creates_a_new_event()
     {
         await using var database = await TestDatabase.CreateAsync();

@@ -22,7 +22,7 @@ public interface ITaskRepository
 
     Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, DateTimeOffset now, CancellationToken cancellationToken = default);
 
-    Task<CompletedTaskMutationResult> CompleteWithSnapshotAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default);
+    Task<CompletedTaskMutationResult> CompleteWithSnapshotAsync(long id, DateTimeOffset now, Func<TaskItem, TaskDraft?>? nextDraftFactory = null, CancellationToken cancellationToken = default);
 
     Task<TaskItem> ReopenWithSnapshotRevertedAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default);
 

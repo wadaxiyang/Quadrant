@@ -127,11 +127,11 @@ public sealed class SqliteTaskRepository : ITaskRepository, ITodayTaskRepository
     public async Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         return isCompleted
-            ? (await CompleteWithSnapshotAsync(id, now, cancellationToken)).Task
+            ? (await CompleteWithSnapshotAsync(id, now, cancellationToken: cancellationToken)).Task
             : await ReopenWithSnapshotRevertedAsync(id, now, cancellationToken);
     }
 
-    public async Task<CompletedTaskMutationResult> CompleteWithSnapshotAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default)
+    public async Task<CompletedTaskMutationResult> CompleteWithSnapshotAsync(long id, DateTimeOffset now, Func<TaskItem, TaskDraft?>? nextDraftFactory = null, CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var transaction = connection.BeginTransaction();
@@ -154,8 +154,13 @@ public sealed class SqliteTaskRepository : ITaskRepository, ITodayTaskRepository
         var completionEvent = new CompletionEvent(Guid.NewGuid().ToString("N"), id, completedUtc, DateOnly.FromDateTime(now.LocalDateTime), task.QuadrantId, task.Title, task.DueAt?.ToUniversalTime(), task.PlannedDate, task.EstimatedMinutes, task.DueAt is { } due && due < now);
         await reader.DisposeAsync();
         await InsertCompletionEventAsync(connection, transaction, completionEvent, cancellationToken);
+        TaskItem? nextTask = null;
+        if (nextDraftFactory?.Invoke(task) is { } nextDraft)
+        {
+            nextTask = await InsertTaskAsync(connection, transaction, nextDraft, now, cancellationToken);
+        }
         await transaction.CommitAsync(cancellationToken);
-        return new CompletedTaskMutationResult(completedTask, completionEvent, false);
+        return new CompletedTaskMutationResult(completedTask, completionEvent, false, nextTask);
     }
 
     public async Task<TaskItem> ReopenWithSnapshotRevertedAsync(long id, DateTimeOffset now, CancellationToken cancellationToken = default)
@@ -246,6 +251,23 @@ public sealed class SqliteTaskRepository : ITaskRepository, ITodayTaskRepository
         command.CommandText = """INSERT INTO task_completion_events (id,task_id,completed_at_utc,completed_local_date,quadrant_snapshot,task_title_snapshot,due_at_utc_snapshot,planned_date_snapshot,estimated_minutes_snapshot,was_overdue,reverted_at_utc) VALUES ($id,$task,$completed,$date,$quadrant,$title,$due,$planned,$estimate,$overdue,NULL);""";
         command.Parameters.AddWithValue("$id", value.Id); command.Parameters.AddWithValue("$task", value.TaskId!); command.Parameters.AddWithValue("$completed", SqliteValueConverter.FormatUtc(value.CompletedAtUtc)); command.Parameters.AddWithValue("$date", SqliteValueConverter.FormatDateOnly(value.CompletedLocalDate)); command.Parameters.AddWithValue("$quadrant", SqliteValueConverter.ToDbValue(value.QuadrantSnapshot)); command.Parameters.AddWithValue("$title", value.TaskTitleSnapshot); command.Parameters.AddWithValue("$due", SqliteValueConverter.ToDbValue(value.DueAtUtcSnapshot)); command.Parameters.AddWithValue("$planned", SqliteValueConverter.ToDbValue(value.PlannedDateSnapshot)); command.Parameters.AddWithValue("$estimate", SqliteValueConverter.ToDbValue(value.EstimatedMinutesSnapshot)); command.Parameters.AddWithValue("$overdue", value.WasOverdue ? 1 : 0);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<TaskItem> InsertTaskAsync(SqliteConnection connection, SqliteTransaction transaction, TaskDraft draft, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO tasks (title, quadrant_id, due_at, reminder_at, note, is_completed, completed_at, created_at, updated_at,
+                planned_date, estimated_minutes, recurrence_kind, recurrence_interval, recurrence_series_id, recurrence_anchor_day)
+            VALUES ($title, $quadrant_id, $due_at, $reminder_at, $note, 0, NULL, $created_at, $updated_at,
+                $planned_date, $estimated_minutes, $recurrence_kind, $recurrence_interval, $recurrence_series_id, $recurrence_anchor_day)
+            RETURNING *;
+            """;
+        AddTaskParameters(command, draft, now, now);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        await reader.ReadAsync(cancellationToken);
+        return MapTask(reader);
     }
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)

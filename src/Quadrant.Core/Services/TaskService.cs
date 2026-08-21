@@ -11,19 +11,22 @@ public sealed class TaskService : ITaskService
     private readonly IClock clock;
     private readonly IDiagnosticLogger? diagnosticLogger;
     private readonly IAppChangeHub appChangeHub;
+    private readonly IRecurrenceService recurrenceService;
 
     public TaskService(
         ITaskRepository repository,
         IReminderScheduler reminderScheduler,
         IClock clock,
         IDiagnosticLogger? diagnosticLogger = null,
-        IAppChangeHub? appChangeHub = null)
+        IAppChangeHub? appChangeHub = null,
+        IRecurrenceService? recurrenceService = null)
     {
         this.repository = repository ?? throw new ArgumentNullException(nameof(repository));
         this.reminderScheduler = reminderScheduler ?? throw new ArgumentNullException(nameof(reminderScheduler));
         this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
         this.diagnosticLogger = diagnosticLogger;
         this.appChangeHub = appChangeHub ?? new AppChangeHub(diagnosticLogger);
+        this.recurrenceService = recurrenceService ?? new RecurrenceService();
     }
 
     public Task<IReadOnlyList<TaskItem>> GetActiveAsync(CancellationToken cancellationToken = default) =>
@@ -174,11 +177,32 @@ public sealed class TaskService : ITaskService
         TaskItem task;
         if (isCompleted)
         {
-            var result = await repository.CompleteWithSnapshotAsync(id, clock.LocalNow, cancellationToken);
+            var now = clock.LocalNow;
+            var result = await repository.CompleteWithSnapshotAsync(
+                id,
+                now,
+                source => recurrenceService.BuildNextDraft(source, now, clock.LocalTimeZone),
+                cancellationToken);
             task = result.Task;
             if (!result.WasAlreadyCompleted)
             {
                 Publish(task.Id, AppChangeKind.TaskCompleted);
+                if (result.NextTask is { } nextTask)
+                {
+                    Publish(nextTask.Id, AppChangeKind.TaskCreated);
+                }
+            }
+            await TryCancelReminderAsync(id, cancellationToken);
+            if (result.NextTask is { } nextOccurrence)
+            {
+                if (nextOccurrence.ReminderAt > now)
+                {
+                    await TrySyncReminderAsync(nextOccurrence, cancellationToken);
+                }
+                else
+                {
+                    await TryCancelReminderAsync(nextOccurrence.Id, cancellationToken);
+                }
             }
         }
         else
@@ -188,7 +212,10 @@ public sealed class TaskService : ITaskService
         }
         // Restoring a task never revives an old OS schedule. The DB value is
         // retained for in-app context and can be explicitly rescheduled later.
-        await TryCancelReminderAsync(id, cancellationToken);
+        if (!isCompleted)
+        {
+            await TryCancelReminderAsync(id, cancellationToken);
+        }
 
         return task;
     }
