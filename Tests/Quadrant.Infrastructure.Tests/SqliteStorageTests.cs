@@ -20,7 +20,7 @@ public sealed class SqliteStorageTests
         Assert.Equal(4, quadrants.Count);
         Assert.Equal(new[] { 1, 2, 3, 4 }, quadrants.Select(q => q.Id));
         Assert.Equal(quadrants, secondRead);
-        Assert.Equal(1, await database.ReadSchemaVersionAsync());
+        Assert.Equal(2, await database.ReadSchemaVersionAsync());
     }
 
     [Fact]

@@ -4,7 +4,7 @@ namespace Quadrant.Infrastructure.Storage;
 
 public sealed class SqliteDatabaseInitializer
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     private readonly SqliteConnectionFactory connectionFactory;
 
@@ -43,6 +43,13 @@ public sealed class SqliteDatabaseInitializer
                 "INSERT INTO schema_version (version) VALUES ($version);",
                 cancellationToken,
                 ("$version", CurrentSchemaVersion));
+            version = 1;
+        }
+
+        if (version == 1)
+        {
+            await ApplyMigration002Async(connection, transaction, cancellationToken);
+            await ExecuteAsync(connection, transaction, "UPDATE schema_version SET version = $version;", cancellationToken, ("$version", 2));
         }
 
         await transaction.CommitAsync(cancellationToken);
@@ -103,6 +110,16 @@ public sealed class SqliteDatabaseInitializer
             INSERT INTO quadrants (id, name, subtitle) VALUES (4, '不重要不紧急', '删除或延后');
             """,
             cancellationToken);
+
+    private static Task ApplyMigration002Async(SqliteConnection connection, SqliteTransaction transaction, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            INSERT INTO settings (key, value) VALUES ('theme', 'System');
+            INSERT INTO settings (key, value) VALUES ('close_to_tray', 'true');
+            INSERT INTO settings (key, value) VALUES ('launch_at_startup', 'false');
+            INSERT INTO settings (key, value) VALUES ('start_minimized', 'false');
+            INSERT INTO settings (key, value) VALUES ('global_hotkey', 'Ctrl+Alt+Q');
+            """, cancellationToken);
 
     internal static async Task ExecuteAsync(
         SqliteConnection connection,

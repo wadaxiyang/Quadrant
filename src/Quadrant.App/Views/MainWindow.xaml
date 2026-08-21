@@ -23,6 +23,7 @@
                        Text="{Binding AppTitle}" />
             <Button DockPanel.Dock="Right" Margin="{StaticResource ToolbarSecondaryMargin}" Command="{Binding NewTaskCommand}" Content="新建任务" />
             <Button DockPanel.Dock="Right" Margin="{StaticResource ToolbarSecondaryMargin}" Click="Completed_Click" Content="已完成" />
+            <Button DockPanel.Dock="Right" Margin="{StaticResource ToolbarSecondaryMargin}" Click="Settings_Click" Content="设置" />
             <TextBox x:Name="SearchBox"
                      DockPanel.Dock="Right"
                      Width="220"

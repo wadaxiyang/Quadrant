@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_14_TRAY_LIFECYCLE` — implementation complete; manual tray and lifecycle checks pending
+`STAGE_15_SETTINGS_STARTUP` — implementation complete; manual settings and startup checks pending
 
 ## Completed
 
@@ -87,6 +87,11 @@
 - Added `TrayService` with double-click restore and New Task, Show, and Exit menu commands.
 - Added explicit `ShutdownMode.OnExplicitShutdown`, close-to-tray behavior, and unified exit cleanup through `ShutdownCoordinator`.
 - MainWindow can be hidden and restored repeatedly without disposing hotkey, notification, or tray resources.
+- Added SQLite migration 002 with a key/value `settings` table for theme, close behavior, startup, start-minimized, and global hotkey settings.
+- Added Settings window for System/Light/Dark, tray/exit behavior, startup options, hotkey validation, and Q1-Q4 name/subtitle editing.
+- Added user-level HKCU Run startup service with quoted executable path and optional `--background` argument.
+- Added background startup handling that initializes services and tray without showing MainWindow.
+- Applied WPF native `ThemeMode` immediately from persisted settings without adding a custom palette.
 
 ## Files changed
 
@@ -126,6 +131,15 @@
 - `src/Quadrant.App/Views/MainWindow.xaml.cs`
 - `src/Quadrant.App/App.xaml.cs`
 - `Tests/Quadrant.Infrastructure.Tests/GlobalHotkeyServiceTests.cs`
+- `src/Quadrant.Core/Models/AppSettings.cs`
+- `src/Quadrant.Core/Interfaces/ISettingsRepository.cs`
+- `src/Quadrant.Core/Interfaces/IStartupService.cs`
+- `src/Quadrant.Infrastructure/Storage/SqliteSettingsRepository.cs`
+- `src/Quadrant.Infrastructure/Windows/RegistryStartupService.cs`
+- `src/Quadrant.App/ViewModels/SettingsViewModel.cs`
+- `src/Quadrant.App/Views/SettingsWindow.xaml`
+- `src/Quadrant.App/Views/SettingsWindow.xaml.cs`
+- `Tests/Quadrant.Infrastructure.Tests/SqliteStorageTests.cs`
 - `src/Quadrant.Infrastructure/Windows/TrayService.cs`
 - `src/Quadrant.App/ShutdownCoordinator.cs`
 - `src/Quadrant.App/Resources/Quadrant.ico`
@@ -292,6 +306,10 @@
 - `dotnet test Quadrant.sln -c Debug --no-restore` — passed after Stage 14; 28 Core tests and 19 Infrastructure tests passed, 0 failed.
 - `git diff --check` — passed; no whitespace errors.
 - Direct `Quadrant.App.exe` launch smoke check — passed after Stage 14; process remained alive for 6 seconds.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed after Stage 15; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-restore` — passed after Stage 15; 28 Core tests and 19 Infrastructure tests passed, 0 failed.
+- `git diff --check` — passed; no whitespace errors.
+- Direct `Quadrant.App.exe --background` smoke check — passed; process remained alive for 6 seconds.
 
 ## Manual tests pending
 
@@ -303,6 +321,7 @@
 - Stage 12 manual checks remain pending: 2-minute scheduled reminder with app closed, Complete/Open/Snooze actions, edit-time cancellation, completion cancellation, and sleep/wake missed-reminder banner.
 - Stage 13 manual checks remain pending: Word/Edge/VS Code foreground activation, hotkey conflict handling, Chinese IME input, Ctrl+1..4 selection, Enter/Esc, duplicate-window prevention, background main-window activation, and immediate quadrant refresh after save.
 - Stage 14 manual checks remain pending: close-to-tray taskbar disappearance, tray icon visibility, double-click restore, tray Quick Add, tray Exit process termination, hotkey release after exit, and single tray icon after restart.
+- Stage 15 manual checks remain pending: restart persistence, Light/Dark/System visual changes, HKCU Run enable/disable and Task Manager visibility, background startup focus behavior, quadrant rename with unchanged task IDs, and invalid hotkey feedback.
 
 ## Sources checked
 
@@ -362,6 +381,9 @@
 - https://learn.microsoft.com/en-us/dotnet/api/system.windows.interop.windowinterophelper.ensurehandle — checked 2026-08-21; WPF HWND acquisition.
 - https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.notifyicon — checked 2026-08-21; WinForms tray icon lifecycle and events.
 - https://learn.microsoft.com/en-us/dotnet/core/project-sdk/msbuild-props-desktop — checked 2026-08-21; `UseWindowsForms` project property.
+- https://learn.microsoft.com/en-us/dotnet/desktop/wpf/whats-new/net90 — checked 2026-08-21; WPF native Fluent `ThemeMode` property and supported values.
+- https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/deploy-unpackaged-apps — checked 2026-08-21; unpackaged desktop deployment guidance.
+- https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys — checked 2026-08-21; per-user Run key behavior.
 
 ## Known issues
 
@@ -384,7 +406,12 @@
 - Stage 11 GUI and Toast acceptance is not verifiable in the current environment; automated parser/build/startup checks pass.
 - Stage 13 has no known build or automated-test issues; full cross-application hotkey and IME behavior still requires an interactive Windows desktop session.
 - Stage 14 has no known build or automated-test issues; tray shell behavior requires an interactive Windows desktop session.
+- Migration 002 is additive and preserves existing quadrant IDs/tasks; schema version is now 2.
+- Startup uses `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run` with a quoted executable path and optional `--background`.
+- Global hotkey persistence currently validates only the implemented `Ctrl+Alt+Q` chord; arbitrary chord registration remains deferred.
+- Stage 15 has no known build or automated-test issues; settings UI, theme visuals, registry startup behavior, and focus behavior require an interactive Windows desktop session.
+- Stage 15 uses `ThemeMode` despite the .NET 10 reference warning that the API is evaluation-only; WPF0001 is explicitly suppressed and the official current WPF guidance was checked.
 
 ## Next stage
 
-`stages/STAGE_15_SETTINGS_STARTUP.md`
+`stages/STAGE_16_ACCESSIBILITY_POLISH.md`

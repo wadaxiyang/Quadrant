@@ -8,12 +8,16 @@ public partial class App : System.Windows.Application
     private readonly Quadrant.Infrastructure.Windows.GlobalHotkeyService globalHotkeyService = new();
     private readonly Quadrant.Infrastructure.Windows.TrayService trayService = new();
     private readonly ShutdownCoordinator shutdownCoordinator = new();
+    private Quadrant.Infrastructure.Storage.SqliteSettingsRepository? settingsRepository;
+    private Quadrant.Infrastructure.Windows.RegistryStartupService? startupService;
+    private Quadrant.Core.Models.AppSettings? currentSettings;
     private System.Drawing.Icon? trayIcon;
     private Quadrant.Infrastructure.Notifications.NotificationActivation? pendingActivation;
 
     private async void OnStartup(object sender, System.Windows.StartupEventArgs e)
     {
         ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
+        var startInBackground = e.Args.Any(argument => string.Equals(argument, "--background", StringComparison.OrdinalIgnoreCase));
         notificationService.ActivationReceived += NotificationService_ActivationReceived;
         try
         {
@@ -49,6 +53,10 @@ public partial class App : System.Windows.Application
         var connectionFactory = new Quadrant.Infrastructure.Storage.SqliteConnectionFactory(pathProvider.DatabasePath);
         var initializer = new Quadrant.Infrastructure.Storage.SqliteDatabaseInitializer(connectionFactory);
         await initializer.InitializeAsync();
+        settingsRepository = new Quadrant.Infrastructure.Storage.SqliteSettingsRepository(connectionFactory);
+        currentSettings = await settingsRepository.GetAsync();
+        startupService = new Quadrant.Infrastructure.Windows.RegistryStartupService();
+        ApplyTheme(currentSettings.Theme);
 
         var taskRepository = new Quadrant.Infrastructure.Storage.SqliteTaskRepository(connectionFactory);
         var quadrantRepository = new Quadrant.Infrastructure.Storage.SqliteQuadrantRepository(connectionFactory);
@@ -77,6 +85,7 @@ public partial class App : System.Windows.Application
         MainWindow = mainWindow;
         mainWindow.ConfigureGlobalHotkey(globalHotkeyService);
         mainWindow.GlobalHotkeyPressed += GlobalHotkeyService_HotkeyPressed;
+        mainWindow.SettingsRequested += MainWindow_SettingsRequested;
         globalHotkeyService.RegistrationFailed += GlobalHotkeyService_RegistrationFailed;
         trayService.ShowRequested += TrayService_ShowRequested;
         trayService.QuickAddRequested += TrayService_QuickAddRequested;
@@ -93,6 +102,11 @@ public partial class App : System.Windows.Application
             trayIcon = null;
         }
         mainWindow.Show();
+        mainWindow.IsCloseToTray = currentSettings.CloseToTray;
+        if (startInBackground || currentSettings.StartMinimized)
+        {
+            mainWindow.Hide();
+        }
 
         if (pendingActivation is not null)
         {
@@ -127,6 +141,38 @@ public partial class App : System.Windows.Application
             _ = Dispatcher.InvokeAsync(() => mainWindow.ShowQuickAddAsync());
         }
     }
+
+    private async void MainWindow_SettingsRequested(object? sender, EventArgs e)
+    {
+        if (MainWindow is not Views.MainWindow mainWindow || settingsRepository is null || currentSettings is null || startupService is null)
+        {
+            return;
+        }
+
+        var viewModel = (ViewModels.MainViewModel)mainWindow.DataContext;
+        var settingsWindow = new Views.SettingsWindow(new ViewModels.SettingsViewModel(settingsRepository, new Quadrant.Infrastructure.Storage.SqliteQuadrantRepository(new Quadrant.Infrastructure.Storage.SqliteConnectionFactory(new Quadrant.Infrastructure.Storage.LocalAppDataPathProvider().DatabasePath)), currentSettings, viewModel.Quadrants.Select(quadrant => new Quadrant.Core.Models.QuadrantDefinition(quadrant.Id, quadrant.Name, quadrant.Subtitle))))
+        {
+            Owner = mainWindow
+        };
+
+        if (settingsWindow.ShowDialog() == true)
+        {
+            currentSettings = new Quadrant.Core.Models.AppSettings(settingsWindow.Settings.Theme, settingsWindow.Settings.CloseToTray, settingsWindow.Settings.LaunchAtStartup, settingsWindow.Settings.StartMinimized, settingsWindow.Settings.GlobalHotkey);
+            ApplyTheme(currentSettings.Theme);
+            mainWindow.IsCloseToTray = currentSettings.CloseToTray;
+            try
+            {
+                startupService.SetEnabled(currentSettings.LaunchAtStartup, currentSettings.StartMinimized);
+                await viewModel.LoadAsync();
+            }
+            catch (Exception exception)
+            {
+                System.Windows.MessageBox.Show(exception.Message, "设置应用失败", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            }
+        }
+    }
+
+    private void ApplyTheme(string theme) => ThemeMode = new System.Windows.ThemeMode(theme);
 
     private void TrayService_ExitRequested(object? sender, EventArgs e) => ExitApplication();
 

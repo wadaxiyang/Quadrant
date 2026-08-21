@@ -31,6 +31,7 @@ public partial class MainWindow : System.Windows.Window
     public event EventHandler? GlobalHotkeyPressed;
 
     public bool IsCloseToTray { get; set; } = true;
+    public event EventHandler? SettingsRequested;
 
     public void ConfigureGlobalHotkey(Quadrant.Infrastructure.Windows.GlobalHotkeyService service)
     {
@@ -109,6 +110,8 @@ public partial class MainWindow : System.Windows.Window
         };
         window.ShowDialog();
     }
+
+    private void Settings_Click(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke(this, EventArgs.Empty);
 
     private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
