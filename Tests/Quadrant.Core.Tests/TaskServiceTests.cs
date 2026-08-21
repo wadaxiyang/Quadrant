@@ -115,6 +115,42 @@ public sealed class TaskServiceTests
     }
 
     [Fact]
+    public async Task Move_preserves_an_expired_reminder_without_revalidating_or_rescheduling_it()
+    {
+        var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));
+        var repository = new FakeTaskRepository
+        {
+            CurrentTask = new TaskItem(1, "Task", 1, null, now.AddMinutes(-5), null, false, null, now.AddDays(-1), now.AddDays(-1))
+        };
+        var scheduler = new FakeReminderScheduler();
+        var service = new TaskService(repository, scheduler, new FakeClock(now));
+
+        var moved = await service.MoveTaskAsync(1, 2);
+
+        Assert.Equal(2, moved?.QuadrantId);
+        Assert.Equal(now.AddMinutes(-5), moved?.ReminderAt);
+        Assert.Empty(scheduler.RescheduledTaskIds);
+    }
+
+    [Fact]
+    public async Task Update_allows_an_unchanged_expired_reminder_but_rejects_a_new_one()
+    {
+        var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));
+        var expired = now.AddMinutes(-5);
+        var repository = new FakeTaskRepository
+        {
+            CurrentTask = new TaskItem(1, "Task", 1, null, expired, null, false, null, now.AddDays(-1), now.AddDays(-1))
+        };
+        var service = new TaskService(repository, new FakeReminderScheduler(), new FakeClock(now));
+
+        var updated = await service.UpdateAsync(new TaskUpdate(1, "Renamed", 1, null, expired, null));
+        Assert.Equal("Renamed", updated.Title);
+
+        await Assert.ThrowsAsync<TaskValidationException>(() =>
+            service.UpdateAsync(new TaskUpdate(1, "Renamed", 1, null, now.AddMinutes(-1), null)));
+    }
+
+    [Fact]
     public async Task Move_to_same_quadrant_is_a_no_op()
     {
         var now = new DateTimeOffset(2026, 8, 20, 9, 30, 0, TimeSpan.FromHours(8));

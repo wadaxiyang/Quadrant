@@ -84,10 +84,25 @@ public partial class App : System.Windows.Application
             diagnosticLogger);
         var clock = new Quadrant.Infrastructure.Windows.SystemClock();
         var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock);
-        await viewModel.LoadAsync();
         try
         {
-            var reconciliation = await reminderScheduler.ReconcileAsync(await taskService.GetActiveAsync(), clock.Now);
+            await viewModel.LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            diagnosticLogger.Error("Initial task load failed; refusing to show an incomplete workspace.", exception);
+            System.Windows.MessageBox.Show(
+                $"任务数据加载失败，应用无法安全继续。\n\n{exception.Message}",
+                "数据加载失败",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Error);
+            Shutdown();
+            return;
+        }
+
+        try
+        {
+            var reconciliation = await reminderScheduler.ReconcileAsync(viewModel.ActiveTasks, clock.Now);
             viewModel.SetPossiblyMissedReminders(reconciliation.Tasks);
         }
         catch (Exception exception)
@@ -104,6 +119,7 @@ public partial class App : System.Windows.Application
         mainWindow.ConfigureGlobalHotkey(globalHotkeyService);
         mainWindow.GlobalHotkeyPressed += GlobalHotkeyService_HotkeyPressed;
         mainWindow.SettingsRequested += MainWindow_SettingsRequested;
+        mainWindow.ExitRequested += MainWindow_ExitRequested;
         globalHotkeyService.RegistrationFailed += GlobalHotkeyService_RegistrationFailed;
         trayService.ShowRequested += TrayService_ShowRequested;
         trayService.QuickAddRequested += TrayService_QuickAddRequested;
@@ -119,14 +135,17 @@ public partial class App : System.Windows.Application
             trayIcon?.Dispose();
             trayIcon = null;
         }
-        mainWindow.Show();
+        mainWindow.IsCloseToTray = currentSettings.CloseToTray;
+        // EnsureHandle creates the HWND and raises SourceInitialized without making
+        // the managed window visible, so background startup can register the global
+        // hotkey without flashing or stealing foreground focus.
+        _ = new System.Windows.Interop.WindowInteropHelper(mainWindow).EnsureHandle();
+        if (!startInBackground && !currentSettings.StartMinimized)
+        {
+            mainWindow.Show();
+        }
         startupTimer.Stop();
         System.Diagnostics.Debug.WriteLine($"Cold start completed in {startupTimer.ElapsedMilliseconds} ms.");
-        mainWindow.IsCloseToTray = currentSettings.CloseToTray;
-        if (startInBackground || currentSettings.StartMinimized)
-        {
-            mainWindow.Hide();
-        }
 
         if (pendingActivation is not null)
         {
@@ -170,23 +189,41 @@ public partial class App : System.Windows.Application
         }
 
         var viewModel = (ViewModels.MainViewModel)mainWindow.DataContext;
-        var settingsWindow = new Views.SettingsWindow(new ViewModels.SettingsViewModel(settingsRepository, new Quadrant.Infrastructure.Storage.SqliteQuadrantRepository(new Quadrant.Infrastructure.Storage.SqliteConnectionFactory(new Quadrant.Infrastructure.Storage.LocalAppDataPathProvider().DatabasePath)), currentSettings, viewModel.Quadrants.Select(quadrant => new Quadrant.Core.Models.QuadrantDefinition(quadrant.Id, quadrant.Name, quadrant.Subtitle))))
+        var settingsWindow = new Views.SettingsWindow(new ViewModels.SettingsViewModel(
+            currentSettings,
+            viewModel.Quadrants.Select(quadrant => new Quadrant.Core.Models.QuadrantDefinition(quadrant.Id, quadrant.Name, quadrant.Subtitle))))
         {
             Owner = mainWindow
         };
 
-        if (settingsWindow.ShowDialog() == true)
+        if (settingsWindow.ShowDialog() == true &&
+            settingsWindow.DesiredSettings is { } desiredSettings &&
+            settingsWindow.DesiredQuadrants is { } desiredQuadrants)
         {
-            currentSettings = new Quadrant.Core.Models.AppSettings(settingsWindow.Settings.Theme, settingsWindow.Settings.CloseToTray, settingsWindow.Settings.LaunchAtStartup, settingsWindow.Settings.StartMinimized, settingsWindow.Settings.GlobalHotkey);
-            ApplyTheme(currentSettings.Theme);
-            mainWindow.IsCloseToTray = currentSettings.CloseToTray;
+            var previousSettings = currentSettings;
             try
             {
-                startupService.SetEnabled(currentSettings.LaunchAtStartup, currentSettings.StartMinimized);
-                await viewModel.LoadAsync();
+                // Apply the external derived state first. If DB persistence fails,
+                // restore the previous registry state so the UI and startup entry do
+                // not silently disagree.
+                startupService.SetEnabled(desiredSettings.LaunchAtStartup, desiredSettings.StartMinimized);
+                await settingsRepository.SaveAsync(desiredSettings, desiredQuadrants);
+                currentSettings = desiredSettings;
+                ApplyTheme(currentSettings.Theme);
+                mainWindow.IsCloseToTray = currentSettings.CloseToTray;
+                viewModel.UpdateDefinitions(desiredQuadrants);
             }
             catch (Exception exception)
             {
+                try
+                {
+                    startupService.SetEnabled(previousSettings.LaunchAtStartup, previousSettings.StartMinimized);
+                }
+                catch (Exception rollbackException)
+                {
+                    diagnosticLogger.Warning("Startup setting rollback failed.", rollbackException);
+                }
+
                 diagnosticLogger.Warning("Applying settings failed; keeping the current session alive.", exception);
                 System.Windows.MessageBox.Show(exception.Message, "设置应用失败", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
             }
@@ -196,6 +233,8 @@ public partial class App : System.Windows.Application
     private void ApplyTheme(string theme) => ThemeMode = new System.Windows.ThemeMode(theme);
 
     private void TrayService_ExitRequested(object? sender, EventArgs e) => ExitApplication();
+
+    private void MainWindow_ExitRequested(object? sender, EventArgs e) => ExitApplication();
 
     private void ExitApplication()
     {
@@ -207,7 +246,7 @@ public partial class App : System.Windows.Application
         shutdownCoordinator.BeginExit();
         if (MainWindow is Views.MainWindow mainWindow)
         {
-            mainWindow.IsCloseToTray = false;
+            mainWindow.AllowApplicationExit();
             mainWindow.Close();
         }
 
@@ -262,15 +301,27 @@ public partial class App : System.Windows.Application
         object? sender,
         Microsoft.Windows.AppLifecycle.AppActivationArguments arguments)
     {
-        var activation = ParseActivation(arguments);
-        if (activation is not null)
+        // AppInstance may raise Activated away from WPF's UI thread. Marshal the
+        // whole decision, including MainWindow access, to the Dispatcher.
+        _ = Dispatcher.InvokeAsync(async () =>
         {
-            _ = Dispatcher.InvokeAsync(() => HandleActivationAsync(activation));
-        }
-        else if (MainWindow is not null)
-        {
-            _ = Dispatcher.InvokeAsync(() => MainWindow.Activate());
-        }
+            try
+            {
+                var activation = ParseActivation(arguments);
+                if (activation is not null)
+                {
+                    await HandleActivationAsync(activation);
+                }
+                else if (MainWindow is Views.MainWindow mainWindow)
+                {
+                    mainWindow.ShowFromTray();
+                }
+            }
+            catch (Exception exception)
+            {
+                diagnosticLogger.Warning("Redirected activation failed.", exception);
+            }
+        });
     }
 
     private async Task HandleActivationAsync(

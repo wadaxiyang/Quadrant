@@ -8,42 +8,42 @@ namespace Quadrant.Infrastructure.Notifications;
 
 public sealed class WindowsReminderScheduler : IReminderScheduler
 {
-    private const string Group = "Quadrant";
-    private readonly Func<ToastNotifier> notifierFactory;
+    internal const string ScheduleGroup = "Quadrant";
+    private readonly IReminderScheduleStore store;
 
     public WindowsReminderScheduler()
-        : this(ToastNotificationManager.CreateToastNotifier)
+        : this(new WindowsReminderScheduleStore())
     {
     }
 
-    internal WindowsReminderScheduler(Func<ToastNotifier> notifierFactory)
+    internal WindowsReminderScheduler(IReminderScheduleStore store)
     {
-        this.notifierFactory = notifierFactory ?? throw new ArgumentNullException(nameof(notifierFactory));
+        this.store = store ?? throw new ArgumentNullException(nameof(store));
     }
 
     public Task ScheduleAsync(TaskItem task, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(task);
         cancellationToken.ThrowIfCancellationRequested();
-        if (task.IsCompleted || task.ReminderAt is null || task.ReminderAt <= DateTimeOffset.Now)
+        if (!ShouldSchedule(task, DateTimeOffset.Now))
         {
             return Task.CompletedTask;
         }
 
-        var scheduled = BuildScheduledNotification(task);
-        notifierFactory().AddToSchedule(scheduled);
+        store.Add(task);
         return Task.CompletedTask;
     }
 
     public Task CancelAsync(long taskId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var notifier = notifierFactory();
-        foreach (var scheduled in notifier.GetScheduledToastNotifications())
+        var tag = GetTag(taskId);
+        foreach (var scheduled in store.GetAll())
         {
-            if (scheduled.Tag == GetTag(taskId) && scheduled.Group == Group)
+            cancellationToken.ThrowIfCancellationRequested();
+            if (scheduled.Tag == tag && scheduled.Group == ScheduleGroup)
             {
-                notifier.RemoveFromSchedule(scheduled);
+                store.Remove(scheduled);
             }
         }
 
@@ -56,12 +56,14 @@ public sealed class WindowsReminderScheduler : IReminderScheduler
         await ScheduleAsync(task, cancellationToken);
     }
 
-    public async Task<MissedReminderResult> ReconcileAsync(
+    public Task<MissedReminderResult> ReconcileAsync(
         IReadOnlyList<TaskItem> activeTasks,
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(activeTasks);
         var missed = new List<TaskItem>();
+        var desired = new Dictionary<string, TaskItem>(StringComparer.Ordinal);
         foreach (var task in activeTasks)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -70,22 +72,57 @@ public sealed class WindowsReminderScheduler : IReminderScheduler
                 continue;
             }
 
-            if (reminderAt < now)
+            if (reminderAt <= now)
             {
                 missed.Add(task);
             }
-            else
+            else if (!task.IsCompleted)
             {
-                await RescheduleAsync(task, cancellationToken);
+                desired[GetTag(task.Id)] = task;
             }
         }
 
-        return new MissedReminderResult(missed);
+        // Get the Windows schedule once. Tag + Group are the documented composite
+        // key. This removes orphan/duplicate/stale entries in O(tasks + schedules)
+        // instead of enumerating the full OS schedule once per task.
+        var retained = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var scheduled in store.GetAll())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (scheduled.Group != ScheduleGroup)
+            {
+                continue;
+            }
+
+            if (!desired.TryGetValue(scheduled.Tag, out var task) ||
+                retained.Contains(scheduled.Tag) ||
+                scheduled.DeliveryTime != task.ReminderAt)
+            {
+                store.Remove(scheduled);
+                continue;
+            }
+
+            retained.Add(scheduled.Tag);
+        }
+
+        foreach (var (tag, task) in desired)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!retained.Contains(tag))
+            {
+                store.Add(task);
+            }
+        }
+
+        return Task.FromResult(new MissedReminderResult(missed));
     }
 
     public static string GetTag(long taskId) => $"q{taskId:X}";
 
-    private static ScheduledToastNotification BuildScheduledNotification(TaskItem task)
+    private static bool ShouldSchedule(TaskItem task, DateTimeOffset now) =>
+        !task.IsCompleted && task.ReminderAt is { } reminderAt && reminderAt > now;
+
+    internal static ScheduledToastNotification BuildScheduledNotification(TaskItem task)
     {
         var taskId = task.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
         var builder = new AppNotificationBuilder()
@@ -111,13 +148,49 @@ public sealed class WindowsReminderScheduler : IReminderScheduler
 
         var document = new XmlDocument();
         document.LoadXml(builder.BuildNotification().Payload);
-        var scheduled = new ScheduledToastNotification(document, task.ReminderAt!.Value);
-        scheduled.Tag = GetTag(task.Id);
-        scheduled.Group = Group;
+        var scheduled = new ScheduledToastNotification(document, task.ReminderAt!.Value)
+        {
+            Tag = GetTag(task.Id),
+            Group = ScheduleGroup
+        };
         // Windows documents an approximately five-minute delivery window. A missed
         // notification is surfaced in-app during reconciliation rather than replayed.
         return scheduled;
     }
+}
+
+internal sealed record ScheduledReminderEntry(
+    string Tag,
+    string Group,
+    DateTimeOffset DeliveryTime,
+    object NativeToken);
+
+internal interface IReminderScheduleStore
+{
+    IReadOnlyList<ScheduledReminderEntry> GetAll();
+
+    void Add(TaskItem task);
+
+    void Remove(ScheduledReminderEntry scheduled);
+}
+
+internal sealed class WindowsReminderScheduleStore : IReminderScheduleStore
+{
+    // The scheduler is composed before AppNotificationManager.Register runs.
+    // Creating ToastNotifier here would make App construction fail, so defer it
+    // until the first actual scheduling operation after notification setup.
+    private readonly Lazy<ToastNotifier> notifier = new(ToastNotificationManager.CreateToastNotifier);
+
+    public IReadOnlyList<ScheduledReminderEntry> GetAll() =>
+        notifier.Value.GetScheduledToastNotifications()
+            .Select(item => new ScheduledReminderEntry(item.Tag, item.Group, item.DeliveryTime, item))
+            .ToArray();
+
+    public void Add(TaskItem task) =>
+        notifier.Value.AddToSchedule(WindowsReminderScheduler.BuildScheduledNotification(task));
+
+    public void Remove(ScheduledReminderEntry scheduled) =>
+        notifier.Value.RemoveFromSchedule((ScheduledToastNotification)scheduled.NativeToken);
 }
 
 public sealed record MissedReminderResult(IReadOnlyList<TaskItem> Tasks);

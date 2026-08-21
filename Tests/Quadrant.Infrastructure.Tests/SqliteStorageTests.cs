@@ -95,6 +95,32 @@ public sealed class SqliteStorageTests
     }
 
     [Fact]
+    public async Task Settings_and_quadrants_are_saved_atomically()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var originalSettings = await database.Settings.GetAsync();
+        var originalQuadrants = await database.Quadrants.GetAllAsync();
+        var changedSettings = originalSettings with { Theme = "Dark", StartMinimized = true };
+        var changedQuadrants = originalQuadrants
+            .Select(quadrant => quadrant with { Name = $"Changed {quadrant.Id}" })
+            .ToArray();
+
+        await database.Settings.SaveAsync(changedSettings, changedQuadrants);
+
+        Assert.Equal(changedSettings, await database.Settings.GetAsync());
+        Assert.Equal(changedQuadrants, await database.Quadrants.GetAllAsync());
+
+        var invalidQuadrants = changedQuadrants
+            .Append(new QuadrantDefinition(99, "Missing", "Missing"))
+            .ToArray();
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            database.Settings.SaveAsync(originalSettings, invalidQuadrants));
+
+        Assert.Equal(changedSettings, await database.Settings.GetAsync());
+        Assert.Equal(changedQuadrants, await database.Quadrants.GetAllAsync());
+    }
+
+    [Fact]
     public async Task One_thousand_active_tasks_load_within_a_measurable_baseline()
     {
         await using var database = await TestDatabase.CreateAsync();
@@ -123,6 +149,7 @@ public sealed class SqliteStorageTests
             Initializer = initializer;
             Tasks = new SqliteTaskRepository(factory);
             Quadrants = new SqliteQuadrantRepository(factory);
+            Settings = new SqliteSettingsRepository(factory);
         }
 
         public SqliteConnectionFactory Factory { get; }
@@ -133,12 +160,14 @@ public sealed class SqliteStorageTests
 
         public SqliteQuadrantRepository Quadrants { get; }
 
+        public SqliteSettingsRepository Settings { get; }
+
         public static async Task<TestDatabase> CreateAsync()
         {
             var directory = Path.Combine(Path.GetTempPath(), "QuadrantTests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(directory);
             var path = Path.Combine(directory, "quadrant.db");
-            var factory = new SqliteConnectionFactory(path);
+            var factory = new SqliteConnectionFactory(path, pooling: false);
             var initializer = new SqliteDatabaseInitializer(factory);
             await initializer.InitializeAsync();
             return new TestDatabase(directory, factory, initializer);

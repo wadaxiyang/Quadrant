@@ -16,6 +16,8 @@ public partial class MainWindow : System.Windows.Window
     private Quadrant.Infrastructure.Windows.GlobalHotkeyService? globalHotkeyService;
     private HwndSource? windowSource;
     private bool quickAddOpen;
+    private bool isApplicationExiting;
+    private bool viewModelHandlersAttached;
 
     public MainWindow()
     {
@@ -30,6 +32,7 @@ public partial class MainWindow : System.Windows.Window
     }
 
     public event EventHandler? GlobalHotkeyPressed;
+    public event EventHandler? ExitRequested;
 
     public bool IsCloseToTray { get; set; } = true;
     public event EventHandler? SettingsRequested;
@@ -46,9 +49,11 @@ public partial class MainWindow : System.Windows.Window
             return;
         }
 
-        windowSource = (HwndSource)PresentationSource.FromVisual(this)!;
+        var handle = new WindowInteropHelper(this).Handle;
+        windowSource = HwndSource.FromHwnd(handle)
+            ?? throw new InvalidOperationException("无法获取主窗口的 HWND 消息源。");
         windowSource.AddHook(WindowSourceHook);
-        globalHotkeyService.Register(new WindowInteropHelper(this).Handle);
+        globalHotkeyService.Register(handle);
     }
 
     private void MainWindow_Closed(object? sender, EventArgs e)
@@ -59,16 +64,35 @@ public partial class MainWindow : System.Windows.Window
         }
 
         globalHotkeyService?.Unregister(new WindowInteropHelper(this).Handle);
+        if (viewModelHandlersAttached && DataContext is MainViewModel viewModel)
+        {
+            viewModel.NewTaskRequested -= NewTaskRequested;
+            viewModel.EditTaskRequested -= EditTaskRequested;
+            viewModel.DeleteTaskRequested -= DeleteTaskRequested;
+            viewModel.RecoverableError -= ViewModel_RecoverableError;
+            viewModelHandlersAttached = false;
+        }
     }
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        if (isApplicationExiting)
+        {
+            return;
+        }
+
         if (IsCloseToTray)
         {
             e.Cancel = true;
             Hide();
+            return;
         }
+
+        e.Cancel = true;
+        ExitRequested?.Invoke(this, EventArgs.Empty);
     }
+
+    public void AllowApplicationExit() => isApplicationExiting = true;
 
     public void ShowFromTray()
     {
@@ -95,21 +119,35 @@ public partial class MainWindow : System.Windows.Window
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        if (viewModelHandlersAttached)
+        {
+            return;
+        }
+
         var viewModel = (MainViewModel)DataContext;
         viewModel.NewTaskRequested += NewTaskRequested;
         viewModel.EditTaskRequested += EditTaskRequested;
         viewModel.DeleteTaskRequested += DeleteTaskRequested;
+        viewModel.RecoverableError += ViewModel_RecoverableError;
+        viewModelHandlersAttached = true;
     }
 
     private async void Completed_Click(object sender, RoutedEventArgs e)
     {
-        var viewModel = (MainViewModel)DataContext;
-        await viewModel.LoadCompletedAsync();
-        var window = new CompletedWindow(viewModel)
+        try
         {
-            Owner = this
-        };
-        window.ShowDialog();
+            var viewModel = (MainViewModel)DataContext;
+            await viewModel.LoadCompletedAsync();
+            var window = new CompletedWindow(viewModel)
+            {
+                Owner = this
+            };
+            window.ShowDialog();
+        }
+        catch (Exception exception)
+        {
+            ShowRecoverableError("已完成任务加载失败", exception);
+        }
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke(this, EventArgs.Empty);
@@ -186,14 +224,12 @@ public partial class MainWindow : System.Windows.Window
         System.Windows.MessageBox.Show($"{title}。\n{exception.Message}", title, System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
     }
 
+    private void ViewModel_RecoverableError(object? sender, RecoverableOperationErrorEventArgs e) =>
+        ShowRecoverableError(e.Title, e.Exception);
+
     public async Task ActivateAndOpenTaskAsync(long id)
     {
-        Activate();
-        if (WindowState == WindowState.Minimized)
-        {
-            WindowState = WindowState.Normal;
-        }
-
+        ShowFromTray();
         await ((MainViewModel)DataContext).OpenTaskAsync(id);
     }
 

@@ -12,11 +12,19 @@ public partial class TaskEditorViewModel : ObservableObject
 {
     private static readonly string[] AcceptedTimeFormats = ["h\\:mm", "hh\\:mm"];
     private readonly IClock clock;
+    private readonly TimeZoneInfo timeZone;
+    private readonly DateTimeOffset? originalReminderAt;
 
-    public TaskEditorViewModel(IEnumerable<QuadrantDefinition> quadrants, IClock clock, TaskItem? task = null)
+    public TaskEditorViewModel(
+        IEnumerable<QuadrantDefinition> quadrants,
+        IClock clock,
+        TaskItem? task = null,
+        TimeZoneInfo? timeZone = null)
     {
         Quadrants = quadrants.OrderBy(quadrant => quadrant.Id).ToArray();
         this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        this.timeZone = timeZone ?? TimeZoneInfo.Local;
+        originalReminderAt = task?.ReminderAt;
         IsEdit = task is not null;
         Id = task?.Id;
         Title = task?.Title ?? string.Empty;
@@ -25,7 +33,7 @@ public partial class TaskEditorViewModel : ObservableObject
 
         if (task?.DueAt is { } due)
         {
-            var localDue = due.ToLocalTime();
+            var localDue = TimeZoneInfo.ConvertTime(due, this.timeZone);
             DueDate = localDue.Date;
             DueTimeText = localDue.TimeOfDay == new TimeSpan(23, 59, 0)
                 ? string.Empty
@@ -35,7 +43,7 @@ public partial class TaskEditorViewModel : ObservableObject
         ReminderPreset = InferReminderPreset(task?.DueAt, task?.ReminderAt);
         if (task?.ReminderAt is { } reminder)
         {
-            var localReminder = reminder.ToLocalTime();
+            var localReminder = TimeZoneInfo.ConvertTime(reminder, this.timeZone);
             CustomReminderDate = localReminder.Date;
             CustomReminderTimeText = localReminder.ToString("H:mm", CultureInfo.InvariantCulture);
         }
@@ -146,8 +154,14 @@ public partial class TaskEditorViewModel : ObservableObject
             if (DueTimeError is null)
             {
                 var localDateTime = date.Date.Add(time);
-                var offset = TimeZoneInfo.Local.GetUtcOffset(localDateTime);
-                dueAt = new DateTimeOffset(localDateTime, offset);
+                if (TryResolveLocalTime(localDateTime, out var resolved, out var error))
+                {
+                    dueAt = resolved;
+                }
+                else
+                {
+                    DueTimeError = error;
+                }
             }
         }
 
@@ -162,7 +176,21 @@ public partial class TaskEditorViewModel : ObservableObject
             else
             {
                 var localDateTime = reminderDate.Date.Add(reminderTime.ToTimeSpan());
-                reminderAt = new DateTimeOffset(localDateTime, TimeZoneInfo.Local.GetUtcOffset(localDateTime));
+                if (MatchesOriginalReminderMinute(localDateTime))
+                {
+                    // Snooze can retain seconds while the editor intentionally shows
+                    // minute precision. Preserve the exact stored instant when the
+                    // displayed local minute was not changed.
+                    reminderAt = originalReminderAt;
+                }
+                else if (TryResolveLocalTime(localDateTime, out var resolved, out var error))
+                {
+                    reminderAt = resolved;
+                }
+                else
+                {
+                    ReminderError = error;
+                }
             }
         }
         else if (ReminderPreset != ReminderPreset.None)
@@ -172,9 +200,13 @@ public partial class TaskEditorViewModel : ObservableObject
                 ReminderError = "相对截止时间提醒需要先设置截止日期。";
             }
             reminderAt = ReminderCalculator.Calculate(ReminderPreset, dueAt, null);
+            if (reminderAt is { } calculated && MatchesOriginalReminderMinute(calculated.DateTime))
+            {
+                reminderAt = originalReminderAt;
+            }
         }
 
-        if (ReminderError is null && reminderAt is { } reminder && reminder <= clock.Now)
+        if (ReminderError is null && reminderAt is { } reminder && reminder <= clock.Now && reminder != originalReminderAt)
         {
             ReminderError = "提醒时间已过去，请改为未来时间。";
         }
@@ -219,6 +251,38 @@ public partial class TaskEditorViewModel : ObservableObject
         }
 
         return ReminderPreset.Custom;
+    }
+
+    private bool TryResolveLocalTime(DateTime localDateTime, out DateTimeOffset value, out string? error)
+    {
+        if (LocalTimeResolver.TryResolve(localDateTime, timeZone, out value, out var resolutionError))
+        {
+            error = null;
+            return true;
+        }
+
+        error = resolutionError switch
+        {
+            LocalTimeResolutionError.Invalid => "该本地时间因夏令时切换而不存在，请选择其他时间。",
+            LocalTimeResolutionError.Ambiguous => "该本地时间因夏令时切换而重复，请选择其他时间。",
+            _ => "请输入有效的本地时间。"
+        };
+        return false;
+    }
+
+    private bool MatchesOriginalReminderMinute(DateTime localDateTime)
+    {
+        if (originalReminderAt is not { } original)
+        {
+            return false;
+        }
+
+        var originalLocal = TimeZoneInfo.ConvertTime(original, timeZone);
+        return originalLocal.Year == localDateTime.Year &&
+               originalLocal.Month == localDateTime.Month &&
+               originalLocal.Day == localDateTime.Day &&
+               originalLocal.Hour == localDateTime.Hour &&
+               originalLocal.Minute == localDateTime.Minute;
     }
 
 }

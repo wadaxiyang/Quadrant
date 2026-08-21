@@ -26,7 +26,10 @@ public sealed class SqliteSettingsRepository : ISettingsRepository
             Get(values, "global_hotkey", "Ctrl+Alt+Q"));
     }
 
-    public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        AppSettings settings,
+        IReadOnlyList<QuadrantDefinition> quadrants,
+        CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken);
         await using var transaction = connection.BeginTransaction();
@@ -46,6 +49,21 @@ public sealed class SqliteSettingsRepository : ISettingsRepository
             command.Parameters.AddWithValue("$value", pair.Value);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
+
+        foreach (var quadrant in quadrants)
+        {
+            await using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = "UPDATE quadrants SET name = $name, subtitle = $subtitle WHERE id = $id;";
+            command.Parameters.AddWithValue("$id", quadrant.Id);
+            command.Parameters.AddWithValue("$name", quadrant.Name);
+            command.Parameters.AddWithValue("$subtitle", quadrant.Subtitle);
+            if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
+            {
+                throw new InvalidOperationException($"Quadrant {quadrant.Id} was not found.");
+            }
+        }
+
         await transaction.CommitAsync(cancellationToken);
     }
 

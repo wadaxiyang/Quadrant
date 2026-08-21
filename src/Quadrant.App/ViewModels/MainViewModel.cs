@@ -1,10 +1,10 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Quadrant.Core.Enums;
 using Quadrant.Core.Interfaces;
 using Quadrant.Core.Models;
-using Quadrant.Core.Enums;
 using Quadrant.Core.Services;
-using System.Collections.ObjectModel;
 
 namespace Quadrant.App.ViewModels;
 
@@ -13,6 +13,9 @@ public partial class MainViewModel : ObservableObject
     private readonly ITaskService taskService;
     private readonly IQuadrantRepository quadrantRepository;
     private readonly IClock clock;
+    private readonly Dictionary<long, TaskItem> loadedTasks = [];
+    private readonly Dictionary<long, TaskCardViewModel> taskCards = [];
+    private IReadOnlyList<QuadrantDefinition> loadedDefinitions = [];
 
     public MainViewModel(ITaskService taskService, IQuadrantRepository quadrantRepository, IClock clock)
     {
@@ -35,8 +38,7 @@ public partial class MainViewModel : ObservableObject
 
     public IReadOnlyList<QuadrantViewModel> Quadrants { get; private set; } = [];
 
-    private IReadOnlyList<TaskItem> loadedTasks = [];
-    private IReadOnlyList<QuadrantDefinition> loadedDefinitions = [];
+    public IReadOnlyList<TaskItem> ActiveTasks => loadedTasks.Values.ToArray();
 
     public ObservableCollection<CompletedTaskViewModel> CompletedTasks { get; } = [];
 
@@ -50,15 +52,12 @@ public partial class MainViewModel : ObservableObject
     public IClock Clock => clock;
 
     public event EventHandler? NewTaskRequested;
-
     public event EventHandler<TaskItem>? EditTaskRequested;
-
     public event EventHandler<long>? DeleteTaskRequested;
+    public event EventHandler<RecoverableOperationErrorEventArgs>? RecoverableError;
 
     partial void OnSelectedFilterChanged(TaskFilter value) => RebuildQuadrants();
-
     partial void OnSearchTextChanged(string value) => RebuildQuadrants();
-
     partial void OnPossiblyMissedReminderTextChanged(string value) => OnPropertyChanged(nameof(HasPossiblyMissedReminders));
 
     [RelayCommand]
@@ -70,8 +69,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void EditTask(long id)
     {
-        var task = loadedTasks.FirstOrDefault(item => item.Id == id);
-        if (task is not null)
+        if (loadedTasks.TryGetValue(id, out var task))
         {
             EditTaskRequested?.Invoke(this, task);
         }
@@ -80,39 +78,53 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task CompleteTask(long id)
     {
-        await taskService.SetCompletedAsync(id, true);
-        await LoadAsync();
+        try
+        {
+            await taskService.SetCompletedAsync(id, true);
+            RemoveActiveTask(id);
+        }
+        catch (Exception exception)
+        {
+            ReportRecoverableError("任务完成失败", exception);
+        }
     }
 
     [RelayCommand]
     private async Task MoveTask(MoveTaskRequest request)
     {
-        await taskService.MoveTaskAsync(request.TaskId, request.TargetQuadrantId);
-        await LoadAsync();
+        try
+        {
+            var moved = await taskService.MoveTaskAsync(request.TaskId, request.TargetQuadrantId);
+            if (moved is not null && !moved.IsCompleted)
+            {
+                UpsertActiveTask(moved);
+            }
+        }
+        catch (Exception exception)
+        {
+            ReportRecoverableError("任务移动失败", exception);
+        }
     }
 
     [RelayCommand]
-    private async Task DeleteTask(long id)
-    {
-        DeleteTaskRequested?.Invoke(this, id);
-    }
+    private void DeleteTask(long id) => DeleteTaskRequested?.Invoke(this, id);
 
     public async Task ConfirmedDeleteAsync(long id)
     {
         await taskService.DeleteAsync(id);
-        await LoadAsync();
+        RemoveActiveTask(id);
     }
 
     public async Task CreateAsync(TaskDraft draft)
     {
-        await taskService.CreateAsync(draft);
-        await LoadAsync();
+        var task = await taskService.CreateAsync(draft);
+        UpsertActiveTask(task);
     }
 
     public async Task UpdateAsync(TaskUpdate update)
     {
-        await taskService.UpdateAsync(update);
-        await LoadAsync();
+        var task = await taskService.UpdateAsync(update);
+        UpsertActiveTask(task);
     }
 
     public async Task OpenTaskAsync(long id, CancellationToken cancellationToken = default)
@@ -120,31 +132,33 @@ public partial class MainViewModel : ObservableObject
         var task = await taskService.GetByIdAsync(id, cancellationToken);
         if (task is not null && !task.IsCompleted)
         {
-            EditTaskTask(task);
+            EditTaskRequested?.Invoke(this, task);
         }
     }
 
     public async Task CompleteFromNotificationAsync(long id, CancellationToken cancellationToken = default)
     {
         await taskService.SetCompletedAsync(id, true, cancellationToken);
-        await LoadAsync(cancellationToken);
+        RemoveActiveTask(id);
     }
 
     public async Task SnoozeFromNotificationAsync(long id, CancellationToken cancellationToken = default)
     {
-        await taskService.SnoozeAsync(id, TimeSpan.FromMinutes(10), cancellationToken);
-        await LoadAsync(cancellationToken);
+        var task = await taskService.SnoozeAsync(id, TimeSpan.FromMinutes(10), cancellationToken);
+        if (task is not null && !task.IsCompleted)
+        {
+            UpsertActiveTask(task);
+        }
     }
 
     public void SetPossiblyMissedReminders(IEnumerable<TaskItem> tasks)
     {
+        const int displayedTitleLimit = 5;
         var titles = tasks.Select(task => task.Title).Where(title => !string.IsNullOrWhiteSpace(title)).ToArray();
         PossiblyMissedReminderText = titles.Length == 0
             ? string.Empty
-            : $"可能错过 {titles.Length} 条提醒：{string.Join("、", titles)}";
+            : $"可能错过 {titles.Length} 条提醒：{string.Join("、", titles.Take(displayedTitleLimit))}{(titles.Length > displayedTitleLimit ? "……" : string.Empty)}";
     }
-
-    private void EditTaskTask(TaskItem task) => EditTaskRequested?.Invoke(this, task);
 
     public async Task LoadCompletedAsync(CancellationToken cancellationToken = default)
     {
@@ -159,34 +173,102 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task RestoreCompleted(long id)
     {
-        await taskService.SetCompletedAsync(id, false);
-        await LoadAsync();
-        await LoadCompletedAsync();
+        try
+        {
+            var restored = await taskService.SetCompletedAsync(id, false);
+            UpsertActiveTask(restored);
+            await LoadCompletedAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportRecoverableError("任务恢复失败", exception);
+        }
     }
 
     [RelayCommand]
     private async Task PermanentlyDeleteCompleted(long id)
     {
-        await taskService.DeleteAsync(id);
-        await LoadCompletedAsync();
+        try
+        {
+            await taskService.DeleteAsync(id);
+            await LoadCompletedAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportRecoverableError("任务删除失败", exception);
+        }
     }
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        loadedDefinitions = (await quadrantRepository.GetAllAsync(cancellationToken))
-            .OrderBy(definition => definition.Id)
-            .ToArray();
-        loadedTasks = await taskService.GetActiveAsync(cancellationToken);
+        var definitionsTask = quadrantRepository.GetAllAsync(cancellationToken);
+        var tasksTask = taskService.GetActiveAsync(cancellationToken);
+        await Task.WhenAll(definitionsTask, tasksTask);
+
+        loadedDefinitions = definitionsTask.Result.OrderBy(definition => definition.Id).ToArray();
+        loadedTasks.Clear();
+        taskCards.Clear();
+        var now = clock.Now;
+        foreach (var task in tasksTask.Result)
+        {
+            loadedTasks[task.Id] = task;
+            taskCards[task.Id] = CreateTaskCard(task, now);
+        }
+
+        EnsureQuadrants();
+        RebuildQuadrants(now);
+    }
+
+    public void UpdateDefinitions(IReadOnlyList<QuadrantDefinition> definitions)
+    {
+        loadedDefinitions = definitions.OrderBy(definition => definition.Id).ToArray();
+        EnsureQuadrants();
         RebuildQuadrants();
     }
 
-    private void RebuildQuadrants()
+    private void UpsertActiveTask(TaskItem task)
     {
-        var query = loadedTasks.AsEnumerable();
+        loadedTasks[task.Id] = task;
+        taskCards[task.Id] = CreateTaskCard(task, clock.Now);
+        RebuildQuadrants();
+    }
+
+    private void RemoveActiveTask(long id)
+    {
+        loadedTasks.Remove(id);
+        taskCards.Remove(id);
+        RebuildQuadrants();
+    }
+
+    private TaskCardViewModel CreateTaskCard(TaskItem task, DateTimeOffset now) =>
+        new(task, EditTaskCommand, CompleteTaskCommand, DeleteTaskCommand, now);
+
+    private void EnsureQuadrants()
+    {
+        var definitions = loadedDefinitions.OrderBy(definition => definition.Id).ToArray();
+        if (Quadrants.Count != definitions.Length ||
+            Quadrants.Select(quadrant => quadrant.Id).SequenceEqual(definitions.Select(definition => definition.Id)) is false)
+        {
+            Quadrants = definitions.Select(definition => new QuadrantViewModel(definition)).ToArray();
+            OnPropertyChanged(nameof(Quadrants));
+            return;
+        }
+
+        for (var index = 0; index < definitions.Length; index++)
+        {
+            Quadrants[index].UpdateDefinition(definitions[index]);
+        }
+    }
+
+    private void RebuildQuadrants() => RebuildQuadrants(clock.Now);
+
+    private void RebuildQuadrants(DateTimeOffset now)
+    {
+        IEnumerable<TaskItem> query = loadedTasks.Values;
         query = SelectedFilter switch
         {
-            TaskFilter.Today => query.Where(task => TaskRules.IsDueToday(task, clock.Now)),
-            TaskFilter.Overdue => query.Where(task => TaskRules.IsOverdue(task, clock.Now)),
+            TaskFilter.Today => query.Where(task => TaskRules.IsDueToday(task, now)),
+            TaskFilter.Overdue => query.Where(task => TaskRules.IsOverdue(task, now)),
             _ => query
         };
 
@@ -198,18 +280,31 @@ public partial class MainViewModel : ObservableObject
                 (task.Note?.Contains(search, StringComparison.CurrentCultureIgnoreCase) ?? false));
         }
 
-        Quadrants = loadedDefinitions
-            .Select(definition => new QuadrantViewModel(
-                definition,
-                query.Where(task => task.QuadrantId == definition.Id),
-                EditTaskCommand,
-                CompleteTaskCommand,
-                DeleteTaskCommand,
-                clock.Now))
-            .ToArray();
+        var tasksByQuadrant = query
+            .GroupBy(task => task.QuadrantId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<TaskCardViewModel>)group
+                    .OrderBy(task => task.DueAt is null)
+                    .ThenBy(task => task.DueAt)
+                    .ThenBy(task => task.CreatedAt)
+                    .Select(task => taskCards[task.Id])
+                    .ToArray());
 
-        OnPropertyChanged(nameof(Quadrants));
+        foreach (var quadrant in Quadrants)
+        {
+            quadrant.SynchronizeTasks(tasksByQuadrant.GetValueOrDefault(quadrant.Id) ?? []);
+        }
     }
+
+    private void ReportRecoverableError(string title, Exception exception) =>
+        RecoverableError?.Invoke(this, new RecoverableOperationErrorEventArgs(title, exception));
 }
 
 public sealed record MoveTaskRequest(long TaskId, int TargetQuadrantId);
+
+public sealed class RecoverableOperationErrorEventArgs(string title, Exception exception) : EventArgs
+{
+    public string Title { get; } = title;
+    public Exception Exception { get; } = exception;
+}

@@ -55,16 +55,18 @@ public sealed class SqliteTaskRepository : ITaskRepository
             UPDATE tasks
             SET title = $title, quadrant_id = $quadrant_id, due_at = $due_at, reminder_at = $reminder_at,
                 note = $note, updated_at = $updated_at
-            WHERE id = $id;
+            WHERE id = $id
+            RETURNING *;
             """;
         command.Parameters.AddWithValue("$id", update.Id);
         AddTaskParameters(command, update.Title, update.QuadrantId, update.DueAt, update.ReminderAt, update.Note, now, now, includeCreatedAt: false);
-        if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
         {
             throw new InvalidOperationException($"Task {update.Id} was not found.");
         }
 
-        return (await GetByIdAsync(update.Id, cancellationToken))!;
+        return MapTask(reader);
     }
 
     public async Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, DateTimeOffset now, CancellationToken cancellationToken = default)
@@ -74,18 +76,20 @@ public sealed class SqliteTaskRepository : ITaskRepository
         command.CommandText = """
             UPDATE tasks
             SET is_completed = $is_completed, completed_at = $completed_at, updated_at = $updated_at
-            WHERE id = $id;
+            WHERE id = $id
+            RETURNING *;
             """;
         command.Parameters.AddWithValue("$id", id);
         command.Parameters.AddWithValue("$is_completed", isCompleted ? 1 : 0);
         command.Parameters.AddWithValue("$completed_at", isCompleted ? SqliteValueConverter.Format(now) : DBNull.Value);
         command.Parameters.AddWithValue("$updated_at", SqliteValueConverter.Format(now));
-        if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
         {
             throw new InvalidOperationException($"Task {id} was not found.");
         }
 
-        return (await GetByIdAsync(id, cancellationToken))!;
+        return MapTask(reader);
     }
 
     public async Task DeleteAsync(long id, CancellationToken cancellationToken = default)

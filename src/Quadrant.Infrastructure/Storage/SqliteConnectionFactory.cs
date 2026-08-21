@@ -4,12 +4,15 @@ namespace Quadrant.Infrastructure.Storage;
 
 public sealed class SqliteConnectionFactory
 {
+    private readonly bool pooling;
+
     public string DatabasePath { get; }
 
-    public SqliteConnectionFactory(string databasePath)
+    public SqliteConnectionFactory(string databasePath, bool pooling = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
         DatabasePath = databasePath;
+        this.pooling = pooling;
     }
 
     public SqliteConnection CreateConnection()
@@ -19,7 +22,7 @@ public sealed class SqliteConnectionFactory
             DataSource = DatabasePath,
             Mode = SqliteOpenMode.ReadWriteCreate,
             Cache = SqliteCacheMode.Default,
-            Pooling = false
+            Pooling = pooling
         };
 
         return new SqliteConnection(builder.ToString());
