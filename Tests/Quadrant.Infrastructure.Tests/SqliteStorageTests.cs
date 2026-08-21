@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Quadrant.Core.Models;
 using Quadrant.Infrastructure.Storage;
+using Quadrant.Infrastructure.Tests.Fixtures;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -136,6 +137,42 @@ public sealed class SqliteStorageTests
 
         output.WriteLine($"1000-task SQLite active load: {stopwatch.ElapsedMilliseconds} ms; rows={tasks.Count}");
         Assert.Equal(1000, tasks.Count);
+    }
+
+    [Fact]
+    public async Task Deterministic_v1_schema2_fixture_opens_without_data_loss()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "QuadrantTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var databasePath = Path.Combine(directory, "v1-schema2.db");
+        try
+        {
+            await V1Schema2Fixture.CreateAsync(databasePath);
+            var factory = new SqliteConnectionFactory(databasePath, pooling: false);
+            var initializer = new SqliteDatabaseInitializer(factory);
+            await initializer.InitializeAsync();
+            var repository = new SqliteTaskRepository(factory);
+
+            var active = await repository.GetActiveAsync();
+            var completed = await repository.GetCompletedAsync();
+
+            Assert.Equal(2, active.Count);
+            Assert.Single(completed);
+            Assert.Contains(active, task => task.Id == 101 && task.Title == "中文活动任务" && task.DueAt is not null && task.ReminderAt is not null && task.Note == "含中文与提醒");
+            Assert.Contains(active, task => task.Id == 103 && task.DueAt is null && task.ReminderAt is not null);
+            Assert.Equal(102, completed[0].Id);
+            Assert.Equal("Completed note", completed[0].Note);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (DirectoryNotFoundException)
+            {
+            }
+        }
     }
 
     private sealed class TestDatabase : IAsyncDisposable
