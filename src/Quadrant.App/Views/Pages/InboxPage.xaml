@@ -40,6 +40,7 @@
                                     <ui:Button Margin="6,0,0,0" Padding="8,4" Content="Q2" Tag="{Binding}" Click="ClassifyQ2_Click" AutomationProperties.Name="分类到 Q2" />
                                     <ui:Button Margin="6,0,0,0" Padding="8,4" Content="Q3" Tag="{Binding}" Click="ClassifyQ3_Click" AutomationProperties.Name="分类到 Q3" />
                                     <ui:Button Margin="6,0,0,0" Padding="8,4" Content="Q4" Tag="{Binding}" Click="ClassifyQ4_Click" AutomationProperties.Name="分类到 Q4" />
+                                    <ui:Button Margin="10,0,0,0" Padding="4" Icon="{ui:SymbolIcon CalendarAdd24}" Tag="{Binding}" Click="PlanToday_Click" ToolTip="添加到 Today" AutomationProperties.Name="添加 Inbox 任务到 Today" />
                                     <ui:Button Margin="10,0,0,0" Padding="4" Icon="{ui:SymbolIcon Edit24}" Tag="{Binding}" Click="Edit_Click" ToolTip="编辑任务" AutomationProperties.Name="编辑 Inbox 任务" />
                                     <ui:Button Margin="6,0,0,0" Padding="4" Appearance="Transparent" Icon="{ui:SymbolIcon Delete24}" Tag="{Binding}" Click="Delete_Click" ToolTip="删除任务" AutomationProperties.Name="删除 Inbox 任务" />
                                 </StackPanel>

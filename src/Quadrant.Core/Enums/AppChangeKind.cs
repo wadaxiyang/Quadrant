@@ -8,5 +8,6 @@ public enum AppChangeKind
     TaskReopened,
     TaskDeleted,
     TaskClassified,
+    TaskPlanned,
     FocusSessionCompleted
 }

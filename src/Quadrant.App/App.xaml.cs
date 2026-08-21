@@ -104,7 +104,7 @@ public partial class App : System.Windows.Application
 
         try
         {
-            var reconciliation = await reminderScheduler.ReconcileAsync(viewModel.ActiveTasks, clock.Now);
+            var reconciliation = await reminderScheduler.ReconcileAsync(viewModel.ActiveTasks, clock.LocalNow);
             viewModel.SetPossiblyMissedReminders(reconciliation.Tasks);
         }
         catch (Exception exception)

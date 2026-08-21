@@ -19,12 +19,13 @@
             <Grid Margin="24,16,24,24">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <StackPanel>
                     <TextBlock Style="{StaticResource TitleLargeTextStyle}" Text="{Binding EditorTitle}" />
-                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="把任务放到正确的象限，并只设置真正需要的时间" />
+                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="截止时间与计划日期独立：前者是期限，后者是你计划处理它的日期。" />
                 </StackPanel>
 
                 <StackPanel Grid.Row="1" Margin="0,16,0,0">
@@ -52,11 +53,26 @@
                 </StackPanel>
 
                 <StackPanel Grid.Row="5" Margin="0,16,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="计划日期（可选）" />
+                            <DatePicker Margin="0,4,0,0" SelectedDate="{Binding PlannedDate}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="预计时长（分钟，可选）" />
+                            <ui:TextBox Margin="0,4,0,0" PlaceholderText="1–1440" Text="{Binding EstimatedMinutesText, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Style="{StaticResource ValidationTextStyle}" Text="{Binding PlanningError}" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="6" Margin="0,16,0,0">
                     <TextBlock Style="{StaticResource CaptionTextStyle}" Text="备注" />
                     <ui:TextBox Margin="0,4,0,0" MinHeight="112" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Text="{Binding Note, UpdateSourceTrigger=PropertyChanged}" />
                 </StackPanel>
 
-                <StackPanel Grid.Row="6" Margin="0,20,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+                <StackPanel Grid.Row="7" Margin="0,20,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
                     <ui:Button IsCancel="True" MinWidth="88" Content="{DynamicResource CancelText}" />
                     <ui:Button Margin="8,0,0,0" Appearance="Primary" IsDefault="True" IsEnabled="{Binding IsValid}" MinWidth="88" Click="Save_Click" Content="{DynamicResource SaveText}" Icon="{ui:SymbolIcon Save24}" />
                 </StackPanel>

@@ -22,6 +22,14 @@ public interface ITaskService
 
     Task<TaskItem> MoveToInboxAsync(long id, CancellationToken cancellationToken = default);
 
+    Task<TaskItem> PlanForDateAsync(long id, DateOnly plannedDate, CancellationToken cancellationToken = default);
+
+    Task<TaskItem> PlanForTodayAsync(long id, CancellationToken cancellationToken = default);
+
+    Task<TaskItem> RemovePlanAsync(long id, CancellationToken cancellationToken = default);
+
+    Task<TaskItem> SetEstimateAsync(long id, int? estimatedMinutes, CancellationToken cancellationToken = default);
+
     Task<TaskItem> SetCompletedAsync(long id, bool isCompleted, CancellationToken cancellationToken = default);
 
     Task<TaskItem?> SnoozeAsync(long id, TimeSpan duration, CancellationToken cancellationToken = default);

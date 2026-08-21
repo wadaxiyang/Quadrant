@@ -215,9 +215,51 @@ public sealed class TaskServiceTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => new TaskService(new FakeTaskRepository(), new FakeReminderScheduler(), new FakeClock(now)).MoveToInboxAsync(99));
     }
 
+    [Fact]
+    public async Task Planning_mutations_change_only_plan_fields_and_publish_planned()
+    {
+        var now = new DateTimeOffset(2026, 8, 21, 23, 59, 0, TimeSpan.FromHours(8));
+        var source = new TaskItem(1, "Plan", null, now.AddDays(2), now.AddHours(1), "note", false, null, now, now,
+            null, null, RecurrenceKind.Monthly, 1, "series", 31);
+        var repository = new FakeTaskRepository { CurrentTask = source };
+        var changes = new List<AppChange>();
+        var hub = new AppChangeHub();
+        using var subscription = hub.Subscribe(changes.Add);
+        var service = new TaskService(repository, new FakeReminderScheduler(), new FakeClock(now), appChangeHub: hub);
+
+        var today = await service.PlanForTodayAsync(source.Id);
+        var estimated = await service.SetEstimateAsync(source.Id, 90);
+        var removed = await service.RemovePlanAsync(source.Id);
+
+        Assert.Equal(new DateOnly(2026, 8, 21), today.PlannedDate);
+        Assert.Equal(90, estimated.EstimatedMinutes);
+        Assert.Null(removed.PlannedDate);
+        Assert.Equal(source.DueAt, removed.DueAt);
+        Assert.Equal(source.ReminderAt, removed.ReminderAt);
+        Assert.Equal(source.QuadrantId, removed.QuadrantId);
+        Assert.Equal(source.RecurrenceSeriesId, removed.RecurrenceSeriesId);
+        Assert.Equal([AppChangeKind.TaskPlanned, AppChangeKind.TaskPlanned, AppChangeKind.TaskPlanned], changes.Select(change => change.Kind));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1441)]
+    public async Task Invalid_estimate_is_rejected(int estimate)
+    {
+        var now = new DateTimeOffset(2026, 8, 21, 9, 0, 0, TimeSpan.FromHours(8));
+        var service = new TaskService(new FakeTaskRepository(), new FakeReminderScheduler(), new FakeClock(now));
+
+        await Assert.ThrowsAsync<TaskValidationException>(() => service.SetEstimateAsync(1, estimate));
+    }
+
     private sealed class FakeClock(DateTimeOffset now) : IClock
     {
-        public DateTimeOffset Now { get; } = now;
+        public DateTimeOffset UtcNow => now.ToUniversalTime();
+        public DateTimeOffset LocalNow => now;
+        public DateOnly LocalDate => DateOnly.FromDateTime(now.Date);
+        public TimeZoneInfo LocalTimeZone => TimeZoneInfo.CreateCustomTimeZone("Test", now.Offset, "Test", "Test");
+        public long GetTimestamp() => 0;
+        public TimeSpan GetElapsedTime(long startingTimestamp, long endingTimestamp) => TimeSpan.Zero;
     }
 
     private sealed class FakeTaskRepository : ITaskRepository

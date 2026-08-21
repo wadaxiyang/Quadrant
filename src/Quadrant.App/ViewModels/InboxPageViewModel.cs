@@ -108,6 +108,23 @@ public partial class InboxPageViewModel : ObservableObject, IDisposable
         }
     }
 
+    public async Task PlanForTodayAsync(TaskItem task, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var updated = await taskService.PlanForTodayAsync(task.Id, cancellationToken);
+            var index = IndexOf(updated.Id);
+            if (index >= 0)
+            {
+                Tasks[index] = updated;
+            }
+        }
+        catch (Exception exception)
+        {
+            RecoverableError?.Invoke(this, new RecoverableOperationErrorEventArgs("添加到 Today 失败", exception));
+        }
+    }
+
     public async Task DeleteAsync(TaskItem task, CancellationToken cancellationToken = default)
     {
         try

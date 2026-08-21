@@ -15,6 +15,10 @@ public partial class TaskEditorViewModel : ObservableObject
     private readonly TimeZoneInfo timeZone;
     private readonly DateTimeOffset? originalReminderAt;
     private readonly bool allowInbox;
+    private readonly RecurrenceKind originalRecurrenceKind;
+    private readonly int originalRecurrenceInterval;
+    private readonly string? originalRecurrenceSeriesId;
+    private readonly int? originalRecurrenceAnchorDay;
 
     public TaskEditorViewModel(
         IEnumerable<QuadrantDefinition> quadrants,
@@ -25,9 +29,13 @@ public partial class TaskEditorViewModel : ObservableObject
     {
         Quadrants = quadrants.OrderBy(quadrant => quadrant.Id).ToArray();
         this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        this.timeZone = timeZone ?? TimeZoneInfo.Local;
+        this.timeZone = timeZone ?? clock.LocalTimeZone;
         this.allowInbox = allowInbox;
         originalReminderAt = task?.ReminderAt;
+        originalRecurrenceKind = task?.RecurrenceKind ?? RecurrenceKind.None;
+        originalRecurrenceInterval = task?.RecurrenceInterval ?? 1;
+        originalRecurrenceSeriesId = task?.RecurrenceSeriesId;
+        originalRecurrenceAnchorDay = task?.RecurrenceAnchorDay;
         IsEdit = task is not null;
         Id = task?.Id;
         Title = task?.Title ?? string.Empty;
@@ -35,6 +43,8 @@ public partial class TaskEditorViewModel : ObservableObject
             ? task.QuadrantId
             : allowInbox ? null : Quadrants.FirstOrDefault()?.Id ?? 1;
         Note = task?.Note ?? string.Empty;
+        PlannedDate = task?.PlannedDate?.ToDateTime(TimeOnly.MinValue);
+        EstimatedMinutesText = task?.EstimatedMinutes?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
 
         if (task?.DueAt is { } due)
         {
@@ -60,7 +70,9 @@ public partial class TaskEditorViewModel : ObservableObject
                 or nameof(DueTimeText)
                 or nameof(ReminderPreset)
                 or nameof(CustomReminderDate)
-                or nameof(CustomReminderTimeText))
+                or nameof(CustomReminderTimeText)
+                or nameof(PlannedDate)
+                or nameof(EstimatedMinutesText))
             {
                 IsValid = true;
             }
@@ -95,6 +107,12 @@ public partial class TaskEditorViewModel : ObservableObject
     public partial string Note { get; set; } = string.Empty;
 
     [ObservableProperty]
+    public partial DateTime? PlannedDate { get; set; }
+
+    [ObservableProperty]
+    public partial string EstimatedMinutesText { get; set; } = string.Empty;
+
+    [ObservableProperty]
     public partial ReminderPreset ReminderPreset { get; set; }
 
     [ObservableProperty]
@@ -111,6 +129,9 @@ public partial class TaskEditorViewModel : ObservableObject
 
     [ObservableProperty]
     public partial string? ReminderError { get; set; }
+
+    [ObservableProperty]
+    public partial string? PlanningError { get; set; }
 
     [ObservableProperty]
     public partial bool IsValid { get; set; } = true;
@@ -141,6 +162,7 @@ public partial class TaskEditorViewModel : ObservableObject
         TitleError = string.IsNullOrWhiteSpace(Title) ? "任务名称不能为空。" : null;
         DueTimeError = null;
         ReminderError = null;
+        PlanningError = null;
         if (QuadrantId is < 1 or > 4)
         {
             TitleError ??= "请选择有效象限。";
@@ -221,12 +243,26 @@ public partial class TaskEditorViewModel : ObservableObject
             }
         }
 
-        if (ReminderError is null && reminderAt is { } reminder && reminder <= clock.Now && reminder != originalReminderAt)
+        if (ReminderError is null && reminderAt is { } reminder && reminder <= clock.LocalNow && reminder != originalReminderAt)
         {
             ReminderError = "提醒时间已过去，请改为未来时间。";
         }
 
-        if (TitleError is not null || DueTimeError is not null || ReminderError is not null)
+        int? estimatedMinutes = null;
+        if (!string.IsNullOrWhiteSpace(EstimatedMinutesText))
+        {
+            if (!int.TryParse(EstimatedMinutesText.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var parsedEstimate) ||
+                parsedEstimate is < 1 or > 1440)
+            {
+                PlanningError = "预计时长需为 1–1440 分钟的整数。";
+            }
+            else
+            {
+                estimatedMinutes = parsedEstimate;
+            }
+        }
+
+        if (TitleError is not null || DueTimeError is not null || ReminderError is not null || PlanningError is not null)
         {
             IsValid = false;
             draft = null!;
@@ -234,7 +270,14 @@ public partial class TaskEditorViewModel : ObservableObject
         }
 
         IsValid = true;
-        draft = new TaskDraft(Title.Trim(), QuadrantId, dueAt, reminderAt, string.IsNullOrWhiteSpace(Note) ? null : Note.Trim());
+        draft = new TaskDraft(
+            Title.Trim(),
+            QuadrantId,
+            dueAt,
+            reminderAt,
+            string.IsNullOrWhiteSpace(Note) ? null : Note.Trim(),
+            PlannedDate is { } plannedDate ? DateOnly.FromDateTime(plannedDate) : null,
+            estimatedMinutes);
         return true;
     }
 
@@ -246,7 +289,9 @@ public partial class TaskEditorViewModel : ObservableObject
             return false;
         }
 
-        update = new TaskUpdate(id, draft.Title, draft.QuadrantId, draft.DueAt, draft.ReminderAt, draft.Note);
+        update = new TaskUpdate(id, draft.Title, draft.QuadrantId, draft.DueAt, draft.ReminderAt, draft.Note,
+            draft.PlannedDate, draft.EstimatedMinutes, originalRecurrenceKind, originalRecurrenceInterval,
+            originalRecurrenceSeriesId, originalRecurrenceAnchorDay);
         return true;
     }
 

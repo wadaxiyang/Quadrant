@@ -96,5 +96,25 @@ public sealed class InboxPageViewModelTests
         }
 
         public Task<TaskItem> MoveToInboxAsync(long id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<TaskItem> PlanForDateAsync(long id, DateOnly plannedDate, CancellationToken cancellationToken = default)
+        {
+            var index = Tasks.FindIndex(task => task.Id == id);
+            Tasks[index] = Tasks[index] with { PlannedDate = plannedDate };
+            return Task.FromResult(Tasks[index]);
+        }
+
+        public Task<TaskItem> PlanForTodayAsync(long id, CancellationToken cancellationToken = default) =>
+            PlanForDateAsync(id, new DateOnly(2026, 8, 21), cancellationToken);
+
+        public Task<TaskItem> RemovePlanAsync(long id, CancellationToken cancellationToken = default) =>
+            PlanForDateAsync(id, default, cancellationToken);
+
+        public Task<TaskItem> SetEstimateAsync(long id, int? estimatedMinutes, CancellationToken cancellationToken = default)
+        {
+            var index = Tasks.FindIndex(task => task.Id == id);
+            Tasks[index] = Tasks[index] with { EstimatedMinutes = estimatedMinutes };
+            return Task.FromResult(Tasks[index]);
+        }
     }
 }

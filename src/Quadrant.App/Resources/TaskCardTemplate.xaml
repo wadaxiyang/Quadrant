@@ -21,6 +21,13 @@
                     <MenuItem Header="删除" Command="{Binding DeleteCommand}" CommandParameter="{Binding Id}">
                         <MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon>
                     </MenuItem>
+                    <Separator />
+                    <MenuItem Header="添加到 Today" Command="{Binding PlanForTodayCommand}" CommandParameter="{Binding Id}">
+                        <MenuItem.Icon><ui:SymbolIcon Symbol="CalendarAdd24" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="移除 Today 计划" Command="{Binding RemovePlanCommand}" CommandParameter="{Binding Id}">
+                        <MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon>
+                    </MenuItem>
                 </ContextMenu>
             </Border.ContextMenu>
             <Grid>
@@ -48,6 +55,14 @@
                     <StackPanel Margin="0,4,0,0" Orientation="Horizontal" Visibility="{Binding ReminderText, Converter={StaticResource TaskCardStringToVisibilityConverter}}">
                         <ui:SymbolIcon Margin="0,0,6,0" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="ClockAlarm20" />
                         <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding ReminderText}" />
+                    </StackPanel>
+                    <StackPanel Margin="0,4,0,0" Orientation="Horizontal" Visibility="{Binding PlanText, Converter={StaticResource TaskCardStringToVisibilityConverter}}">
+                        <ui:SymbolIcon Margin="0,0,6,0" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CalendarAdd24" />
+                        <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding PlanText}" />
+                    </StackPanel>
+                    <StackPanel Margin="0,4,0,0" Orientation="Horizontal" Visibility="{Binding EstimateText, Converter={StaticResource TaskCardStringToVisibilityConverter}}">
+                        <ui:SymbolIcon Margin="0,0,6,0" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="ClockAlarm20" />
+                        <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding EstimateText}" />
                     </StackPanel>
                 </StackPanel>
 

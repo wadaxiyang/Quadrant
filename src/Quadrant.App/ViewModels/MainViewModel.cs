@@ -115,6 +115,32 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void DeleteTask(long id) => DeleteTaskRequested?.Invoke(this, id);
 
+    [RelayCommand]
+    private async Task PlanForToday(long id)
+    {
+        try
+        {
+            UpsertActiveTask(await taskService.PlanForTodayAsync(id));
+        }
+        catch (Exception exception)
+        {
+            ReportRecoverableError("添加到 Today 失败", exception);
+        }
+    }
+
+    [RelayCommand]
+    private async Task RemovePlan(long id)
+    {
+        try
+        {
+            UpsertActiveTask(await taskService.RemovePlanAsync(id));
+        }
+        catch (Exception exception)
+        {
+            ReportRecoverableError("移除计划失败", exception);
+        }
+    }
+
     public async Task ConfirmedDeleteAsync(long id)
     {
         await taskService.DeleteAsync(id);
@@ -217,7 +243,7 @@ public partial class MainViewModel : ObservableObject
         loadedDefinitions = definitionsTask.Result.OrderBy(definition => definition.Id).ToArray();
         loadedTasks.Clear();
         taskCards.Clear();
-        var now = clock.Now;
+        var now = clock.LocalNow;
         foreach (var task in tasksTask.Result)
         {
             loadedTasks[task.Id] = task;
@@ -238,7 +264,7 @@ public partial class MainViewModel : ObservableObject
     private void UpsertActiveTask(TaskItem task)
     {
         loadedTasks[task.Id] = task;
-        taskCards[task.Id] = CreateTaskCard(task, clock.Now);
+        taskCards[task.Id] = CreateTaskCard(task, clock.LocalNow);
         RebuildQuadrants();
     }
 
@@ -250,7 +276,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     private TaskCardViewModel CreateTaskCard(TaskItem task, DateTimeOffset now) =>
-        new(task, EditTaskCommand, CompleteTaskCommand, DeleteTaskCommand, now);
+        new(task, EditTaskCommand, CompleteTaskCommand, DeleteTaskCommand, PlanForTodayCommand, RemovePlanCommand, now, clock.LocalTimeZone);
 
     private void EnsureQuadrants()
     {
@@ -269,7 +295,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private void RebuildQuadrants() => RebuildQuadrants(clock.Now);
+    private void RebuildQuadrants() => RebuildQuadrants(clock.LocalNow);
 
     private void RebuildQuadrants(DateTimeOffset now)
     {

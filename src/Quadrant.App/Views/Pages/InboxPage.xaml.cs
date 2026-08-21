@@ -46,6 +46,15 @@ public partial class InboxPage : Page
     private async void ClassifyQ3_Click(object sender, RoutedEventArgs e) => await AssignAsync(sender, 3);
     private async void ClassifyQ4_Click(object sender, RoutedEventArgs e) => await AssignAsync(sender, 4);
 
+    private async void PlanToday_Click(object sender, RoutedEventArgs e)
+    {
+        await RequireViewModel().PlanForTodayAsync((TaskItem)((FrameworkElement)sender).Tag);
+        if (Window.GetWindow(this) is MainWindow window)
+        {
+            window.ShowFeedback("已添加到 Today", "计划日期已设为今天。", ControlAppearance.Success, SymbolRegular.CalendarAdd24);
+        }
+    }
+
     private async Task AssignAsync(object sender, int quadrantId)
     {
         await RequireViewModel().AssignQuadrantAsync((TaskItem)((FrameworkElement)sender).Tag, quadrantId);

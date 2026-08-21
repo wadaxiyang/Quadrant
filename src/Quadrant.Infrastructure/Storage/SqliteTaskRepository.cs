@@ -291,10 +291,10 @@ public sealed class SqliteTaskRepository : ITaskRepository
         command.Parameters.AddWithValue("$recurrence_anchor_day", SqliteValueConverter.ToDbValue(draft.RecurrenceAnchorDay));
         if (includeCreatedAt)
         {
-            command.Parameters.AddWithValue("$created_at", SqliteValueConverter.Format(createdAt));
+            command.Parameters.AddWithValue("$created_at", SqliteValueConverter.FormatUtc(createdAt));
         }
 
-        command.Parameters.AddWithValue("$updated_at", SqliteValueConverter.Format(updatedAt));
+        command.Parameters.AddWithValue("$updated_at", SqliteValueConverter.FormatUtc(updatedAt));
     }
 
     private static void AddTaskParameters(SqliteCommand command, TaskUpdate update, DateTimeOffset createdAt, DateTimeOffset updatedAt, bool includeCreatedAt = true) =>
