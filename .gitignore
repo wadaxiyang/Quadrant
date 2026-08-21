@@ -78,3 +78,9 @@ Desktop.ini
 test-results/
 test-output/
 scratch/
+
+# Local agent memory and project documentation
+# These files are intentionally workspace-local and must not be committed.
+/AGENTS.md
+/*.md
+/docs/
