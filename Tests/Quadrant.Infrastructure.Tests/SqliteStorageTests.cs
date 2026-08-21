@@ -264,10 +264,30 @@ public sealed class SqliteStorageTests
         var sessions = new SqliteFocusSessionRepository(database.Factory);
         var localDate = new DateOnly(2026, 8, 21);
         await events.CreateAsync(new Quadrant.Core.Models.CompletionEvent("event-1", task.Id, DateTimeOffset.UtcNow, localDate, 1, "History", null, null, null, false));
-        await sessions.CreateAsync(new Quadrant.Core.Models.FocusSession("session-1", task.Id, Quadrant.Core.Enums.FocusMode.Stopwatch, DateTimeOffset.UtcNow, null, null, null, 0, Quadrant.Core.Enums.FocusStatus.Paused, null, localDate, "History", 1));
+        Assert.NotNull(await sessions.CreateIfNoCurrentAsync(new Quadrant.Core.Models.FocusSession("session-1", task.Id, Quadrant.Core.Enums.FocusMode.Stopwatch, DateTimeOffset.UtcNow, null, null, null, 0, Quadrant.Core.Enums.FocusStatus.Paused, null, localDate, "History", 1)));
 
         Assert.Equal(task.Id, (await events.GetByIdAsync("event-1"))!.TaskId);
         Assert.Equal(task.Id, (await sessions.GetByIdAsync("session-1"))!.TaskId);
+    }
+
+    [Fact]
+    public async Task Focus_repository_enforces_one_current_session_and_transition_status()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var task = await database.Tasks.CreateAsync(new TaskDraft("Focus", 1), DateTimeOffset.UtcNow);
+        var sessions = new SqliteFocusSessionRepository(database.Factory);
+        var start = DateTimeOffset.UtcNow;
+        var running = new FocusSession("focus-running", task.Id, Quadrant.Core.Enums.FocusMode.Stopwatch, start, start, null, null, 0, Quadrant.Core.Enums.FocusStatus.Running, null, DateOnly.FromDateTime(start.Date), "Focus", 1);
+
+        Assert.NotNull(await sessions.CreateIfNoCurrentAsync(running));
+        Assert.Null(await sessions.CreateIfNoCurrentAsync(running with { Id = "second" }));
+        var paused = await sessions.TransitionAsync(running with { Status = Quadrant.Core.Enums.FocusStatus.Paused, ActiveSegmentStartedAtUtc = null, DurationSeconds = 30 }, Quadrant.Core.Enums.FocusStatus.Running);
+        Assert.NotNull(paused);
+        Assert.Null(await sessions.TransitionAsync(running with { Status = Quadrant.Core.Enums.FocusStatus.Completed }, Quadrant.Core.Enums.FocusStatus.Running));
+        await database.Tasks.DeleteAsync(task.Id);
+        var stored = await sessions.GetByIdAsync(running.Id);
+        Assert.Null(stored!.TaskId);
+        Assert.Equal("Focus", stored.TaskTitleSnapshot);
     }
 
     [Fact]
