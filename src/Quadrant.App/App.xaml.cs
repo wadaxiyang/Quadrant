@@ -90,6 +90,11 @@ public partial class App : System.Windows.Application
         var focusSessionService = new Quadrant.Core.Services.FocusSessionService(focusRepository, taskRepository, clock, appChangeHub);
         var focusTimerService = new Quadrant.Core.Services.FocusTimerService(focusSessionService, clock);
         var pomodoroTimerService = new Quadrant.Core.Services.PomodoroTimerService(focusSessionService, clock, new Quadrant.Core.Services.SystemFocusCompletionScheduler());
+        pomodoroTimerService.SessionCompleted += (_, session) =>
+        {
+            try { notificationService.ShowFocusCompleted(session, pomodoroTimerService.SuggestedNextKind); }
+            catch (Exception exception) { diagnosticLogger.Warning("Focus completion notification failed; session remains completed.", exception); }
+        };
         var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock, appChangeHub, todayQueryService, focusTimerService, pomodoroTimerService, focusSessionService);
         try
         {
@@ -392,15 +397,24 @@ public partial class App : System.Windows.Application
         {
             if (activation.Action == "complete")
             {
-                await viewModel.CompleteFromNotificationAsync(activation.TaskId);
+                await viewModel.CompleteFromNotificationAsync(activation.TaskId!.Value);
             }
             else if (activation.Action == "snooze10")
             {
-                await viewModel.SnoozeFromNotificationAsync(activation.TaskId);
+                await viewModel.SnoozeFromNotificationAsync(activation.TaskId!.Value);
+            }
+            else if (activation.Action == "startbreak")
+            {
+                await viewModel.PomodoroTimerService.StartAsync(null,
+                    viewModel.PomodoroTimerService.SuggestedNextKind is Quadrant.Core.Enums.PomodoroKind.LongBreak
+                        ? Quadrant.Core.Enums.PomodoroKind.LongBreak
+                        : Quadrant.Core.Enums.PomodoroKind.ShortBreak,
+                    new Quadrant.Core.Models.PomodoroSettings());
+                mainWindow.ShowFromTray();
             }
             else
             {
-                await mainWindow.ActivateAndOpenTaskAsync(activation.TaskId);
+                mainWindow.ShowFromTray();
             }
         }
         catch (Exception exception)

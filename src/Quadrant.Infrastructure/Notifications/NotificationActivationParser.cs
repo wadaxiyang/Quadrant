@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace Quadrant.Infrastructure.Notifications;
 
-public sealed record NotificationActivation(string Action, long TaskId);
+public sealed record NotificationActivation(string Action, long? TaskId = null, string? SessionId = null);
 
 public static class NotificationActivationParser
 {
@@ -28,14 +28,17 @@ public static class NotificationActivationParser
             values[key] = value;
         }
 
-        if (!values.TryGetValue("action", out var action) ||
-            action is not ("complete" or "open" or "snooze10") ||
-            !values.TryGetValue("taskId", out var taskIdText) ||
-            !long.TryParse(taskIdText, NumberStyles.None, CultureInfo.InvariantCulture, out var taskId) ||
-            taskId <= 0)
+        if (!values.TryGetValue("action", out var action))
         {
             return false;
         }
+
+        if (action is "focusopen" or "startbreak")
+        {
+            if (!values.TryGetValue("sessionId", out var sessionId) || string.IsNullOrWhiteSpace(sessionId)) return false;
+            activation = new NotificationActivation(action, null, sessionId); return true;
+        }
+        if (action is not ("complete" or "open" or "snooze10") || !values.TryGetValue("taskId", out var taskIdText) || !long.TryParse(taskIdText, NumberStyles.None, CultureInfo.InvariantCulture, out var taskId) || taskId <= 0) return false;
 
         activation = new NotificationActivation(action, taskId);
         return true;
