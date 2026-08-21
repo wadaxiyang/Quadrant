@@ -56,6 +56,8 @@ public partial class TaskEditorViewModel : ObservableObject
 
     public IReadOnlyList<QuadrantDefinition> Quadrants { get; }
 
+    public string QuadrantLabel => Quadrants.FirstOrDefault(quadrant => quadrant.Id == QuadrantId)?.Name ?? $"Q{QuadrantId}";
+
     public bool IsEdit { get; }
 
     public string EditorTitle => IsEdit ? "编辑任务" : "新建任务";
@@ -116,6 +118,8 @@ public partial class TaskEditorViewModel : ObservableObject
             ReminderPreset = ReminderPreset.None;
         }
     }
+
+    partial void OnQuadrantIdChanged(int value) => OnPropertyChanged(nameof(QuadrantLabel));
 
     public bool TryBuildDraft(out TaskDraft draft)
     {

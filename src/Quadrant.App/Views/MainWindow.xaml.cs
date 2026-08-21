@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Interop;
 using Quadrant.App.ViewModels;
 using Quadrant.Core.Models;
 
@@ -12,13 +13,58 @@ public partial class MainWindow : System.Windows.Window
     private const string TaskIdFormat = "Quadrant.TaskId";
     private Point dragStartPoint;
     private Border? highlightedQuadrant;
+    private Quadrant.Infrastructure.Windows.GlobalHotkeyService? globalHotkeyService;
+    private HwndSource? windowSource;
+    private bool quickAddOpen;
 
     public MainWindow()
     {
         InitializeComponent();
         Loaded += MainWindow_Loaded;
+        SourceInitialized += MainWindow_SourceInitialized;
+        Closed += MainWindow_Closed;
         AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(TaskCard_MouseLeftButtonDown));
         AddHandler(UIElement.PreviewMouseMoveEvent, new MouseEventHandler(TaskCard_MouseMove));
+    }
+
+    public event EventHandler? GlobalHotkeyPressed;
+
+    public void ConfigureGlobalHotkey(Quadrant.Infrastructure.Windows.GlobalHotkeyService service)
+    {
+        globalHotkeyService = service;
+    }
+
+    private void MainWindow_SourceInitialized(object? sender, EventArgs e)
+    {
+        if (globalHotkeyService is null)
+        {
+            return;
+        }
+
+        windowSource = (HwndSource)PresentationSource.FromVisual(this)!;
+        windowSource.AddHook(WindowSourceHook);
+        globalHotkeyService.Register(new WindowInteropHelper(this).Handle);
+    }
+
+    private void MainWindow_Closed(object? sender, EventArgs e)
+    {
+        if (windowSource is not null)
+        {
+            windowSource.RemoveHook(WindowSourceHook);
+        }
+
+        globalHotkeyService?.Unregister(new WindowInteropHelper(this).Handle);
+    }
+
+    private IntPtr WindowSourceHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (globalHotkeyService?.IsHotkeyMessage(msg, wParam) == true)
+        {
+            GlobalHotkeyPressed?.Invoke(this, EventArgs.Empty);
+            handled = true;
+        }
+
+        return IntPtr.Zero;
     }
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -107,6 +153,33 @@ public partial class MainWindow : System.Windows.Window
         }
 
         await ((MainViewModel)DataContext).OpenTaskAsync(id);
+    }
+
+    public async Task ShowQuickAddAsync()
+    {
+        if (quickAddOpen)
+        {
+            return;
+        }
+
+        quickAddOpen = true;
+        var viewModel = (MainViewModel)DataContext;
+        try
+        {
+            var editor = new QuickAddWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock))
+            {
+                Owner = IsVisible ? this : null
+            };
+
+            if (editor.ShowDialog() == true && editor.DraftResult is { } draft)
+            {
+                await viewModel.CreateAsync(draft);
+            }
+        }
+        finally
+        {
+            quickAddOpen = false;
+        }
     }
 
     private async void DeleteTaskRequested(object? sender, long id)

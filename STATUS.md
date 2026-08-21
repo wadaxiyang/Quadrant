@@ -2,7 +2,7 @@
 
 ## Current stage
 
-`STAGE_12_SCHEDULED_REMINDERS` — implementation complete; manual scheduled notification checks pending
+`STAGE_13_QUICK_ADD_HOTKEY` — implementation complete; manual global hotkey and Quick Add checks pending
 
 ## Completed
 
@@ -79,6 +79,10 @@
 - Added the in-app possibly-missed reminder banner and tests for snooze, activation support, and schedule tag stability.
 - Fixed Stage 12 regression: Windows scheduler failures no longer block database create/update/complete/delete/snooze operations; scheduler errors are diagnostic-only derived-state failures.
 - Protected delete event handling and startup reminder reconciliation from escaping `async void`/startup boundaries and terminating the app.
+- Added `GlobalHotkeyService` with `RegisterHotKey`, `UnregisterHotKey`, `MOD_NOREPEAT`, Win32 error reporting, and `WM_HOTKEY` message-id filtering.
+- Added MainWindow HWND lifecycle hook for the default `Ctrl+Alt+Q` hotkey and cleanup on close/exit.
+- Added Quick Add with title autofocus, Q1-Q4 selection, Ctrl+1..4, Enter/Esc behavior, expandable date/time/reminder controls, and reuse of existing task validation/persistence.
+- Prevented repeated hotkey activation from opening multiple Quick Add windows.
 
 ## Files changed
 
@@ -112,6 +116,13 @@
 - `src/Quadrant.App/Views/CompletedWindow.xaml.cs`
 - `src/Quadrant.App/Views/MainWindow.xaml.cs`
 - `src/Quadrant.App/ViewModels/TaskEditorViewModel.cs`
+- `src/Quadrant.Infrastructure/Windows/GlobalHotkeyService.cs`
+- `src/Quadrant.App/Views/QuickAddWindow.xaml`
+- `src/Quadrant.App/Views/QuickAddWindow.xaml.cs`
+- `src/Quadrant.App/Views/MainWindow.xaml.cs`
+- `src/Quadrant.App/App.xaml.cs`
+- `Tests/Quadrant.Infrastructure.Tests/GlobalHotkeyServiceTests.cs`
+- `STATUS.md`
 - `src/Quadrant.App/Views/TaskEditorWindow.xaml`
 - `src/Quadrant.Infrastructure/Notifications/NotificationActivationParser.cs`
 - `src/Quadrant.Infrastructure/Notifications/WindowsAppNotificationService.cs`
@@ -264,6 +275,10 @@
 - `dotnet build Quadrant.sln -c Debug --no-restore` — passed after scheduler failure fix; 0 warnings, 0 errors.
 - `dotnet test Quadrant.sln -c Debug --no-build --no-restore` — passed after scheduler failure fix; 28 Core tests and 16 Infrastructure tests passed, 0 failed.
 - Direct `Quadrant.App.exe` launch smoke check — passed after scheduler failure fix; process remained alive for 7 seconds.
+- `dotnet build Quadrant.sln -c Debug --no-restore` — passed after Stage 13; 0 warnings, 0 errors.
+- `dotnet test Quadrant.sln -c Debug --no-restore` — passed after Stage 13; 28 Core tests and 19 Infrastructure tests passed, 0 failed.
+- `git diff --check` — passed; no whitespace errors.
+- Direct `Quadrant.App.exe` launch smoke check — passed; process remained alive for 6 seconds.
 
 ## Manual tests pending
 
@@ -273,6 +288,7 @@
 - Stage 10 manual GUI/runtime checks remain pending: DEBUG output should be inspected from an IDE/debug listener to confirm the probe prints the installed 2.4.0 runtime string.
 - Stage 11 manual checks remain pending: immediate Toast display, Complete/Open button behavior, closed-app activation, second-launch redirection, and Dispatcher deadlock check require an interactive Windows desktop session.
 - Stage 12 manual checks remain pending: 2-minute scheduled reminder with app closed, Complete/Open/Snooze actions, edit-time cancellation, completion cancellation, and sleep/wake missed-reminder banner.
+- Stage 13 manual checks remain pending: Word/Edge/VS Code foreground activation, hotkey conflict handling, Chinese IME input, Ctrl+1..4 selection, Enter/Esc, duplicate-window prevention, background main-window activation, and immediate quadrant refresh after save.
 
 ## Sources checked
 
@@ -325,6 +341,11 @@
 - https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.toastnotifier.addtoschedule — checked 2026-08-21; schedule API.
 - https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.toastnotifier.getscheduledtoastnotifications — checked 2026-08-21; enumeration API.
 - https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.toastnotifier.removefromschedule — checked 2026-08-21; removal API.
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey — checked 2026-08-21; registration return value, modifiers, and error behavior.
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-unregisterhotkey — checked 2026-08-21; unregister behavior.
+- https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-hotkey — checked 2026-08-21; message and `wParam` id behavior.
+- https://learn.microsoft.com/en-us/dotnet/api/system.windows.interop.hwndsource.addhook — checked 2026-08-21; WPF HWND message hook.
+- https://learn.microsoft.com/en-us/dotnet/api/system.windows.interop.windowinterophelper.ensurehandle — checked 2026-08-21; WPF HWND acquisition.
 
 ## Known issues
 
@@ -340,10 +361,13 @@
 - Stage 09 GUI manual acceptance is pending: reminder preset enablement, Custom without Due, future/past validation, and edit preset inference.
 - Stage 10 cannot validate the DEBUG probe through the xUnit test host because automatic initialization is generated for the App executable; direct App launch passed, while runtime version output remains an IDE/debug-listener check.
 - No known MVVMTK0045 warnings remain after the partial-property migration.
+- Stage 13 keeps WPF HWND hook code in `Quadrant.App`; Infrastructure owns only Win32 hotkey registration, unregistration, error reporting, and `WM_HOTKEY` id matching.
+- Default hotkey is `Ctrl+Alt+Q` with `MOD_CONTROL | MOD_ALT | MOD_NOREPEAT`; Win-key and F12 are not used.
 - Stage 11 follows the official WPF startup order: register the notification handler, call `Register()`, then call `GetActivatedEventArgs()` and register the single instance. Scheduled notifications and snooze remain intentionally deferred to Stage 12.
 - Official documentation states elevated/admin apps cannot send or receive App Notifications; this remains a documented support limitation.
 - Stage 11 GUI and Toast acceptance is not verifiable in the current environment; automated parser/build/startup checks pass.
+- Stage 13 has no known build or automated-test issues; full cross-application hotkey and IME behavior still requires an interactive Windows desktop session.
 
 ## Next stage
 
-`stages/STAGE_13_GLOBAL_HOTKEY_QUICK_ADD.md`
+`stages/STAGE_14_TRAY_LIFECYCLE.md`

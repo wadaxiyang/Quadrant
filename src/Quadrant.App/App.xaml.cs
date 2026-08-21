@@ -5,6 +5,7 @@ public partial class App : System.Windows.Application
     private readonly Quadrant.Infrastructure.Notifications.WindowsAppNotificationService notificationService = new();
     private readonly Quadrant.Infrastructure.Notifications.WindowsReminderScheduler reminderScheduler = new();
     private readonly Quadrant.Infrastructure.Windows.SingleInstanceService singleInstanceService = new();
+    private readonly Quadrant.Infrastructure.Windows.GlobalHotkeyService globalHotkeyService = new();
     private Quadrant.Infrastructure.Notifications.NotificationActivation? pendingActivation;
 
     private async void OnStartup(object sender, System.Windows.StartupEventArgs e)
@@ -70,6 +71,9 @@ public partial class App : System.Windows.Application
         };
 
         MainWindow = mainWindow;
+        mainWindow.ConfigureGlobalHotkey(globalHotkeyService);
+        mainWindow.GlobalHotkeyPressed += GlobalHotkeyService_HotkeyPressed;
+        globalHotkeyService.RegistrationFailed += GlobalHotkeyService_RegistrationFailed;
         mainWindow.Show();
 
         if (pendingActivation is not null)
@@ -81,9 +85,37 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(System.Windows.ExitEventArgs e)
     {
+        globalHotkeyService.Dispose();
         notificationService.Dispose();
         singleInstanceService.Dispose();
         base.OnExit(e);
+    }
+
+    private void GlobalHotkeyService_HotkeyPressed(object? sender, EventArgs e)
+    {
+        if (MainWindow is Views.MainWindow mainWindow)
+        {
+            _ = Dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    await mainWindow.ShowQuickAddAsync();
+                }
+                catch (Exception exception)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Quick Add failed: {exception}");
+                }
+            });
+        }
+    }
+
+    private static void GlobalHotkeyService_RegistrationFailed(object? sender, Quadrant.Infrastructure.Windows.GlobalHotkeyRegistrationFailedEventArgs e)
+    {
+        System.Windows.MessageBox.Show(
+            $"快速添加快捷键 Ctrl+Alt+Q 注册失败，应用仍可正常使用。\n{e.Message}",
+            "快捷键不可用",
+            System.Windows.MessageBoxButton.OK,
+            System.Windows.MessageBoxImage.Information);
     }
 
     private void NotificationService_ActivationReceived(
