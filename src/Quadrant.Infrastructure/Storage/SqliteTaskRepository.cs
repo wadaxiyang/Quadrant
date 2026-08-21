@@ -5,7 +5,7 @@ using Quadrant.Core.Models;
 
 namespace Quadrant.Infrastructure.Storage;
 
-public sealed class SqliteTaskRepository : ITaskRepository
+public sealed class SqliteTaskRepository : ITaskRepository, ITodayTaskRepository
 {
     private readonly SqliteConnectionFactory connectionFactory;
 
@@ -32,6 +32,30 @@ public sealed class SqliteTaskRepository : ITaskRepository
 
     public async Task<IReadOnlyList<TaskItem>> GetCompletedAsync(CancellationToken cancellationToken = default) =>
         await GetManyAsync("SELECT * FROM tasks WHERE is_completed = 1 ORDER BY completed_at DESC, id DESC;", cancellationToken);
+
+    public async Task<IReadOnlyList<TaskItem>> GetTodayCandidatesAsync(DateOnly localToday, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        // Due instants may still contain V1 offset text. Compare their parsed
+        // DateTimeOffset values in the query service instead of asking SQLite to
+        // infer a local date from the text. This query never reads completed/history.
+        command.CommandText = """
+            SELECT * FROM tasks
+            WHERE is_completed = 0
+              AND (due_at IS NOT NULL OR planned_date <= $local_today)
+            ORDER BY due_at, planned_date, created_at, id;
+            """;
+        command.Parameters.AddWithValue("$local_today", SqliteValueConverter.FormatDateOnly(localToday));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var tasks = new List<TaskItem>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            tasks.Add(MapTask(reader));
+        }
+
+        return tasks;
+    }
 
     public async Task<TaskItem?> GetByIdAsync(long id, CancellationToken cancellationToken = default)
     {

@@ -66,6 +66,25 @@ public sealed class SqliteStorageTests
     }
 
     [Fact]
+    public async Task Today_candidates_include_active_due_or_old_plan_but_exclude_completed_and_future_plan_only()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var now = new DateTimeOffset(2026, 8, 21, 9, 0, 0, TimeSpan.FromHours(8));
+        var due = await database.Tasks.CreateAsync(new TaskDraft("Due", 1, DueAt: now.AddDays(10)), now);
+        var oldPlan = await database.Tasks.CreateAsync(new TaskDraft("Old plan", 1, PlannedDate: new DateOnly(2026, 8, 20)), now);
+        var futurePlan = await database.Tasks.CreateAsync(new TaskDraft("Future plan", 1, PlannedDate: new DateOnly(2026, 8, 22)), now);
+        var completedDue = await database.Tasks.CreateAsync(new TaskDraft("Completed due", 1, DueAt: now), now);
+        await database.Tasks.SetCompletedAsync(completedDue.Id, true, now.AddMinutes(1));
+
+        var candidates = await ((Quadrant.Core.Interfaces.ITodayTaskRepository)database.Tasks)
+            .GetTodayCandidatesAsync(new DateOnly(2026, 8, 21));
+
+        Assert.Equal([due.Id, oldPlan.Id], candidates.Select(task => task.Id).OrderBy(id => id));
+        Assert.DoesNotContain(candidates, task => task.Id == futurePlan.Id);
+        Assert.DoesNotContain(candidates, task => task.Id == completedDue.Id);
+    }
+
+    [Fact]
     public async Task Complete_restore_delete_and_completed_order_work()
     {
         await using var database = await TestDatabase.CreateAsync();
