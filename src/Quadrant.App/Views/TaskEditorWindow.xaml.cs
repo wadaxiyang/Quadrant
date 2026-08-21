@@ -4,7 +4,7 @@ using Quadrant.Core.Models;
 
 namespace Quadrant.App.Views;
 
-public partial class TaskEditorWindow : Window
+public partial class TaskEditorWindow : Wpf.Ui.Controls.FluentWindow
 {
     public TaskEditorWindow(TaskEditorViewModel viewModel)
     {

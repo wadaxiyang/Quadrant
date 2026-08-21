@@ -5,7 +5,7 @@ using Quadrant.Core.Models;
 
 namespace Quadrant.App.Views;
 
-public partial class QuickAddWindow : Window
+public partial class QuickAddWindow : Wpf.Ui.Controls.FluentWindow
 {
     public QuickAddWindow(TaskEditorViewModel viewModel)
     {

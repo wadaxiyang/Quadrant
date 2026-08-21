@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title description">
+  <title id="title">Quadrant</title>
+  <desc id="description">A blue rounded square containing a two by two task quadrant.</desc>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="#0F6CBD"/>
+  <rect x="27" y="27" width="32" height="32" rx="8" fill="#FFFFFF"/>
+  <rect x="69" y="27" width="32" height="32" rx="8" fill="#DCEEFF"/>
+  <rect x="27" y="69" width="32" height="32" rx="8" fill="#FFF4CE"/>
+  <rect x="69" y="69" width="32" height="32" rx="8" fill="#E8EAED"/>
+</svg>

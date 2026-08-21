@@ -1,10 +1,11 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:converters="clr-namespace:Quadrant.App.Converters">
+                    xmlns:converters="clr-namespace:Quadrant.App.Converters"
+                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
     <converters:StringToVisibilityConverter x:Key="TaskCardStringToVisibilityConverter" />
 
     <DataTemplate x:Key="TaskCardTemplate">
-        <Border Style="{StaticResource TaskCardStyle}" Margin="{StaticResource TaskCardBottomMargin}">
+        <Border x:Name="CardSurface" Style="{StaticResource TaskCardStyle}" Margin="{StaticResource TaskCardBottomMargin}">
             <AutomationProperties.Name>
                 <MultiBinding StringFormat="{}{0}；{1}；{2}">
                     <Binding Path="Title" />
@@ -12,23 +13,60 @@
                     <Binding Path="DueStatusText" />
                 </MultiBinding>
             </AutomationProperties.Name>
+            <Border.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="编辑" Command="{Binding EditCommand}" CommandParameter="{Binding Id}">
+                        <MenuItem.Icon><ui:SymbolIcon Symbol="Edit24" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="删除" Command="{Binding DeleteCommand}" CommandParameter="{Binding Id}">
+                        <MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon>
+                    </MenuItem>
+                </ContextMenu>
+            </Border.ContextMenu>
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
+
+                <ui:Button Grid.Column="0"
+                           Margin="0,0,12,0"
+                           VerticalAlignment="Top"
+                           Appearance="Transparent"
+                           Command="{Binding CompleteCommand}"
+                           CommandParameter="{Binding Id}"
+                           Icon="{ui:SymbolIcon CheckmarkCircle24}"
+                           AutomationProperties.Name="标记任务完成"
+                           ToolTip="完成任务" />
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Style="{StaticResource BodyStrongTextStyle}" Text="{Binding Title}" TextWrapping="Wrap" />
-                    <TextBlock Style="{StaticResource CaptionTextStyle}" Margin="{StaticResource CaptionTopMargin}" Opacity="0.72" Text="{Binding DueText}" />
-                    <TextBlock Style="{StaticResource CaptionTextStyle}" Margin="{StaticResource CaptionTopMargin}" Text="{Binding DueStatusText}" />
-                    <TextBlock Style="{StaticResource CaptionTextStyle}" Margin="{StaticResource CaptionTopMargin}" Opacity="0.72" Text="{Binding ReminderText}" Visibility="{Binding ReminderText, Converter={StaticResource TaskCardStringToVisibilityConverter}}" />
+                    <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
+                        <ui:SymbolIcon Margin="0,0,6,0" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CalendarClock20" />
+                        <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding DueText}" />
+                        <TextBlock x:Name="DueStatus" Margin="8,0,0,0" Style="{StaticResource CaptionTextStyle}" Text="{Binding DueStatusText}" Visibility="{Binding DueStatusText, Converter={StaticResource TaskCardStringToVisibilityConverter}}" />
+                    </StackPanel>
+                    <StackPanel Margin="0,4,0,0" Orientation="Horizontal" Visibility="{Binding ReminderText, Converter={StaticResource TaskCardStringToVisibilityConverter}}">
+                        <ui:SymbolIcon Margin="0,0,6,0" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="ClockAlarm20" />
+                        <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding ReminderText}" />
+                    </StackPanel>
                 </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Command="{Binding CompleteCommand}" CommandParameter="{Binding Id}" Content="{DynamicResource CompleteText}" AutomationProperties.Name="标记任务完成" ToolTip="完成任务" />
-                    <Button Margin="{StaticResource ButtonGap}" Command="{Binding EditCommand}" CommandParameter="{Binding Id}" Content="{DynamicResource EditText}" AutomationProperties.Name="编辑任务" ToolTip="编辑任务" />
-                    <Button Margin="{StaticResource ButtonGap}" Command="{Binding DeleteCommand}" CommandParameter="{Binding Id}" Content="{DynamicResource DeleteText}" AutomationProperties.Name="删除任务" ToolTip="删除任务" />
+
+                <StackPanel x:Name="HoverActions" Grid.Column="2" Margin="8,0,0,0" Orientation="Horizontal" VerticalAlignment="Top" Visibility="Collapsed">
+                    <ui:Button Appearance="Transparent" Command="{Binding EditCommand}" CommandParameter="{Binding Id}" Icon="{ui:SymbolIcon Edit20}" AutomationProperties.Name="编辑任务" ToolTip="编辑" />
+                    <ui:Button Margin="4,0,0,0" Appearance="Transparent" Command="{Binding DeleteCommand}" CommandParameter="{Binding Id}" Icon="{ui:SymbolIcon Delete20}" AutomationProperties.Name="删除任务" ToolTip="删除" />
                 </StackPanel>
             </Grid>
         </Border>
+        <DataTemplate.Triggers>
+            <Trigger SourceName="CardSurface" Property="IsMouseOver" Value="True">
+                <Setter TargetName="HoverActions" Property="Visibility" Value="Visible" />
+            </Trigger>
+            <DataTrigger Binding="{Binding IsOverdue}" Value="True">
+                <Setter TargetName="DueStatus" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                <Setter TargetName="DueStatus" Property="FontWeight" Value="SemiBold" />
+            </DataTrigger>
+        </DataTemplate.Triggers>
     </DataTemplate>
 </ResourceDictionary>

@@ -1,46 +1,42 @@
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Interop;
 using Quadrant.App.ViewModels;
+using Quadrant.App.Views.Pages;
 using Quadrant.Core.Models;
+using Wpf.Ui;
+using Wpf.Ui.Controls;
 
 namespace Quadrant.App.Views;
 
-public partial class MainWindow : System.Windows.Window
+public partial class MainWindow : FluentWindow
 {
-    private const string TaskIdFormat = "Quadrant.TaskId";
-    private System.Windows.Point dragStartPoint;
-    private Border? highlightedQuadrant;
+    private readonly SnackbarService snackbarService = new();
     private Quadrant.Infrastructure.Windows.GlobalHotkeyService? globalHotkeyService;
     private HwndSource? windowSource;
     private bool quickAddOpen;
     private bool isApplicationExiting;
     private bool viewModelHandlersAttached;
+    private bool initialNavigationCompleted;
+    private bool dialogOpen;
 
     public MainWindow()
     {
         InitializeComponent();
+        snackbarService.SetSnackbarPresenter(SnackbarPresenter);
         Loaded += MainWindow_Loaded;
         SourceInitialized += MainWindow_SourceInitialized;
         Closed += MainWindow_Closed;
         Closing += MainWindow_Closing;
-        AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(TaskCard_MouseLeftButtonDown));
-        AddHandler(UIElement.PreviewMouseMoveEvent, new System.Windows.Input.MouseEventHandler(TaskCard_MouseMove));
-        AddHandler(UIElement.PreviewKeyDownEvent, new System.Windows.Input.KeyEventHandler(TaskCard_PreviewKeyDown));
     }
 
     public event EventHandler? GlobalHotkeyPressed;
     public event EventHandler? ExitRequested;
-
-    public bool IsCloseToTray { get; set; } = true;
     public event EventHandler? SettingsRequested;
 
-    public void ConfigureGlobalHotkey(Quadrant.Infrastructure.Windows.GlobalHotkeyService service)
-    {
+    public bool IsCloseToTray { get; set; } = true;
+
+    public void ConfigureGlobalHotkey(Quadrant.Infrastructure.Windows.GlobalHotkeyService service) =>
         globalHotkeyService = service;
-    }
 
     private void MainWindow_SourceInitialized(object? sender, EventArgs e)
     {
@@ -106,6 +102,16 @@ public partial class MainWindow : System.Windows.Window
         Focus();
     }
 
+    public void ShowFeedback(
+        string title,
+        string message,
+        ControlAppearance appearance = ControlAppearance.Success,
+        SymbolRegular symbol = SymbolRegular.CheckmarkCircle24)
+    {
+        SnackbarPresenter.HideCurrent();
+        snackbarService.Show(title, message, appearance, new SymbolIcon(symbol), TimeSpan.FromSeconds(4));
+    }
+
     private IntPtr WindowSourceHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (globalHotkeyService?.IsHotkeyMessage(msg, wParam) == true)
@@ -119,17 +125,29 @@ public partial class MainWindow : System.Windows.Window
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        if (viewModelHandlersAttached)
+        var viewModel = (MainViewModel)DataContext;
+        if (!viewModelHandlersAttached)
         {
-            return;
+            viewModel.NewTaskRequested += NewTaskRequested;
+            viewModel.EditTaskRequested += EditTaskRequested;
+            viewModel.DeleteTaskRequested += DeleteTaskRequested;
+            viewModel.RecoverableError += ViewModel_RecoverableError;
+            viewModelHandlersAttached = true;
         }
 
-        var viewModel = (MainViewModel)DataContext;
-        viewModel.NewTaskRequested += NewTaskRequested;
-        viewModel.EditTaskRequested += EditTaskRequested;
-        viewModel.DeleteTaskRequested += DeleteTaskRequested;
-        viewModel.RecoverableError += ViewModel_RecoverableError;
-        viewModelHandlersAttached = true;
+        if (!initialNavigationCompleted)
+        {
+            RootNavigationView.Navigate(typeof(QuadrantsPage), viewModel);
+            initialNavigationCompleted = true;
+        }
+    }
+
+    private void RootNavigationView_Navigated(NavigationView sender, NavigatedEventArgs args)
+    {
+        if (args.Page is FrameworkElement page && page.DataContext is null)
+        {
+            page.DataContext = DataContext;
+        }
     }
 
     private async void Completed_Click(object sender, RoutedEventArgs e)
@@ -138,49 +156,22 @@ public partial class MainWindow : System.Windows.Window
         {
             var viewModel = (MainViewModel)DataContext;
             await viewModel.LoadCompletedAsync();
-            var window = new CompletedWindow(viewModel)
-            {
-                Owner = this
-            };
-            window.ShowDialog();
+            new CompletedWindow(viewModel) { Owner = this }.ShowDialog();
         }
         catch (Exception exception)
         {
-            ShowRecoverableError("已完成任务加载失败", exception);
+            await ShowRecoverableErrorAsync("已完成任务加载失败", exception);
+        }
+        finally
+        {
+            QuadrantsNavigationItem.IsActive = true;
         }
     }
 
-    private void Settings_Click(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke(this, EventArgs.Empty);
-
-    private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
-        {
-            SearchBox.Focus();
-            SearchBox.SelectAll();
-            e.Handled = true;
-        }
-        else if (e.Key == Key.Escape && SearchBox.IsKeyboardFocusWithin)
-        {
-            SearchBox.Clear();
-            ((MainViewModel)DataContext).SelectedFilter = Quadrant.Core.Enums.TaskFilter.All;
-            Keyboard.ClearFocus();
-            e.Handled = true;
-        }
-    }
-
-    private void TaskCard_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
-    {
-        if (e.Key is not (Key.Enter or Key.Space) || e.OriginalSource is System.Windows.Controls.Button || FindTaskCard(e.OriginalSource as DependencyObject)?.DataContext is not TaskCardViewModel task)
-        {
-            return;
-        }
-
-        if (task.CompleteCommand.CanExecute(task.Id))
-        {
-            task.CompleteCommand.Execute(task.Id);
-            e.Handled = true;
-        }
+        SettingsRequested?.Invoke(this, EventArgs.Empty);
+        QuadrantsNavigationItem.IsActive = true;
     }
 
     private async void NewTaskRequested(object? sender, EventArgs e)
@@ -188,16 +179,16 @@ public partial class MainWindow : System.Windows.Window
         try
         {
             var viewModel = (MainViewModel)DataContext;
-            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock));
-            editor.Owner = this;
+            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock)) { Owner = this };
             if (editor.ShowDialog() == true && editor.DraftResult is { } draft)
             {
                 await viewModel.CreateAsync(draft);
+                ShowFeedback("任务已添加", draft.Title);
             }
         }
         catch (Exception exception)
         {
-            ShowRecoverableError("任务保存失败", exception);
+            await ShowRecoverableErrorAsync("任务保存失败", exception);
         }
     }
 
@@ -206,26 +197,21 @@ public partial class MainWindow : System.Windows.Window
         try
         {
             var viewModel = (MainViewModel)DataContext;
-            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock, task));
-            editor.Owner = this;
+            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock, task)) { Owner = this };
             if (editor.ShowDialog() == true && editor.UpdateResult is { } update)
             {
                 await viewModel.UpdateAsync(update);
+                ShowFeedback("任务已更新", update.Title);
             }
         }
         catch (Exception exception)
         {
-            ShowRecoverableError("任务保存失败", exception);
+            await ShowRecoverableErrorAsync("任务保存失败", exception);
         }
     }
 
-    private void ShowRecoverableError(string title, Exception exception)
-    {
-        System.Windows.MessageBox.Show($"{title}。\n{exception.Message}", title, System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
-    }
-
-    private void ViewModel_RecoverableError(object? sender, RecoverableOperationErrorEventArgs e) =>
-        ShowRecoverableError(e.Title, e.Exception);
+    private async void ViewModel_RecoverableError(object? sender, RecoverableOperationErrorEventArgs e) =>
+        await ShowRecoverableErrorAsync(e.Title, e.Exception);
 
     public async Task ActivateAndOpenTaskAsync(long id)
     {
@@ -252,6 +238,10 @@ public partial class MainWindow : System.Windows.Window
             if (editor.ShowDialog() == true && editor.DraftResult is { } draft)
             {
                 await viewModel.CreateAsync(draft);
+                if (IsVisible)
+                {
+                    ShowFeedback("任务已添加", draft.Title);
+                }
             }
         }
         finally
@@ -262,7 +252,12 @@ public partial class MainWindow : System.Windows.Window
 
     private async void DeleteTaskRequested(object? sender, long id)
     {
-        if (System.Windows.MessageBox.Show("确定删除此任务吗？", "删除任务", System.Windows.MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning) != System.Windows.MessageBoxResult.OK)
+        var result = await ShowDialogAsync(
+            "删除任务？",
+            "此操作会永久删除该任务。",
+            "删除",
+            ControlAppearance.Danger);
+        if (result != ContentDialogResult.Primary)
         {
             return;
         }
@@ -270,134 +265,62 @@ public partial class MainWindow : System.Windows.Window
         try
         {
             await ((MainViewModel)DataContext).ConfirmedDeleteAsync(id);
+            ShowFeedback("任务已删除", "任务已从四象限中移除。", ControlAppearance.Success, SymbolRegular.Delete24);
         }
         catch (Exception exception)
         {
-            ShowRecoverableError("任务删除失败", exception);
+            await ShowRecoverableErrorAsync("任务删除失败", exception);
+        }
+    }
+
+    private async Task ShowRecoverableErrorAsync(string title, Exception exception)
+    {
+        if (!IsVisible)
+        {
+            System.Windows.MessageBox.Show(
+                $"{title}。\n{exception.Message}",
+                title,
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
+            return;
+        }
+
+        await ShowDialogAsync(title, exception.Message, "知道了", ControlAppearance.Primary, closeButtonText: null);
+    }
+
+    private async Task<ContentDialogResult> ShowDialogAsync(
+        string title,
+        string message,
+        string primaryButtonText,
+        ControlAppearance primaryAppearance,
+        string? closeButtonText = "取消")
+    {
+        if (dialogOpen)
+        {
+            ShowFeedback(title, message, ControlAppearance.Caution, SymbolRegular.Alert24);
+            return ContentDialogResult.None;
+        }
+
+        dialogOpen = true;
+        try
+        {
+            var dialog = new ContentDialog(DialogHost)
+            {
+                Title = title,
+                Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+                PrimaryButtonText = primaryButtonText,
+                CloseButtonText = closeButtonText ?? string.Empty,
+                PrimaryButtonAppearance = primaryAppearance,
+                DefaultButton = ContentDialogButton.Primary
+            };
+            return await dialog.ShowAsync();
+        }
+        finally
+        {
+            dialogOpen = false;
         }
     }
 
     private static QuadrantDefinition ToDefinition(QuadrantViewModel quadrant) =>
         new(quadrant.Id, quadrant.Name, quadrant.Subtitle);
-
-    private void TaskCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (FindTaskCard(e.OriginalSource as DependencyObject) is not null)
-        {
-            dragStartPoint = e.GetPosition(this);
-        }
-    }
-
-    private void TaskCard_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
-    {
-        if (e.LeftButton != MouseButtonState.Pressed || FindTaskCard(e.OriginalSource as DependencyObject) is not Border card)
-        {
-            return;
-        }
-
-        var current = e.GetPosition(this);
-        if (Math.Abs(current.X - dragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
-            Math.Abs(current.Y - dragStartPoint.Y) < SystemParameters.MinimumVerticalDragDistance)
-        {
-            return;
-        }
-
-        if (card.DataContext is not TaskCardViewModel task)
-        {
-            return;
-        }
-
-        var data = new System.Windows.DataObject(TaskIdFormat, task.Id);
-        System.Windows.DragDrop.DoDragDrop(card, data, System.Windows.DragDropEffects.Move);
-        ClearQuadrantFeedback();
-    }
-
-    private void Quadrant_DragOver(object sender, System.Windows.DragEventArgs e)
-    {
-        if (!e.Data.GetDataPresent(TaskIdFormat) || sender is not Border target)
-        {
-            e.Effects = System.Windows.DragDropEffects.None;
-            e.Handled = true;
-            return;
-        }
-
-        e.Effects = System.Windows.DragDropEffects.Move;
-        SetQuadrantFeedback(target);
-        e.Handled = true;
-    }
-
-    private async void Quadrant_Drop(object sender, System.Windows.DragEventArgs e)
-    {
-        ClearQuadrantFeedback();
-        if (sender is not Border target || !e.Data.GetDataPresent(TaskIdFormat) || e.Data.GetData(TaskIdFormat) is not long taskId || target.Tag is not string targetText || !int.TryParse(targetText, out var targetQuadrantId))
-        {
-            return;
-        }
-
-        try
-        {
-            var viewModel = (MainViewModel)DataContext;
-            if (viewModel.MoveTaskCommand.CanExecute(new MoveTaskRequest(taskId, targetQuadrantId)))
-            {
-                await viewModel.MoveTaskCommand.ExecuteAsync(new MoveTaskRequest(taskId, targetQuadrantId));
-            }
-        }
-        catch (Exception)
-        {
-            System.Windows.MessageBox.Show("任务移动失败，原位置未改变。", "移动任务", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
-        }
-        e.Handled = true;
-    }
-
-    private void Quadrant_DragLeave(object sender, System.Windows.DragEventArgs e)
-    {
-        if (e.OriginalSource is Border target)
-        {
-            ClearQuadrantFeedback(target);
-        }
-    }
-
-    private void SetQuadrantFeedback(Border target)
-    {
-        if (highlightedQuadrant == target)
-        {
-            return;
-        }
-
-        ClearQuadrantFeedback();
-        highlightedQuadrant = target;
-        target.BorderThickness = new Thickness(2);
-        target.SetResourceReference(Border.BorderBrushProperty, "SystemControlHighlightAltAccentBrush");
-    }
-
-    private void ClearQuadrantFeedback(Border? target = null)
-    {
-        var border = target ?? highlightedQuadrant;
-        if (border is null)
-        {
-            return;
-        }
-
-        border.BorderThickness = new Thickness(1);
-        border.SetResourceReference(Border.BorderBrushProperty, "ControlStrokeColorDefaultBrush");
-        if (highlightedQuadrant == border)
-        {
-            highlightedQuadrant = null;
-        }
-    }
-
-    private static Border? FindTaskCard(DependencyObject? source)
-    {
-        while (source is not null)
-        {
-            if (source is Border border && border.DataContext is TaskCardViewModel)
-            {
-                return border;
-            }
-
-            source = source is Visual ? VisualTreeHelper.GetParent(source) : null;
-        }
-
-        return null;
-    }
 }

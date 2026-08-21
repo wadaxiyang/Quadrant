@@ -3,7 +3,7 @@ using Quadrant.App.ViewModels;
 
 namespace Quadrant.App.Views;
 
-public partial class SettingsWindow : Window
+public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
 {
     public SettingsWindow(SettingsViewModel viewModel) { InitializeComponent(); DataContext = viewModel; }
     public SettingsViewModel Settings => (SettingsViewModel)DataContext;
@@ -18,6 +18,10 @@ public partial class SettingsWindow : Window
             DesiredQuadrants = Settings.BuildQuadrants();
             DialogResult = true;
         }
-        catch (Exception exception) { System.Windows.MessageBox.Show(exception.Message, "设置保存失败", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning); }
+        catch (Exception exception)
+        {
+            ValidationInfo.Message = exception.Message;
+            ValidationInfo.IsOpen = true;
+        }
     }
 }

@@ -1,100 +1,66 @@
-<Window x:Class="Quadrant.App.Views.TaskEditorWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="任务编辑"
-        Width="560"
-        MinWidth="480"
-        SizeToContent="Height"
-        WindowStartupLocation="CenterOwner"
-        ResizeMode="CanResizeWithGrip">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <Grid Margin="{StaticResource WindowMargin}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+<ui:FluentWindow x:Class="Quadrant.App.Views.TaskEditorWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="任务编辑"
+                 Icon="/Resources/Quadrant.ico"
+                 Width="600"
+                 Height="720"
+                 MinWidth="520"
+                 MinHeight="600"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+        <ui:TitleBar Grid.Row="0" Title="{Binding EditorTitle}" CloseWindowByDoubleClickOnIcon="True">
+            <ui:TitleBar.Icon><ui:ImageIcon Source="/Resources/Quadrant.ico" /></ui:TitleBar.Icon>
+        </ui:TitleBar>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="24,16,24,24">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Style="{StaticResource TitleMediumTextStyle}" Text="{Binding EditorTitle}" />
+                <StackPanel>
+                    <TextBlock Style="{StaticResource TitleLargeTextStyle}" Text="{Binding EditorTitle}" />
+                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="把任务放到正确的象限，并只设置真正需要的时间" />
+                </StackPanel>
 
-        <StackPanel Grid.Row="1" Margin="{StaticResource FieldTopMargin}">
-            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="标题（必填）" />
-            <TextBox x:Name="TitleBox" Margin="{StaticResource CaptionTopMargin}" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" />
-            <TextBlock Style="{StaticResource ValidationTextStyle}" Text="{Binding TitleError}" />
-        </StackPanel>
+                <StackPanel Grid.Row="1" Margin="0,16,0,0">
+                    <TextBlock Style="{StaticResource CaptionTextStyle}" Text="标题（必填）" />
+                    <ui:TextBox x:Name="TitleBox" Margin="0,4,0,0" Icon="{ui:SymbolIcon Edit24}" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Style="{StaticResource ValidationTextStyle}" Text="{Binding TitleError}" />
+                </StackPanel>
 
-        <StackPanel Grid.Row="2" Margin="{StaticResource FieldTopMargin}">
-            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="象限" />
-            <ComboBox Margin="{StaticResource CaptionTopMargin}"
-                      ItemsSource="{Binding Quadrants}"
-                      DisplayMemberPath="Name"
-                      SelectedValuePath="Id"
-                      SelectedValue="{Binding QuadrantId}" />
-        </StackPanel>
+                <Grid Grid.Row="2" Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <StackPanel><TextBlock Style="{StaticResource CaptionTextStyle}" Text="象限" /><ComboBox Margin="0,4,0,0" ItemsSource="{Binding Quadrants}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding QuadrantId}" /></StackPanel>
+                    <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource CaptionTextStyle}" Text="截止日期（可选）" /><DatePicker Margin="0,4,0,0" SelectedDate="{Binding DueDate}" /></StackPanel>
+                </Grid>
 
-        <Grid Grid.Row="3" Margin="{StaticResource FieldTopMargin}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="{StaticResource FormColumnGap}" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0">
-                <TextBlock Style="{StaticResource CaptionTextStyle}" Text="截止日期（可选）" />
-                <DatePicker Margin="{StaticResource CaptionTopMargin}" SelectedDate="{Binding DueDate}" />
-            </StackPanel>
-            <StackPanel Grid.Column="2">
-                <TextBlock Style="{StaticResource CaptionTextStyle}" Text="截止时间" />
-                <ComboBox Margin="{StaticResource CaptionTopMargin}"
-                          IsEditable="True"
-                          IsTextSearchEnabled="False"
-                          ItemsSource="{Binding TimeSuggestions}"
-                          Text="{Binding DueTimeText, UpdateSourceTrigger=PropertyChanged}" />
-                <TextBlock Style="{StaticResource ValidationTextStyle}" Text="{Binding DueTimeError}" />
-            </StackPanel>
-        </Grid>
+                <Grid Grid.Row="3" Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <StackPanel><TextBlock Style="{StaticResource CaptionTextStyle}" Text="截止时间" /><ComboBox Margin="0,4,0,0" IsEditable="True" IsTextSearchEnabled="False" ItemsSource="{Binding TimeSuggestions}" Text="{Binding DueTimeText, UpdateSourceTrigger=PropertyChanged}" /><TextBlock Style="{StaticResource ValidationTextStyle}" Text="{Binding DueTimeError}" /></StackPanel>
+                    <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource CaptionTextStyle}" Text="提醒" /><ComboBox Margin="0,4,0,0" ItemsSource="{Binding ReminderPresets}" SelectedItem="{Binding ReminderPreset}"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Converter={StaticResource ReminderPresetDisplayConverter}}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+                </Grid>
 
-        <StackPanel Grid.Row="4" Margin="{StaticResource FieldTopMargin}">
-            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="提醒" />
-            <ComboBox Margin="{StaticResource CaptionTopMargin}"
-                      ItemsSource="{Binding ReminderPresets}"
-                      SelectedItem="{Binding ReminderPreset}">
-                <ComboBox.ItemTemplate>
-                <DataTemplate>
-                    <TextBlock Text="{Binding Converter={StaticResource ReminderPresetDisplayConverter}}" />
-                </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
-            <Grid Margin="{StaticResource CaptionTopMargin}" IsEnabled="{Binding ReminderPreset, Converter={StaticResource ReminderPresetToCustomEnabledConverter}}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="{StaticResource FormColumnGap}" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <DatePicker Grid.Column="0" SelectedDate="{Binding CustomReminderDate}" />
-                <ComboBox Grid.Column="2" IsEditable="True" IsTextSearchEnabled="False" ItemsSource="{Binding TimeSuggestions}" Text="{Binding CustomReminderTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                <StackPanel Grid.Row="4" Margin="0,16,0,0" IsEnabled="{Binding ReminderPreset, Converter={StaticResource ReminderPresetToCustomEnabledConverter}}">
+                    <TextBlock Style="{StaticResource CaptionTextStyle}" Text="自定义提醒时间" />
+                    <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><DatePicker SelectedDate="{Binding CustomReminderDate}" /><ComboBox Grid.Column="2" IsEditable="True" IsTextSearchEnabled="False" ItemsSource="{Binding TimeSuggestions}" Text="{Binding CustomReminderTimeText, UpdateSourceTrigger=PropertyChanged}" /></Grid>
+                    <TextBlock Style="{StaticResource ValidationTextStyle}" Text="{Binding ReminderError}" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="5" Margin="0,16,0,0">
+                    <TextBlock Style="{StaticResource CaptionTextStyle}" Text="备注" />
+                    <ui:TextBox Margin="0,4,0,0" MinHeight="112" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Text="{Binding Note, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="6" Margin="0,20,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+                    <ui:Button IsCancel="True" MinWidth="88" Content="{DynamicResource CancelText}" />
+                    <ui:Button Margin="8,0,0,0" Appearance="Primary" IsDefault="True" IsEnabled="{Binding IsValid}" MinWidth="88" Click="Save_Click" Content="{DynamicResource SaveText}" Icon="{ui:SymbolIcon Save24}" />
+                </StackPanel>
             </Grid>
-            <TextBlock Style="{StaticResource ValidationTextStyle}" Text="{Binding ReminderError}" />
-        </StackPanel>
-
-        <StackPanel Grid.Row="5" Margin="{StaticResource FieldTopMargin}">
-            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="备注" />
-            <TextBox Margin="{StaticResource CaptionTopMargin}"
-                     MinHeight="96"
-                     AcceptsReturn="True"
-                     TextWrapping="Wrap"
-                     VerticalScrollBarVisibility="Auto"
-                     Text="{Binding Note, UpdateSourceTrigger=PropertyChanged}" />
-        </StackPanel>
-
-        <StackPanel Grid.Row="6" Margin="{StaticResource FieldTopMargin}" HorizontalAlignment="Right" Orientation="Horizontal">
-            <Button IsCancel="True" MinWidth="80" Content="{DynamicResource CancelText}" AutomationProperties.Name="取消编辑" />
-            <Button Margin="{StaticResource ButtonGap}" IsDefault="True" IsEnabled="{Binding IsValid}" MinWidth="80" Click="Save_Click" Content="{DynamicResource SaveText}" AutomationProperties.Name="保存任务" />
-        </StackPanel>
+        </ScrollViewer>
     </Grid>
-    </ScrollViewer>
-</Window>
+</ui:FluentWindow>

@@ -15,6 +15,7 @@ public partial class App : System.Windows.Application
     private Quadrant.Core.Models.AppSettings? currentSettings;
     private System.Drawing.Icon? trayIcon;
     private Quadrant.Infrastructure.Notifications.NotificationActivation? pendingActivation;
+    private bool isWatchingSystemTheme;
 
     private async void OnStartup(object sender, System.Windows.StartupEventArgs e)
     {
@@ -140,6 +141,7 @@ public partial class App : System.Windows.Application
         // the managed window visible, so background startup can register the global
         // hotkey without flashing or stealing foreground focus.
         _ = new System.Windows.Interop.WindowInteropHelper(mainWindow).EnsureHandle();
+        ConfigureSystemThemeWatcher(mainWindow, currentSettings.Theme);
         if (!startInBackground && !currentSettings.StartMinimized)
         {
             mainWindow.Show();
@@ -156,6 +158,12 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(System.Windows.ExitEventArgs e)
     {
+        if (isWatchingSystemTheme && MainWindow is System.Windows.Window window)
+        {
+            Wpf.Ui.Appearance.SystemThemeWatcher.UnWatch(window);
+            isWatchingSystemTheme = false;
+        }
+
         trayService.Dispose();
         trayIcon?.Dispose();
         trayIcon = null;
@@ -210,8 +218,10 @@ public partial class App : System.Windows.Application
                 await settingsRepository.SaveAsync(desiredSettings, desiredQuadrants);
                 currentSettings = desiredSettings;
                 ApplyTheme(currentSettings.Theme);
+                ConfigureSystemThemeWatcher(mainWindow, currentSettings.Theme);
                 mainWindow.IsCloseToTray = currentSettings.CloseToTray;
                 viewModel.UpdateDefinitions(desiredQuadrants);
+                mainWindow.ShowFeedback("设置已保存", "主题和四象限设置已更新。");
             }
             catch (Exception exception)
             {
@@ -230,7 +240,40 @@ public partial class App : System.Windows.Application
         }
     }
 
-    private void ApplyTheme(string theme) => ThemeMode = new System.Windows.ThemeMode(theme);
+    private static void ApplyTheme(string theme)
+    {
+        if (string.Equals(theme, "System", StringComparison.OrdinalIgnoreCase))
+        {
+            Wpf.Ui.Appearance.ApplicationThemeManager.ApplySystemTheme(updateAccent: true);
+            return;
+        }
+
+        var applicationTheme = string.Equals(theme, "Dark", StringComparison.OrdinalIgnoreCase)
+            ? Wpf.Ui.Appearance.ApplicationTheme.Dark
+            : Wpf.Ui.Appearance.ApplicationTheme.Light;
+        Wpf.Ui.Appearance.ApplicationThemeManager.Apply(
+            applicationTheme,
+            Wpf.Ui.Controls.WindowBackdropType.Mica,
+            updateAccent: true);
+    }
+
+    private void ConfigureSystemThemeWatcher(System.Windows.Window window, string theme)
+    {
+        if (isWatchingSystemTheme)
+        {
+            Wpf.Ui.Appearance.SystemThemeWatcher.UnWatch(window);
+            isWatchingSystemTheme = false;
+        }
+
+        if (string.Equals(theme, "System", StringComparison.OrdinalIgnoreCase))
+        {
+            Wpf.Ui.Appearance.SystemThemeWatcher.Watch(
+                window,
+                Wpf.Ui.Controls.WindowBackdropType.Mica,
+                updateAccents: true);
+            isWatchingSystemTheme = true;
+        }
+    }
 
     private void TrayService_ExitRequested(object? sender, EventArgs e) => ExitApplication();
 
@@ -255,11 +298,12 @@ public partial class App : System.Windows.Application
 
     private static System.Drawing.Icon LoadTrayIcon()
     {
-        var resource = typeof(App).Assembly.GetManifestResourceStream("Quadrant.App.Resources.Quadrant.ico")
+        var resource = GetResourceStream(
+            new Uri("pack://application:,,,/Resources/Quadrant.ico", UriKind.Absolute))
             ?? throw new InvalidOperationException("托盘图标资源缺失。");
-        using (resource)
+        using (resource.Stream)
         {
-            return new System.Drawing.Icon(resource);
+            return new System.Drawing.Icon(resource.Stream);
         }
     }
 
