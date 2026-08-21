@@ -6,15 +6,25 @@ namespace Quadrant.App.Views;
 
 public partial class TaskEditorWindow : Wpf.Ui.Controls.FluentWindow
 {
-    public TaskEditorWindow(TaskEditorViewModel viewModel)
+    private readonly bool focusRecurrence;
+
+    public TaskEditorWindow(TaskEditorViewModel viewModel, bool focusRecurrence = false)
     {
         InitializeComponent();
         DataContext = viewModel;
+        this.focusRecurrence = focusRecurrence;
         Loaded += (_, _) =>
         {
             MaxHeight = SystemParameters.WorkArea.Height;
             MaxWidth = SystemParameters.WorkArea.Width;
-            TitleBox.Focus();
+            if (this.focusRecurrence)
+            {
+                RecurrenceCombo.Focus();
+            }
+            else
+            {
+                TitleBox.Focus();
+            }
         };
     }
 

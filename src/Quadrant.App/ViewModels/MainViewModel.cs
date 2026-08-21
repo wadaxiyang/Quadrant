@@ -62,6 +62,7 @@ public partial class MainViewModel : ObservableObject
 
     public event EventHandler? NewTaskRequested;
     public event EventHandler<TaskItem>? EditTaskRequested;
+    public event EventHandler<TaskItem>? RepeatTaskRequested;
     public event EventHandler<long>? DeleteTaskRequested;
     public event EventHandler<RecoverableOperationErrorEventArgs>? RecoverableError;
 
@@ -85,12 +86,20 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void EditRecurrence(long id)
+    {
+        if (loadedTasks.TryGetValue(id, out var task))
+        {
+            RepeatTaskRequested?.Invoke(this, task);
+        }
+    }
+
+    [RelayCommand]
     private async Task CompleteTask(long id)
     {
         try
         {
-            await taskService.SetCompletedAsync(id, true);
-            RemoveActiveTask(id);
+            await CompleteAndRefreshAsync(id);
         }
         catch (Exception exception)
         {
@@ -188,8 +197,7 @@ public partial class MainViewModel : ObservableObject
 
     public async Task CompleteFromNotificationAsync(long id, CancellationToken cancellationToken = default)
     {
-        await taskService.SetCompletedAsync(id, true, cancellationToken);
-        RemoveActiveTask(id);
+        await CompleteAndRefreshAsync(id, cancellationToken);
     }
 
     public async Task SnoozeFromNotificationAsync(long id, CancellationToken cancellationToken = default)
@@ -283,6 +291,26 @@ public partial class MainViewModel : ObservableObject
         RebuildQuadrants();
     }
 
+    private async Task<TaskItem> CompleteAndRefreshAsync(long id, CancellationToken cancellationToken = default)
+    {
+        long? nextTaskId = null;
+        using var subscription = appChangeHub.Subscribe(change =>
+        {
+            if (change.Kind == AppChangeKind.TaskCreated)
+            {
+                nextTaskId = change.TaskId;
+            }
+        });
+        var completed = await taskService.SetCompletedAsync(id, true, cancellationToken);
+        RemoveActiveTask(id);
+        if (nextTaskId is { } nextId)
+        {
+            await RefreshActiveTaskAsync(nextId, cancellationToken);
+        }
+
+        return completed;
+    }
+
     private void RemoveActiveTask(long id)
     {
         loadedTasks.Remove(id);
@@ -291,7 +319,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     private TaskCardViewModel CreateTaskCard(TaskItem task, DateTimeOffset now) =>
-        new(task, EditTaskCommand, CompleteTaskCommand, DeleteTaskCommand, PlanForTodayCommand, RemovePlanCommand, now, clock.LocalTimeZone);
+        new(task, EditTaskCommand, EditRecurrenceCommand, CompleteTaskCommand, DeleteTaskCommand, PlanForTodayCommand, RemovePlanCommand, now, clock.LocalTimeZone);
 
     private void EnsureQuadrants()
     {

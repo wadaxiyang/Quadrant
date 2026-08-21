@@ -1,4 +1,5 @@
 using Quadrant.Core.Models;
+using Quadrant.Core.Enums;
 using System.Windows.Input;
 
 namespace Quadrant.App.ViewModels;
@@ -11,6 +12,7 @@ public sealed class TaskCardViewModel
     public TaskCardViewModel(
         TaskItem task,
         ICommand editCommand,
+        ICommand editRecurrenceCommand,
         ICommand completeCommand,
         ICommand deleteCommand,
         ICommand planForTodayCommand,
@@ -26,12 +28,14 @@ public sealed class TaskCardViewModel
         DueAt = task.DueAt;
         ReminderAt = task.ReminderAt;
         EditCommand = editCommand;
+        EditRecurrenceCommand = editRecurrenceCommand;
         CompleteCommand = completeCommand;
         DeleteCommand = deleteCommand;
         PlanForTodayCommand = planForTodayCommand;
         RemovePlanCommand = removePlanCommand;
         PlannedDate = task.PlannedDate;
         EstimatedMinutes = task.EstimatedMinutes;
+        RecurrenceKind = task.RecurrenceKind;
         IsOverdue = task.DueAt is { } due && !task.IsCompleted && due < now;
         DueStatusText = IsOverdue
             ? "已逾期"
@@ -54,6 +58,8 @@ public sealed class TaskCardViewModel
 
     public int? EstimatedMinutes { get; }
 
+    public RecurrenceKind RecurrenceKind { get; }
+
     public string DueText => DueAt is { } due
         ? $"截止 {TimeZoneInfo.ConvertTime(due, timeZone):yyyy-MM-dd HH:mm}"
         : "无截止时间";
@@ -68,11 +74,21 @@ public sealed class TaskCardViewModel
 
     public string EstimateText => EstimatedMinutes is { } estimate ? $"预计 {estimate} 分钟" : string.Empty;
 
+    public string RecurrenceText => RecurrenceKind switch
+    {
+        RecurrenceKind.Daily => "每天重复",
+        RecurrenceKind.Weekly => "每周重复",
+        RecurrenceKind.Monthly => "每月重复",
+        _ => string.Empty
+    };
+
     public bool IsOverdue { get; }
 
     public string DueStatusText { get; }
 
     public ICommand EditCommand { get; }
+
+    public ICommand EditRecurrenceCommand { get; }
 
     public ICommand CompleteCommand { get; }
 

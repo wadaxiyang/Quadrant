@@ -5,7 +5,7 @@
                  Title="任务编辑"
                  Icon="/Resources/Quadrant.ico"
                  Width="600"
-                 Height="720"
+                 Height="800"
                  MinWidth="520"
                  MinHeight="600"
                  ExtendsContentIntoTitleBar="True"
@@ -20,7 +20,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <StackPanel>
@@ -68,11 +68,19 @@
                 </StackPanel>
 
                 <StackPanel Grid.Row="6" Margin="0,16,0,0">
+                    <TextBlock Style="{StaticResource CaptionTextStyle}" Text="重复" />
+                    <ComboBox x:Name="RecurrenceCombo" Margin="0,4,0,0" ItemsSource="{Binding RecurrenceKinds}" SelectedItem="{Binding RecurrenceKind}" AutomationProperties.Name="任务重复规则">
+                        <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" /></DataTemplate></ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding RecurrenceSummary}" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="7" Margin="0,16,0,0">
                     <TextBlock Style="{StaticResource CaptionTextStyle}" Text="备注" />
                     <ui:TextBox Margin="0,4,0,0" MinHeight="112" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Text="{Binding Note, UpdateSourceTrigger=PropertyChanged}" />
                 </StackPanel>
 
-                <StackPanel Grid.Row="7" Margin="0,20,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+                <StackPanel Grid.Row="8" Margin="0,20,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
                     <ui:Button IsCancel="True" MinWidth="88" Content="{DynamicResource CancelText}" />
                     <ui:Button Margin="8,0,0,0" Appearance="Primary" IsDefault="True" IsEnabled="{Binding IsValid}" MinWidth="88" Click="Save_Click" Content="{DynamicResource SaveText}" Icon="{ui:SymbolIcon Save24}" />
                 </StackPanel>

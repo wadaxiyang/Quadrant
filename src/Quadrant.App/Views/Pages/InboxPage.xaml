@@ -33,7 +33,12 @@
                                 <ui:Button Grid.Column="0" Margin="0,0,12,0" Padding="4" Click="Complete_Click" Tag="{Binding}" ToolTip="完成任务" AutomationProperties.Name="完成 Inbox 任务" Icon="{ui:SymbolIcon CheckmarkCircle24}" />
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding CreatedAt, StringFormat=收集于 {0:g}}" />
+                                    <StackPanel Margin="0,4,0,0" Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding CreatedAt, StringFormat=收集于 {0:g}}" />
+                                        <ui:SymbolIcon Margin="8,0,0,0" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="ArrowRepeatAll20" ToolTip="重复任务：完成后创建下一项" AutomationProperties.Name="重复任务">
+                                            <ui:SymbolIcon.Style><Style TargetType="ui:SymbolIcon"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding RecurrenceKind}" Value="Daily"><Setter Property="Visibility" Value="Visible"/></DataTrigger><DataTrigger Binding="{Binding RecurrenceKind}" Value="Weekly"><Setter Property="Visibility" Value="Visible"/></DataTrigger><DataTrigger Binding="{Binding RecurrenceKind}" Value="Monthly"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></ui:SymbolIcon.Style>
+                                        </ui:SymbolIcon>
+                                    </StackPanel>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                     <ui:Button Margin="8,0,0,0" Padding="8,4" Content="Q1" Tag="{Binding}" Click="ClassifyQ1_Click" AutomationProperties.Name="分类到 Q1" />

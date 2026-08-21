@@ -64,6 +64,7 @@ public partial class MainWindow : FluentWindow
         {
             viewModel.NewTaskRequested -= NewTaskRequested;
             viewModel.EditTaskRequested -= EditTaskRequested;
+            viewModel.RepeatTaskRequested -= RepeatTaskRequested;
             viewModel.DeleteTaskRequested -= DeleteTaskRequested;
             viewModel.RecoverableError -= ViewModel_RecoverableError;
             viewModelHandlersAttached = false;
@@ -130,6 +131,7 @@ public partial class MainWindow : FluentWindow
         {
             viewModel.NewTaskRequested += NewTaskRequested;
             viewModel.EditTaskRequested += EditTaskRequested;
+            viewModel.RepeatTaskRequested += RepeatTaskRequested;
             viewModel.DeleteTaskRequested += DeleteTaskRequested;
             viewModel.RecoverableError += ViewModel_RecoverableError;
             viewModelHandlersAttached = true;
@@ -207,6 +209,24 @@ public partial class MainWindow : FluentWindow
         catch (Exception exception)
         {
             await ShowRecoverableErrorAsync("任务保存失败", exception);
+        }
+    }
+
+    private async void RepeatTaskRequested(object? sender, TaskItem task)
+    {
+        try
+        {
+            var viewModel = (MainViewModel)DataContext;
+            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock, task), focusRecurrence: true) { Owner = this };
+            if (editor.ShowDialog() == true && editor.UpdateResult is { } update)
+            {
+                await viewModel.UpdateAsync(update);
+                ShowFeedback("重复规则已更新", update.RecurrenceKind == Quadrant.Core.Enums.RecurrenceKind.None ? "任务不会重复。" : "完成后会创建下一项任务。");
+            }
+        }
+        catch (Exception exception)
+        {
+            await ShowRecoverableErrorAsync("重复规则保存失败", exception);
         }
     }
 

@@ -1,6 +1,7 @@
 using Quadrant.App.ViewModels;
 using Quadrant.Core.Interfaces;
 using Quadrant.Core.Models;
+using Quadrant.Core.Enums;
 using Xunit;
 
 namespace Quadrant.App.Tests;
@@ -83,6 +84,50 @@ public sealed class TaskEditorViewModelTests
         Assert.Equal(Quadrant.Core.Enums.RecurrenceKind.Monthly, update.RecurrenceKind);
         Assert.Equal("series", update.RecurrenceSeriesId);
         Assert.Equal(31, update.RecurrenceAnchorDay);
+    }
+
+    [Theory]
+    [InlineData(RecurrenceKind.None)]
+    [InlineData(RecurrenceKind.Daily)]
+    [InlineData(RecurrenceKind.Weekly)]
+    [InlineData(RecurrenceKind.Monthly)]
+    public void Editor_round_trips_simple_recurrence(RecurrenceKind recurrenceKind)
+    {
+        var viewModel = new TaskEditorViewModel(Quadrants, new FixedClock())
+        {
+            Title = "重复任务",
+            QuadrantId = 1,
+            DueDate = new DateTime(2026, 8, 25),
+            RecurrenceKind = recurrenceKind
+        };
+
+        Assert.True(viewModel.TryBuildDraft(out var draft));
+        Assert.Equal(recurrenceKind, draft.RecurrenceKind);
+        Assert.Equal(1, draft.RecurrenceInterval);
+        Assert.Equal(recurrenceKind == RecurrenceKind.None, draft.RecurrenceSeriesId is null);
+        Assert.Equal(recurrenceKind == RecurrenceKind.Monthly ? 25 : null, draft.RecurrenceAnchorDay);
+    }
+
+    [Fact]
+    public void Monthly_edit_preserves_anchor_until_user_changes_due_or_plan_date()
+    {
+        var task = new TaskItem(12, "月度", 2, new DateTimeOffset(2026, 2, 28, 9, 0, 0, TimeSpan.FromHours(8)), null, null, false, null,
+            new DateTimeOffset(2026, 1, 31, 9, 0, 0, TimeSpan.FromHours(8)), new DateTimeOffset(2026, 2, 1, 9, 0, 0, TimeSpan.FromHours(8)),
+            new DateOnly(2026, 2, 28), 30, RecurrenceKind.Monthly, 1, "series", 31);
+        var viewModel = new TaskEditorViewModel(Quadrants, new FixedClock(), task) { Title = "只改标题" };
+
+        Assert.True(viewModel.TryBuildUpdate(out var unchanged));
+        Assert.Equal(31, unchanged.RecurrenceAnchorDay);
+        Assert.Equal("series", unchanged.RecurrenceSeriesId);
+
+        viewModel.DueDate = new DateTime(2026, 3, 15);
+        Assert.True(viewModel.TryBuildUpdate(out var dueChanged));
+        Assert.Equal(15, dueChanged.RecurrenceAnchorDay);
+
+        viewModel.DueDate = null;
+        viewModel.PlannedDate = new DateTime(2026, 3, 12);
+        Assert.True(viewModel.TryBuildUpdate(out var planChanged));
+        Assert.Equal(12, planChanged.RecurrenceAnchorDay);
     }
 
     [Theory]

@@ -19,6 +19,9 @@ public partial class TaskEditorViewModel : ObservableObject
     private readonly int originalRecurrenceInterval;
     private readonly string? originalRecurrenceSeriesId;
     private readonly int? originalRecurrenceAnchorDay;
+    private readonly DateOnly? originalDueDate;
+    private readonly DateOnly? originalPlannedDate;
+    private string? recurrenceSeriesId;
 
     public TaskEditorViewModel(
         IEnumerable<QuadrantDefinition> quadrants,
@@ -36,6 +39,9 @@ public partial class TaskEditorViewModel : ObservableObject
         originalRecurrenceInterval = task?.RecurrenceInterval ?? 1;
         originalRecurrenceSeriesId = task?.RecurrenceSeriesId;
         originalRecurrenceAnchorDay = task?.RecurrenceAnchorDay;
+        originalDueDate = task?.DueAt is { } originalDue ? DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(originalDue, this.timeZone).Date) : null;
+        originalPlannedDate = task?.PlannedDate;
+        recurrenceSeriesId = task?.RecurrenceSeriesId;
         IsEdit = task is not null;
         Id = task?.Id;
         Title = task?.Title ?? string.Empty;
@@ -45,6 +51,7 @@ public partial class TaskEditorViewModel : ObservableObject
         Note = task?.Note ?? string.Empty;
         PlannedDate = task?.PlannedDate?.ToDateTime(TimeOnly.MinValue);
         EstimatedMinutesText = task?.EstimatedMinutes?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        RecurrenceKind = task?.RecurrenceKind ?? RecurrenceKind.None;
 
         if (task?.DueAt is { } due)
         {
@@ -113,6 +120,9 @@ public partial class TaskEditorViewModel : ObservableObject
     public partial string EstimatedMinutesText { get; set; } = string.Empty;
 
     [ObservableProperty]
+    public partial RecurrenceKind RecurrenceKind { get; set; }
+
+    [ObservableProperty]
     public partial ReminderPreset ReminderPreset { get; set; }
 
     [ObservableProperty]
@@ -145,6 +155,16 @@ public partial class TaskEditorViewModel : ObservableObject
 
     public bool HasDueDate => DueDate is not null;
 
+    public IEnumerable<RecurrenceKind> RecurrenceKinds => Enum.GetValues<RecurrenceKind>();
+
+    public string RecurrenceSummary => RecurrenceKind switch
+    {
+        RecurrenceKind.Daily => "完成后会创建下一项每日任务。",
+        RecurrenceKind.Weekly => "完成后会创建下一项每周任务。",
+        RecurrenceKind.Monthly => "完成后会创建下一项每月任务；短月会落在当月最后一天。",
+        _ => "不重复；完成后仅归档当前任务。"
+    };
+
     partial void OnDueDateChanged(DateTime? value)
     {
         OnPropertyChanged(nameof(HasDueDate));
@@ -156,6 +176,8 @@ public partial class TaskEditorViewModel : ObservableObject
     }
 
     partial void OnQuadrantIdChanged(int? value) => OnPropertyChanged(nameof(QuadrantLabel));
+
+    partial void OnRecurrenceKindChanged(RecurrenceKind value) => OnPropertyChanged(nameof(RecurrenceSummary));
 
     public bool TryBuildDraft(out TaskDraft draft)
     {
@@ -270,6 +292,10 @@ public partial class TaskEditorViewModel : ObservableObject
         }
 
         IsValid = true;
+        var recurrenceAnchorDay = GetRecurrenceAnchorDay(dueAt, PlannedDate is { } planned ? DateOnly.FromDateTime(planned) : null);
+        var recurrenceSeries = RecurrenceKind == RecurrenceKind.None
+            ? null
+            : recurrenceSeriesId ??= Guid.NewGuid().ToString("N");
         draft = new TaskDraft(
             Title.Trim(),
             QuadrantId,
@@ -277,7 +303,11 @@ public partial class TaskEditorViewModel : ObservableObject
             reminderAt,
             string.IsNullOrWhiteSpace(Note) ? null : Note.Trim(),
             PlannedDate is { } plannedDate ? DateOnly.FromDateTime(plannedDate) : null,
-            estimatedMinutes);
+            estimatedMinutes,
+            RecurrenceKind,
+            1,
+            recurrenceSeries,
+            recurrenceAnchorDay);
         return true;
     }
 
@@ -290,8 +320,8 @@ public partial class TaskEditorViewModel : ObservableObject
         }
 
         update = new TaskUpdate(id, draft.Title, draft.QuadrantId, draft.DueAt, draft.ReminderAt, draft.Note,
-            draft.PlannedDate, draft.EstimatedMinutes, originalRecurrenceKind, originalRecurrenceInterval,
-            originalRecurrenceSeriesId, originalRecurrenceAnchorDay);
+            draft.PlannedDate, draft.EstimatedMinutes, draft.RecurrenceKind, draft.RecurrenceInterval,
+            draft.RecurrenceSeriesId, draft.RecurrenceAnchorDay);
         return true;
     }
 
@@ -343,6 +373,27 @@ public partial class TaskEditorViewModel : ObservableObject
                originalLocal.Day == localDateTime.Day &&
                originalLocal.Hour == localDateTime.Hour &&
                originalLocal.Minute == localDateTime.Minute;
+    }
+
+    private int? GetRecurrenceAnchorDay(DateTimeOffset? dueAt, DateOnly? plannedDate)
+    {
+        if (RecurrenceKind != RecurrenceKind.Monthly)
+        {
+            return null;
+        }
+
+        DateOnly? currentDueDate = dueAt is { } due ? DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(due, timeZone).Date) : null;
+        if (currentDueDate != originalDueDate && currentDueDate is { } changedDue)
+        {
+            return changedDue.Day;
+        }
+
+        if (plannedDate != originalPlannedDate && plannedDate is { } changedPlan)
+        {
+            return changedPlan.Day;
+        }
+
+        return originalRecurrenceAnchorDay ?? currentDueDate?.Day ?? plannedDate?.Day ?? clock.LocalDate.Day;
     }
 
 }
