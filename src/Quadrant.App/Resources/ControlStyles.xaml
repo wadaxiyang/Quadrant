@@ -65,9 +65,40 @@
 
     <Style x:Key="TaskMetadataChipStyle" TargetType="Border">
         <Setter Property="Margin" Value="0,0,4,4" />
-        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="Padding" Value="6,2" />
         <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
         <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+    </Style>
+
+    <Style x:Key="HomeFilterGroupStyle" TargetType="Border">
+        <Setter Property="Padding" Value="2" />
+        <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+    </Style>
+
+    <Style x:Key="HomeFilterToggleStyle" TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="MinWidth" Value="64" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="Padding" Value="12,4" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <Style x:Key="QuadrantCountBadgeStyle" TargetType="ui:InfoBadge" BasedOn="{StaticResource {x:Type ui:InfoBadge}}">
+        <Setter Property="MinWidth" Value="24" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="QuadrantAddButtonStyle" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+        <Setter Property="Appearance" Value="Transparent" />
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Margin" Value="8,0,0,0" />
+        <Setter Property="Padding" Value="4" />
     </Style>
 
     <Style x:Key="TaskRowActionButtonStyle" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">

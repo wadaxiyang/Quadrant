@@ -67,6 +67,7 @@ public partial class MainWindow : FluentWindow
         if (viewModelHandlersAttached && DataContext is MainViewModel viewModel)
         {
             viewModel.NewTaskRequested -= NewTaskRequested;
+            viewModel.NewTaskInQuadrantRequested -= NewTaskInQuadrantRequested;
             viewModel.EditTaskRequested -= EditTaskRequested;
             viewModel.RepeatTaskRequested -= RepeatTaskRequested;
             viewModel.FocusTaskRequested -= FocusTaskRequested;
@@ -190,6 +191,7 @@ public partial class MainWindow : FluentWindow
         if (!viewModelHandlersAttached)
         {
             viewModel.NewTaskRequested += NewTaskRequested;
+            viewModel.NewTaskInQuadrantRequested += NewTaskInQuadrantRequested;
             viewModel.EditTaskRequested += EditTaskRequested;
             viewModel.RepeatTaskRequested += RepeatTaskRequested;
             viewModel.FocusTaskRequested += FocusTaskRequested;
@@ -277,6 +279,32 @@ public partial class MainWindow : FluentWindow
                     draft.Title,
                     ControlAppearance.Success,
                     draft.QuadrantId is null ? SymbolRegular.Archive32 : SymbolRegular.CheckmarkCircle24);
+            }
+        }
+        catch (Exception exception)
+        {
+            await ShowRecoverableErrorAsync("任务保存失败", exception);
+        }
+    }
+
+    private async void NewTaskInQuadrantRequested(object? sender, QuadrantTaskRequestEventArgs e)
+    {
+        try
+        {
+            var viewModel = (MainViewModel)DataContext;
+            var editorViewModel = new TaskEditorViewModel(
+                viewModel.Quadrants.Select(ToDefinition),
+                viewModel.Clock,
+                defaultReminderPreset: viewModel.Settings.DefaultReminder)
+            {
+                QuadrantId = e.QuadrantId
+            };
+            var editor = new TaskEditorWindow(editorViewModel) { Owner = this };
+            if (editor.ShowDialog() == true && editor.DraftResult is { } draft)
+            {
+                await viewModel.CreateAsync(draft);
+                var quadrantName = viewModel.Quadrants.FirstOrDefault(quadrant => quadrant.Id == e.QuadrantId)?.Name ?? $"Q{e.QuadrantId}";
+                ShowFeedback("任务已添加", $"已添加到 {quadrantName}。", ControlAppearance.Success, SymbolRegular.CheckmarkCircle24);
             }
         }
         catch (Exception exception)

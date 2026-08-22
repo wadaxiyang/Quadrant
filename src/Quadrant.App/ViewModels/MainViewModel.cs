@@ -73,6 +73,7 @@ public partial class MainViewModel : ObservableObject
     public void UpdateSettings(AppSettings settings) => Settings = settings ?? throw new ArgumentNullException(nameof(settings));
 
     public event EventHandler? NewTaskRequested;
+    public event EventHandler<QuadrantTaskRequestEventArgs>? NewTaskInQuadrantRequested;
     public event EventHandler<TaskItem>? EditTaskRequested;
     public event EventHandler<TaskItem>? RepeatTaskRequested;
     public event EventHandler<long>? FocusTaskRequested;
@@ -88,6 +89,15 @@ public partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private void NewTask() => NewTaskRequested?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand]
+    private void NewTaskInQuadrant(int quadrantId)
+    {
+        if (Quadrants.Any(quadrant => quadrant.Id == quadrantId))
+        {
+            NewTaskInQuadrantRequested?.Invoke(this, new QuadrantTaskRequestEventArgs(quadrantId));
+        }
+    }
 
     [RelayCommand]
     private void EditTask(long id)
@@ -410,6 +420,11 @@ public partial class MainViewModel : ObservableObject
 }
 
 public sealed record MoveTaskRequest(long TaskId, int TargetQuadrantId);
+
+public sealed class QuadrantTaskRequestEventArgs(int quadrantId) : EventArgs
+{
+    public int QuadrantId { get; } = quadrantId;
+}
 
 public sealed class RecoverableOperationErrorEventArgs(string title, Exception exception) : EventArgs
 {

@@ -159,8 +159,17 @@ public partial class QuadrantsPage : Page
         }
 
         var data = new System.Windows.DataObject(TaskIdFormat, task.Id);
-        System.Windows.DragDrop.DoDragDrop(card, data, System.Windows.DragDropEffects.Move);
-        ClearQuadrantFeedback();
+        var originalOpacity = card.Opacity;
+        card.Opacity = 0.65;
+        try
+        {
+            System.Windows.DragDrop.DoDragDrop(card, data, System.Windows.DragDropEffects.Move);
+        }
+        finally
+        {
+            card.Opacity = originalOpacity;
+            ClearQuadrantFeedback();
+        }
     }
 
     private void InboxTask_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -193,8 +202,17 @@ public partial class QuadrantsPage : Page
         data.SetData(TaskIdFormat, taskId);
         data.SetData(InboxTaskIdFormat, taskId);
         pendingInboxDragTaskId = null;
-        System.Windows.DragDrop.DoDragDrop(row, data, System.Windows.DragDropEffects.Move);
-        ClearQuadrantFeedback();
+        var originalOpacity = row.Opacity;
+        row.Opacity = 0.65;
+        try
+        {
+            System.Windows.DragDrop.DoDragDrop(row, data, System.Windows.DragDropEffects.Move);
+        }
+        finally
+        {
+            row.Opacity = originalOpacity;
+            ClearQuadrantFeedback();
+        }
     }
 
     private void Quadrant_DragOver(object sender, System.Windows.DragEventArgs e)
@@ -258,6 +276,16 @@ public partial class QuadrantsPage : Page
         highlightedQuadrant = target;
         target.BorderThickness = new Thickness(2);
         target.SetResourceReference(Border.BorderBrushProperty, "SystemAccentColorPrimaryBrush");
+        target.SetResourceReference(Border.BackgroundProperty, "SubtleFillColorSecondaryBrush");
+        if (FindTaggedElement<Border>(target, "AccentBar") is { } accentBar)
+        {
+            accentBar.Opacity = 1;
+        }
+
+        if (FindTaggedElement<Border>(target, "DropHint") is { } dropHint)
+        {
+            dropHint.Visibility = Visibility.Visible;
+        }
     }
 
     private void ClearQuadrantFeedback(Border? target = null)
@@ -270,6 +298,17 @@ public partial class QuadrantsPage : Page
 
         border.BorderThickness = new Thickness(1);
         border.SetResourceReference(Border.BorderBrushProperty, "CardStrokeColorDefaultBrush");
+        border.SetResourceReference(Border.BackgroundProperty, "CardBackgroundFillColorDefaultBrush");
+        if (FindTaggedElement<Border>(border, "AccentBar") is { } accentBar)
+        {
+            accentBar.Opacity = 0.85;
+        }
+
+        if (FindTaggedElement<Border>(border, "DropHint") is { } dropHint)
+        {
+            dropHint.Visibility = Visibility.Collapsed;
+        }
+
         if (highlightedQuadrant == border)
         {
             highlightedQuadrant = null;
@@ -454,6 +493,25 @@ public partial class QuadrantsPage : Page
             }
 
             source = source is Visual ? VisualTreeHelper.GetParent(source) : null;
+        }
+
+        return null;
+    }
+
+    private static T? FindTaggedElement<T>(DependencyObject root, string tag) where T : FrameworkElement
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            if (child is T element && Equals(element.Tag, tag))
+            {
+                return element;
+            }
+
+            if (FindTaggedElement<T>(child, tag) is { } descendant)
+            {
+                return descendant;
+            }
         }
 
         return null;
