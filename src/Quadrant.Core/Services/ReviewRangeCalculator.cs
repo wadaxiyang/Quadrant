@@ -17,4 +17,12 @@ public sealed class ReviewRangeCalculator(IClock clock)
             _ => throw new ArgumentOutOfRangeException(nameof(range))
         };
     }
+
+    public ReviewDateRange? GetPreviousRange(ReviewRange range)
+    {
+        var current = GetRange(range);
+        if (current.LowerInclusive is not { } lower) return null;
+        var length = current.UpperExclusive.DayNumber - lower.DayNumber;
+        return new ReviewDateRange(lower.AddDays(-length), lower);
+    }
 }

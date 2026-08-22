@@ -17,6 +17,19 @@ public sealed class ReviewRangeCalculatorTests
         Assert.Equal(new DateOnly(2026, 8, 22), range.UpperExclusive);
     }
 
+    [Fact]
+    public void Previous_range_has_same_length_and_ends_at_current_lower_bound()
+    {
+        var calculator = new ReviewRangeCalculator(new Clock(new DateTimeOffset(2026, 8, 21, 12, 0, 0, TimeSpan.Zero)));
+        var current = calculator.GetRange(ReviewRange.ThirtyDays);
+        var previous = calculator.GetPreviousRange(ReviewRange.ThirtyDays);
+
+        Assert.NotNull(previous);
+        Assert.Equal(current.LowerInclusive, previous!.UpperExclusive);
+        Assert.Equal(30, previous.UpperExclusive.DayNumber - previous.LowerInclusive!.Value.DayNumber);
+        Assert.Null(calculator.GetPreviousRange(ReviewRange.AllTime));
+    }
+
     private sealed class Clock(DateTimeOffset local) : IClock
     {
         public DateTimeOffset UtcNow => local.ToUniversalTime(); public DateTimeOffset LocalNow => local;

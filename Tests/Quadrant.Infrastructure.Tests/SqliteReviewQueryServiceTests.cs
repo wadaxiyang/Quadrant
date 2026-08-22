@@ -28,6 +28,7 @@ public sealed class SqliteReviewQueryServiceTests
         await sessions.CreateIfNoCurrentAsync(Session("cancelled", FocusMode.Stopwatch, FocusStatus.Cancelled, null, 1, 999, new DateOnly(2026, 8, 21)));
         var service = new SqliteReviewQueryService(database.Factory, new FixedClock(now));
 
+        var dashboard = await service.GetDashboardAsync(ReviewRange.SevenDays, DayOfWeek.Monday);
         var summary = await service.GetSummaryAsync(ReviewRange.SevenDays);
         var completed = await service.GetCompletedTrendAsync(ReviewRange.SevenDays, DayOfWeek.Monday);
         var focus = await service.GetFocusByQuadrantAsync(ReviewRange.SevenDays);
@@ -40,6 +41,12 @@ public sealed class SqliteReviewQueryServiceTests
         Assert.True(summary.HasFocusData);
         Assert.Equal(1, summary.CurrentInboxCount);
         Assert.Equal(1, summary.CurrentOverdueCount);
+        Assert.Equal(1, dashboard.Previous?.CompletedTaskCount);
+        Assert.Equal(120, dashboard.FocusSummary.LongestSessionSeconds);
+        Assert.Equal("Snapshot", dashboard.FocusSummary.MostFocusedTaskTitle);
+        Assert.Equal(180, dashboard.FocusSummary.MostFocusedTaskSeconds);
+        Assert.Equal(2, dashboard.FocusSummary.MostFocusedTaskSessions);
+        Assert.Equal(2, dashboard.FocusSummary.MostFocusedQuadrantId);
         Assert.Equal(7, completed.Count);
         Assert.Equal(1, completed.Single(point => point.StartDate == new DateOnly(2026, 8, 15)).Value);
         Assert.Equal(0, completed.Single(point => point.StartDate == new DateOnly(2026, 8, 20)).Value);
@@ -61,6 +68,7 @@ public sealed class SqliteReviewQueryServiceTests
         Assert.Equal(0, summary.AverageFocusSeconds);
         Assert.False(summary.HasFocusData);
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.GetRecentCompletedAsync(51));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.GetDashboardAsync(ReviewRange.SevenDays, DayOfWeek.Monday, 51));
         using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.GetSummaryAsync(ReviewRange.AllTime, cancelled.Token));
     }

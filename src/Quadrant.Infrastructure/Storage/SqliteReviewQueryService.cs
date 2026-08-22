@@ -12,16 +12,41 @@ public sealed class SqliteReviewQueryService(SqliteConnectionFactory connectionF
 {
     private readonly ReviewRangeCalculator ranges = new(clock);
 
-    public async Task<ReviewSummary> GetSummaryAsync(ReviewRange range, CancellationToken cancellationToken = default)
+    public async Task<ReviewDashboard> GetDashboardAsync(ReviewRange range, DayOfWeek weekStart, int recentLimit = 20, CancellationToken cancellationToken = default)
     {
-        var dates = ranges.GetRange(range);
+        if (recentLimit is < 1 or > 50) throw new ArgumentOutOfRangeException(nameof(recentLimit));
+        var currentDates = ranges.GetRange(range);
+        var previousDates = ranges.GetPreviousRange(range);
+        var currentTask = GetSummaryForDatesAsync(currentDates, includeCurrentState: true, cancellationToken);
+        var previousTask = previousDates is null
+            ? Task.FromResult<ReviewSummary?>(null)
+            : GetOptionalSummaryAsync(previousDates, cancellationToken);
+        var completedTask = GetCompletedTrendAsync(range, weekStart, cancellationToken);
+        var focusTask = GetFocusTrendAsync(range, weekStart, cancellationToken);
+        var completedQuadrantsTask = GetCompletionByQuadrantAsync(range, cancellationToken);
+        var focusQuadrantsTask = GetFocusByQuadrantAsync(range, cancellationToken);
+        var focusSummaryTask = GetFocusSummaryAsync(currentDates, cancellationToken);
+        var recentTask = GetRecentCompletedAsync(recentLimit, cancellationToken);
+        await Task.WhenAll(currentTask, previousTask, completedTask, focusTask, completedQuadrantsTask, focusQuadrantsTask, focusSummaryTask, recentTask);
+        return new ReviewDashboard(range, currentTask.Result, previousTask.Result, completedTask.Result, focusTask.Result,
+            completedQuadrantsTask.Result, focusQuadrantsTask.Result, focusSummaryTask.Result, recentTask.Result);
+    }
+
+    public async Task<ReviewSummary> GetSummaryAsync(ReviewRange range, CancellationToken cancellationToken = default)
+        => await GetSummaryForDatesAsync(ranges.GetRange(range), includeCurrentState: true, cancellationToken);
+
+    private async Task<ReviewSummary> GetSummaryForDatesAsync(ReviewDateRange dates, bool includeCurrentState, CancellationToken cancellationToken)
+    {
         await using var connection = await OpenAsync(cancellationToken);
         var completed = await ScalarIntAsync(connection, CompletionWhere("COUNT(*)"), dates, cancellationToken);
         var focus = await ReadFocusTotalsAsync(connection, dates, cancellationToken);
-        var inbox = await ScalarIntAsync(connection, "SELECT COUNT(*) FROM tasks WHERE is_completed = 0 AND quadrant_id IS NULL;", null, cancellationToken);
-        var overdue = await ScalarIntAsync(connection, "SELECT COUNT(*) FROM tasks WHERE is_completed = 0 AND due_at IS NOT NULL AND due_at < $now;", null, cancellationToken, ("$now", SqliteValueConverter.FormatUtc(clock.UtcNow)));
+        var inbox = includeCurrentState ? await ScalarIntAsync(connection, "SELECT COUNT(*) FROM tasks WHERE is_completed = 0 AND quadrant_id IS NULL;", null, cancellationToken) : 0;
+        var overdue = includeCurrentState ? await ScalarIntAsync(connection, "SELECT COUNT(*) FROM tasks WHERE is_completed = 0 AND due_at IS NOT NULL AND due_at < $now;", null, cancellationToken, ("$now", SqliteValueConverter.FormatUtc(clock.UtcNow))) : 0;
         return new ReviewSummary(completed, focus.Count, focus.Seconds, focus.Count == 0 ? 0 : (int)(focus.Seconds / focus.Count), focus.Count > 0, inbox, overdue);
     }
+
+    private async Task<ReviewSummary?> GetOptionalSummaryAsync(ReviewDateRange dates, CancellationToken cancellationToken) =>
+        await GetSummaryForDatesAsync(dates, includeCurrentState: false, cancellationToken);
 
     public Task<IReadOnlyList<DateBucketPoint>> GetCompletedTrendAsync(ReviewRange range, DayOfWeek weekStart, CancellationToken cancellationToken = default) =>
         GetTrendAsync("task_completion_events", "completed_local_date", "COUNT(*)", "reverted_at_utc IS NULL", range, weekStart, cancellationToken);
@@ -79,6 +104,40 @@ public sealed class SqliteReviewQueryService(SqliteConnectionFactory connectionF
         await using var reader = await command.ExecuteReaderAsync(ct);
         await reader.ReadAsync(ct);
         return (reader.GetInt32(0), reader.GetInt64(1));
+    }
+
+    private async Task<FocusReviewSummary> GetFocusSummaryAsync(ReviewDateRange dates, CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenAsync(cancellationToken);
+        var totals = await ReadFocusTotalsAsync(connection, dates, cancellationToken);
+        long longest;
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = $"SELECT COALESCE(MAX(duration_seconds), 0) FROM focus_sessions WHERE {ProductiveFocusWhere}{RangeClause("created_local_date", dates)};";
+            AddRange(command, dates);
+            longest = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture);
+        }
+
+        string? taskTitle = null; long taskSeconds = 0; var taskSessions = 0;
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = $"SELECT task_title_snapshot, SUM(duration_seconds) AS seconds, COUNT(*) AS sessions FROM focus_sessions WHERE {ProductiveFocusWhere} AND task_title_snapshot IS NOT NULL AND TRIM(task_title_snapshot) <> ''{RangeClause("created_local_date", dates)} GROUP BY COALESCE(CAST(task_id AS TEXT), 'title:' || task_title_snapshot), task_title_snapshot ORDER BY seconds DESC, sessions DESC, task_title_snapshot LIMIT 1;";
+            AddRange(command, dates);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken)) { taskTitle = reader.GetString(0); taskSeconds = reader.GetInt64(1); taskSessions = reader.GetInt32(2); }
+        }
+
+        int? quadrantId = null; long quadrantSeconds = 0;
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = $"SELECT quadrant_snapshot, SUM(duration_seconds) AS seconds FROM focus_sessions WHERE {ProductiveFocusWhere} AND quadrant_snapshot IS NOT NULL{RangeClause("created_local_date", dates)} GROUP BY quadrant_snapshot ORDER BY seconds DESC, quadrant_snapshot LIMIT 1;";
+            AddRange(command, dates);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken)) { quadrantId = reader.GetInt32(0); quadrantSeconds = reader.GetInt64(1); }
+        }
+
+        return new FocusReviewSummary(totals.Seconds, totals.Count, totals.Count == 0 ? 0 : totals.Seconds / totals.Count,
+            longest, taskTitle, taskSeconds, taskSessions, quadrantId, quadrantSeconds);
     }
 
     private async Task<IReadOnlyList<QuadrantValue>> GetQuadrantsAsync(string table, string dateColumn, string quadrantColumn, string aggregate, string predicate, ReviewRange range, CancellationToken ct)

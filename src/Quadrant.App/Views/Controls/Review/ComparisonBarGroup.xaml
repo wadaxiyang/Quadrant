@@ -1,0 +1,25 @@
+<UserControl x:Class="Quadrant.App.Views.Controls.Review.ComparisonBarGroup"
+    x:Name="Root"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    MinHeight="112">
+  <StackPanel>
+    <Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <TextBlock Style="{StaticResource BodyStrongTextStyle}" Text="{Binding MetricName, ElementName=Root}"/>
+      <TextBlock Grid.Column="1" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding DeltaText, ElementName=Root}"/>
+    </Grid>
+    <Grid Margin="0,12,0,0">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="56"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="{Binding CurrentLabel, ElementName=Root}"/>
+      <ProgressBar Grid.Column="1" Height="8" Margin="8,0" VerticalAlignment="Center" Maximum="100" Value="{Binding CurrentValue, ElementName=Root}" Foreground="{DynamicResource AccentFillColorDefaultBrush}" IsHitTestVisible="False"/>
+      <TextBlock Grid.Column="2" MinWidth="56" TextAlignment="Right" Style="{StaticResource CaptionTextStyle}" Text="{Binding CurrentText, ElementName=Root}"/>
+    </Grid>
+    <Grid Margin="0,8,0,0">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="56"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="{Binding PreviousLabel, ElementName=Root}"/>
+      <ProgressBar Grid.Column="1" Height="8" Margin="8,0" VerticalAlignment="Center" Maximum="100" Value="{Binding PreviousValue, ElementName=Root}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsHitTestVisible="False"/>
+      <TextBlock Grid.Column="2" MinWidth="56" TextAlignment="Right" Style="{StaticResource CaptionTextStyle}" Text="{Binding PreviousText, ElementName=Root}"/>
+    </Grid>
+  </StackPanel>
+</UserControl>
