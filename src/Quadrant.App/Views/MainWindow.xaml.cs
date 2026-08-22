@@ -118,6 +118,59 @@ public partial class MainWindow : FluentWindow
         snackbarService.Show(title, message, appearance, new SymbolIcon(symbol), TimeSpan.FromSeconds(4));
     }
 
+    public void ShowUndoFeedback(string title, string message, Func<Task> undoAction)
+    {
+        ArgumentNullException.ThrowIfNull(undoAction);
+
+        var messageText = new TextBlock
+        {
+            Text = message,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var undoButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "撤销",
+            Appearance = ControlAppearance.Transparent,
+            Margin = new Thickness(12, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        System.Windows.Automation.AutomationProperties.SetName(undoButton, "撤销任务分类");
+
+        var content = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+        content.Children.Add(messageText);
+        content.Children.Add(undoButton);
+
+        var snackbar = new Snackbar(SnackbarPresenter)
+        {
+            Title = title,
+            Content = content,
+            Appearance = ControlAppearance.Success,
+            Icon = new SymbolIcon(SymbolRegular.ArrowUndo24),
+            Timeout = TimeSpan.FromSeconds(8)
+        };
+        var invoked = false;
+        undoButton.Click += async (_, _) =>
+        {
+            if (invoked)
+            {
+                return;
+            }
+
+            invoked = true;
+            await SnackbarPresenter.HideCurrent();
+            try
+            {
+                await undoAction();
+            }
+            catch (Exception exception)
+            {
+                await ShowRecoverableErrorAsync("撤销失败", exception);
+            }
+        };
+        snackbar.Show(true);
+    }
+
     private IntPtr WindowSourceHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (globalHotkeyService?.IsHotkeyMessage(msg, wParam) == true)
@@ -215,11 +268,15 @@ public partial class MainWindow : FluentWindow
         try
         {
             var viewModel = (MainViewModel)DataContext;
-            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock, defaultReminderPreset: viewModel.Settings.DefaultReminder)) { Owner = this };
+            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock, allowInbox: true, defaultReminderPreset: viewModel.Settings.DefaultReminder)) { Owner = this };
             if (editor.ShowDialog() == true && editor.DraftResult is { } draft)
             {
                 await viewModel.CreateAsync(draft);
-                ShowFeedback("任务已添加", draft.Title);
+                ShowFeedback(
+                    draft.QuadrantId is null ? "已收集到 Inbox" : "任务已添加",
+                    draft.Title,
+                    ControlAppearance.Success,
+                    draft.QuadrantId is null ? SymbolRegular.Archive32 : SymbolRegular.CheckmarkCircle24);
             }
         }
         catch (Exception exception)

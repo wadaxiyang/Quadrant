@@ -193,7 +193,14 @@ public partial class MainViewModel : ObservableObject
     public async Task UpdateAsync(TaskUpdate update)
     {
         var task = await taskService.UpdateAsync(update);
-        UpsertActiveTask(task);
+        if (task.QuadrantId is null)
+        {
+            RemoveActiveTask(task.Id);
+        }
+        else
+        {
+            UpsertActiveTask(task);
+        }
     }
 
     public async Task OpenTaskAsync(long id, CancellationToken cancellationToken = default)

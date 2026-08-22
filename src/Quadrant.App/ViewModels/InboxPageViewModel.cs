@@ -82,16 +82,39 @@ public partial class InboxPageViewModel : ObservableObject, IDisposable
         }
     }
 
-    public async Task AssignQuadrantAsync(TaskItem task, int quadrantId, CancellationToken cancellationToken = default)
+    public async Task<TaskItem?> AssignQuadrantAsync(TaskItem task, int quadrantId, CancellationToken cancellationToken = default)
     {
         try
         {
-            await taskService.AssignQuadrantAsync(task.Id, quadrantId, cancellationToken);
+            var moved = await taskService.AssignQuadrantAsync(task.Id, quadrantId, cancellationToken);
             Remove(task.Id);
+            return moved;
         }
         catch (Exception exception)
         {
             RecoverableError?.Invoke(this, new RecoverableOperationErrorEventArgs("任务分类失败", exception));
+            return null;
+        }
+    }
+
+    public async Task<TaskItem?> RestoreToInboxAsync(long taskId, int expectedQuadrantId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var current = await taskService.GetByIdAsync(taskId, cancellationToken);
+            if (current is null || current.IsCompleted || current.QuadrantId != expectedQuadrantId)
+            {
+                return null;
+            }
+
+            var restored = await taskService.MoveToInboxAsync(taskId, cancellationToken);
+            Upsert(restored);
+            return restored;
+        }
+        catch (Exception exception)
+        {
+            RecoverableError?.Invoke(this, new RecoverableOperationErrorEventArgs("撤销分类失败", exception));
+            return null;
         }
     }
 
@@ -108,7 +131,7 @@ public partial class InboxPageViewModel : ObservableObject, IDisposable
         }
     }
 
-    public async Task PlanForTodayAsync(TaskItem task, CancellationToken cancellationToken = default)
+    public async Task<TaskItem?> PlanForTodayAsync(TaskItem task, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -118,10 +141,13 @@ public partial class InboxPageViewModel : ObservableObject, IDisposable
             {
                 Tasks[index] = updated;
             }
+
+            return updated;
         }
         catch (Exception exception)
         {
             RecoverableError?.Invoke(this, new RecoverableOperationErrorEventArgs("添加到 Today 失败", exception));
+            return null;
         }
     }
 
@@ -172,17 +198,7 @@ public partial class InboxPageViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            if (index >= 0)
-            {
-                Tasks[index] = task;
-            }
-            else
-            {
-                Tasks.Add(task);
-            }
-
-            SortByCapturedTime();
-            NotifyCollectionState();
+            Upsert(task);
         }
         catch (Exception exception)
         {
@@ -194,6 +210,22 @@ public partial class InboxPageViewModel : ObservableObject, IDisposable
     {
         var index = IndexOf(id);
         if (index >= 0) Tasks.RemoveAt(index);
+        NotifyCollectionState();
+    }
+
+    private void Upsert(TaskItem task)
+    {
+        var index = IndexOf(task.Id);
+        if (index >= 0)
+        {
+            Tasks[index] = task;
+        }
+        else
+        {
+            Tasks.Add(task);
+        }
+
+        SortByCapturedTime();
         NotifyCollectionState();
     }
 

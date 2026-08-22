@@ -59,6 +59,27 @@ public sealed class InboxPageViewModelTests
         Assert.Equal(1, viewModel.Count);
     }
 
+    [Fact]
+    public async Task Classification_can_be_undone_only_while_task_is_in_expected_quadrant()
+    {
+        var task = InboxTask(1, "Undo me");
+        var service = new FakeTaskService([task]);
+        using var viewModel = new InboxPageViewModel(service, new AppChangeHub());
+        await viewModel.ActivateAsync();
+
+        var moved = await viewModel.AssignQuadrantAsync(task, 2);
+        Assert.NotNull(moved);
+        Assert.Empty(viewModel.Tasks);
+
+        var restored = await viewModel.RestoreToInboxAsync(task.Id, 2);
+        Assert.NotNull(restored);
+        Assert.Equal([restored], viewModel.Tasks);
+
+        service.Tasks[0] = restored! with { QuadrantId = 3 };
+        Assert.Null(await viewModel.RestoreToInboxAsync(task.Id, 2));
+        Assert.Equal(3, service.Tasks[0].QuadrantId);
+    }
+
     private static TaskItem InboxTask(long id, string title) => new(id, title, null, null, null, null, false, null,
         new DateTimeOffset(2026, 8, 21, 9, 0, 0, TimeSpan.Zero).AddMinutes(id), DateTimeOffset.UtcNow);
 
@@ -95,7 +116,12 @@ public sealed class InboxPageViewModelTests
             return Task.FromResult(Tasks[index]);
         }
 
-        public Task<TaskItem> MoveToInboxAsync(long id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<TaskItem> MoveToInboxAsync(long id, CancellationToken cancellationToken = default)
+        {
+            var index = Tasks.FindIndex(task => task.Id == id);
+            Tasks[index] = Tasks[index] with { QuadrantId = null };
+            return Task.FromResult(Tasks[index]);
+        }
 
         public Task<TaskItem> PlanForDateAsync(long id, DateOnly plannedDate, CancellationToken cancellationToken = default)
         {
