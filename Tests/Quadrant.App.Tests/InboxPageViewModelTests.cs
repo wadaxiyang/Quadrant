@@ -80,6 +80,31 @@ public sealed class InboxPageViewModelTests
         Assert.Equal(3, service.Tasks[0].QuadrantId);
     }
 
+    [Fact]
+    public async Task Quadrant_task_can_move_to_inbox_and_restore_only_while_still_unclassified()
+    {
+        var task = InboxTask(1, "Move both ways") with { QuadrantId = 2 };
+        var service = new FakeTaskService([task]);
+        using var viewModel = new InboxPageViewModel(service, new AppChangeHub());
+        await viewModel.ActivateAsync();
+        Assert.Empty(viewModel.Tasks);
+
+        var moved = await viewModel.MoveFromQuadrantAsync(task.Id);
+        Assert.NotNull(moved);
+        Assert.Null(moved.QuadrantId);
+        Assert.Equal([moved], viewModel.Tasks);
+
+        var restored = await viewModel.RestoreToQuadrantAsync(task.Id, 2);
+        Assert.NotNull(restored);
+        Assert.Equal(2, restored.QuadrantId);
+        Assert.Empty(viewModel.Tasks);
+
+        await viewModel.MoveFromQuadrantAsync(task.Id);
+        service.Tasks[0] = service.Tasks[0] with { QuadrantId = 3 };
+        Assert.Null(await viewModel.RestoreToQuadrantAsync(task.Id, 2));
+        Assert.Equal(3, service.Tasks[0].QuadrantId);
+    }
+
     private static TaskItem InboxTask(long id, string title) => new(id, title, null, null, null, null, false, null,
         new DateTimeOffset(2026, 8, 21, 9, 0, 0, TimeSpan.Zero).AddMinutes(id), DateTimeOffset.UtcNow);
 

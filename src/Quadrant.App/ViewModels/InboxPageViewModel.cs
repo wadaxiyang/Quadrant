@@ -118,6 +118,42 @@ public partial class InboxPageViewModel : ObservableObject, IDisposable
         }
     }
 
+    public async Task<TaskItem?> MoveFromQuadrantAsync(long taskId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var moved = await taskService.MoveToInboxAsync(taskId, cancellationToken);
+            Upsert(moved);
+            return moved;
+        }
+        catch (Exception exception)
+        {
+            RecoverableError?.Invoke(this, new RecoverableOperationErrorEventArgs("移入 Inbox 失败", exception));
+            return null;
+        }
+    }
+
+    public async Task<TaskItem?> RestoreToQuadrantAsync(long taskId, int targetQuadrantId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var current = await taskService.GetByIdAsync(taskId, cancellationToken);
+            if (current is null || current.IsCompleted || current.QuadrantId is not null)
+            {
+                return null;
+            }
+
+            var restored = await taskService.AssignQuadrantAsync(taskId, targetQuadrantId, cancellationToken);
+            Remove(taskId);
+            return restored;
+        }
+        catch (Exception exception)
+        {
+            RecoverableError?.Invoke(this, new RecoverableOperationErrorEventArgs("撤销移入 Inbox 失败", exception));
+            return null;
+        }
+    }
+
     public async Task CompleteAsync(TaskItem task, CancellationToken cancellationToken = default)
     {
         try

@@ -12,9 +12,10 @@ public partial class QuadrantsPage : Page
 {
     private const string TaskIdFormat = "Quadrant.TaskId";
     private const string InboxTaskIdFormat = "Quadrant.InboxTaskId";
+    private const string SourceQuadrantIdFormat = "Quadrant.SourceQuadrantId";
     private const double InboxBreakpoint = 900;
     private System.Windows.Point dragStartPoint;
-    private Border? highlightedQuadrant;
+    private Border? highlightedDropTarget;
     private MainViewModel? mainViewModel;
     private InboxPageViewModel? inboxViewModel;
     private long? pendingInboxDragTaskId;
@@ -50,7 +51,7 @@ public partial class QuadrantsPage : Page
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
         inboxViewModel?.Deactivate();
-        ClearQuadrantFeedback();
+        ClearDropTargetFeedback();
         pendingInboxDragTaskId = null;
     }
 
@@ -159,6 +160,10 @@ public partial class QuadrantsPage : Page
         }
 
         var data = new System.Windows.DataObject(TaskIdFormat, task.Id);
+        if (task.QuadrantId is { } sourceQuadrantId)
+        {
+            data.SetData(SourceQuadrantIdFormat, sourceQuadrantId);
+        }
         var originalOpacity = card.Opacity;
         card.Opacity = 0.65;
         try
@@ -168,7 +173,7 @@ public partial class QuadrantsPage : Page
         finally
         {
             card.Opacity = originalOpacity;
-            ClearQuadrantFeedback();
+            ClearDropTargetFeedback();
         }
     }
 
@@ -211,28 +216,45 @@ public partial class QuadrantsPage : Page
         finally
         {
             row.Opacity = originalOpacity;
-            ClearQuadrantFeedback();
+            ClearDropTargetFeedback();
         }
     }
 
-    private void Quadrant_DragOver(object sender, System.Windows.DragEventArgs e)
+    private void DropTarget_DragOver(object sender, System.Windows.DragEventArgs e)
     {
-        if (!e.Data.GetDataPresent(TaskIdFormat) || sender is not Border target)
+        if (sender is not Border target || !CanDrop(e.Data, target))
         {
             e.Effects = System.Windows.DragDropEffects.None;
+            ClearDropTargetFeedback();
             e.Handled = true;
             return;
         }
 
         e.Effects = System.Windows.DragDropEffects.Move;
-        SetQuadrantFeedback(target);
+        SetDropTargetFeedback(target);
         e.Handled = true;
     }
 
-    private async void Quadrant_Drop(object sender, System.Windows.DragEventArgs e)
+    private async void DropTarget_Drop(object sender, System.Windows.DragEventArgs e)
     {
-        ClearQuadrantFeedback();
-        if (sender is not Border target || !e.Data.GetDataPresent(TaskIdFormat) || e.Data.GetData(TaskIdFormat) is not long taskId || target.Tag is not string targetText || !int.TryParse(targetText, out var targetQuadrantId))
+        ClearDropTargetFeedback();
+        if (sender is not Border target || !CanDrop(e.Data, target) || e.Data.GetData(TaskIdFormat) is not long taskId)
+        {
+            return;
+        }
+
+        if (Equals(target.Tag, "Inbox"))
+        {
+            if (e.Data.GetData(SourceQuadrantIdFormat) is int sourceQuadrantId)
+            {
+                await MoveQuadrantTaskToInboxAsync(taskId, sourceQuadrantId);
+            }
+
+            e.Handled = true;
+            return;
+        }
+
+        if (target.Tag is not string targetText || !int.TryParse(targetText, out var targetQuadrantId))
         {
             return;
         }
@@ -257,26 +279,32 @@ public partial class QuadrantsPage : Page
         e.Handled = true;
     }
 
-    private void Quadrant_DragLeave(object sender, System.Windows.DragEventArgs e)
+    private void DropTarget_DragLeave(object sender, System.Windows.DragEventArgs e)
     {
         if (sender is Border target)
         {
-            ClearQuadrantFeedback(target);
+            ClearDropTargetFeedback(target);
         }
     }
 
-    private void SetQuadrantFeedback(Border target)
+    private void SetDropTargetFeedback(Border target)
     {
-        if (highlightedQuadrant == target)
+        if (highlightedDropTarget == target)
         {
             return;
         }
 
-        ClearQuadrantFeedback();
-        highlightedQuadrant = target;
+        ClearDropTargetFeedback();
+        highlightedDropTarget = target;
         target.BorderThickness = new Thickness(2);
         target.SetResourceReference(Border.BorderBrushProperty, "SystemAccentColorPrimaryBrush");
         target.SetResourceReference(Border.BackgroundProperty, "SubtleFillColorSecondaryBrush");
+        if (FindTaggedElement<FrameworkElement>(target, "DropContent") is { } content)
+        {
+            content.Opacity = 0;
+            content.IsHitTestVisible = false;
+        }
+
         if (FindTaggedElement<Border>(target, "AccentBar") is { } accentBar)
         {
             accentBar.Opacity = 1;
@@ -288,9 +316,9 @@ public partial class QuadrantsPage : Page
         }
     }
 
-    private void ClearQuadrantFeedback(Border? target = null)
+    private void ClearDropTargetFeedback(Border? target = null)
     {
-        var border = target ?? highlightedQuadrant;
+        var border = target ?? highlightedDropTarget;
         if (border is null)
         {
             return;
@@ -299,6 +327,12 @@ public partial class QuadrantsPage : Page
         border.BorderThickness = new Thickness(1);
         border.SetResourceReference(Border.BorderBrushProperty, "CardStrokeColorDefaultBrush");
         border.SetResourceReference(Border.BackgroundProperty, "CardBackgroundFillColorDefaultBrush");
+        if (FindTaggedElement<FrameworkElement>(border, "DropContent") is { } content)
+        {
+            content.Opacity = 1;
+            content.IsHitTestVisible = true;
+        }
+
         if (FindTaggedElement<Border>(border, "AccentBar") is { } accentBar)
         {
             accentBar.Opacity = 0.85;
@@ -309,10 +343,30 @@ public partial class QuadrantsPage : Page
             dropHint.Visibility = Visibility.Collapsed;
         }
 
-        if (highlightedQuadrant == border)
+        if (highlightedDropTarget == border)
         {
-            highlightedQuadrant = null;
+            highlightedDropTarget = null;
         }
+    }
+
+    private static bool CanDrop(System.Windows.IDataObject data, Border target)
+    {
+        if (!data.GetDataPresent(TaskIdFormat))
+        {
+            return false;
+        }
+
+        if (Equals(target.Tag, "Inbox"))
+        {
+            return !data.GetDataPresent(InboxTaskIdFormat);
+        }
+
+        if (target.Tag is not string targetText || !int.TryParse(targetText, out var targetQuadrantId))
+        {
+            return false;
+        }
+
+        return data.GetData(SourceQuadrantIdFormat) is not int sourceQuadrantId || sourceQuadrantId != targetQuadrantId;
     }
 
     private async Task AssignInboxTaskAsync(TaskItem task, int targetQuadrantId)
@@ -342,6 +396,36 @@ public partial class QuadrantsPage : Page
 
             await main.RefreshActiveTaskAsync(restored.Id);
             window.ShowFeedback("已撤销分类", "任务已恢复到 Inbox。", ControlAppearance.Success, SymbolRegular.ArrowUndo24);
+        });
+    }
+
+    private async Task MoveQuadrantTaskToInboxAsync(long taskId, int sourceQuadrantId)
+    {
+        var moved = await RequireInboxViewModel().MoveFromQuadrantAsync(taskId);
+        if (moved is null)
+        {
+            return;
+        }
+
+        var main = RequireMainViewModel();
+        await main.RefreshActiveTaskAsync(moved.Id);
+        if (Window.GetWindow(this) is not MainWindow window)
+        {
+            return;
+        }
+
+        window.ShowUndoFeedback("任务已移入 Inbox", "可稍后重新分类。", async () =>
+        {
+            var restored = await RequireInboxViewModel().RestoreToQuadrantAsync(moved.Id, sourceQuadrantId);
+            if (restored is null)
+            {
+                window.ShowFeedback("无法撤销", "任务状态已经发生变化。", ControlAppearance.Caution, SymbolRegular.Alert24);
+                return;
+            }
+
+            await main.RefreshActiveTaskAsync(restored.Id);
+            var sourceName = main.Quadrants.FirstOrDefault(quadrant => quadrant.Id == sourceQuadrantId)?.Name ?? $"Q{sourceQuadrantId}";
+            window.ShowFeedback("已撤销移动", $"任务已恢复到 {sourceName}。", ControlAppearance.Success, SymbolRegular.ArrowUndo24);
         });
     }
 
