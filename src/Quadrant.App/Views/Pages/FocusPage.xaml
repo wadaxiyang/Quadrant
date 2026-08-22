@@ -19,16 +19,7 @@
 
                 <Border Grid.Column="0" Style="{StaticResource HeroSurfaceStyle}">
                     <StackPanel VerticalAlignment="Center">
-                        <Border Width="68" Height="68" HorizontalAlignment="Center"
-                                Background="{DynamicResource SubtleFillColorSecondaryBrush}" CornerRadius="{StaticResource RadiusMedium}">
-                            <ui:SymbolIcon HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="42"
-                                           Foreground="{DynamicResource SystemAccentColorPrimaryBrush}" Symbol="Clock24" />
-                        </Border>
-
-                        <TextBlock Margin="0,14,0,0" HorizontalAlignment="Center"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   Style="{StaticResource SectionSubtitleTextStyle}" Text="当前任务" />
-                        <Border MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Stretch" Style="{StaticResource SectionSurfaceStyle}">
+                        <Border MaxWidth="560" HorizontalAlignment="Stretch" Style="{StaticResource SectionSurfaceStyle}">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <StackPanel>
