@@ -57,7 +57,7 @@ public sealed class WindowsReminderSchedulerTests
             return entries;
         }
 
-        public void Add(TaskItem task) => AddedTasks.Add(task);
+        public void Add(TaskItem task, bool soundEnabled = true) => AddedTasks.Add(task);
 
         public void Remove(ScheduledReminderEntry scheduled) => RemovedEntries.Add(scheduled);
     }

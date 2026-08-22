@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
+using Quadrant.Core.Enums;
 using Quadrant.Core.Models;
 using Quadrant.Infrastructure.Storage;
 using Quadrant.Infrastructure.Tests.Fixtures;
@@ -146,6 +147,37 @@ public sealed class SqliteStorageTests
     }
 
     [Fact]
+    public async Task V2_settings_round_trip_and_invalid_values_fall_back_without_writeback()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var expected = AppSettings.Default with
+        {
+            QuickCaptureQuadrantId = 3,
+            DefaultReminder = ReminderPreset.TenMinutesBefore,
+            FocusMinutes = 40,
+            ShortBreakMinutes = 8,
+            LongBreakMinutes = 20,
+            LongBreakInterval = 5,
+            AutoStartBreak = true,
+            FocusNotificationsEnabled = false,
+            ReviewDefaultRange = ReviewRange.NinetyDays,
+            WeekStart = DayOfWeek.Sunday,
+            SidebarIconSize = 28
+        };
+        var quadrants = await database.Quadrants.GetAllAsync();
+        await database.Settings.SaveAsync(expected, quadrants);
+        Assert.Equal(expected, await database.Settings.GetAsync());
+
+        await ExecuteAsync(database.Factory, "UPDATE settings SET value = 'invalid' WHERE key IN ('focus_minutes', 'review_default_range', 'task_reminders_enabled', 'sidebar_icon_size');");
+        var loaded = await database.Settings.GetAsync();
+        Assert.Equal(AppSettings.Default.FocusMinutes, loaded.FocusMinutes);
+        Assert.Equal(AppSettings.Default.ReviewDefaultRange, loaded.ReviewDefaultRange);
+        Assert.Equal(AppSettings.Default.TaskRemindersEnabled, loaded.TaskRemindersEnabled);
+        Assert.Equal(AppSettings.Default.SidebarIconSize, loaded.SidebarIconSize);
+        Assert.Equal(4, await ReadScalarAsync(database.Factory, "SELECT COUNT(*) FROM settings WHERE value = 'invalid';"));
+    }
+
+    [Fact]
     public async Task One_thousand_active_tasks_load_within_a_measurable_baseline()
     {
         await using var database = await TestDatabase.CreateAsync();
@@ -168,25 +200,36 @@ public sealed class SqliteStorageTests
     {
         var directory = Path.Combine(Path.GetTempPath(), "QuadrantTests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
+        var sourcePath = Path.Combine(directory, "v1-schema2-original.db");
         var databasePath = Path.Combine(directory, "v1-schema2.db");
         try
         {
-            await V1Schema2Fixture.CreateAsync(databasePath);
+            await V1Schema2Fixture.CreateAsync(sourcePath);
+            File.Copy(sourcePath, databasePath);
             var factory = new SqliteConnectionFactory(databasePath, pooling: false);
             var initializer = new SqliteDatabaseInitializer(factory);
             await initializer.InitializeAsync();
+            await initializer.InitializeAsync();
             var repository = new SqliteTaskRepository(factory);
+            var settings = await new SqliteSettingsRepository(factory).GetAsync();
 
             var active = await repository.GetActiveAsync();
             var completed = await repository.GetCompletedAsync();
 
             Assert.Equal(4, await ReadSchemaVersionAsync(factory));
+            Assert.Equal(2, await ReadSchemaVersionAsync(new SqliteConnectionFactory(sourcePath, pooling: false)));
             Assert.Equal(2, active.Count);
             Assert.Single(completed);
             Assert.Contains(active, task => task.Id == 101 && task.Title == "中文活动任务" && task.DueAt is not null && task.ReminderAt is not null && task.Note == "含中文与提醒");
             Assert.Contains(active, task => task.Id == 103 && task.DueAt is null && task.ReminderAt is not null);
             Assert.Equal(102, completed[0].Id);
             Assert.Equal("Completed note", completed[0].Note);
+            Assert.Null(settings.QuickCaptureQuadrantId);
+            Assert.Equal(AppSettings.Default.DefaultReminder, settings.DefaultReminder);
+            Assert.Equal(0, await ReadScalarAsync(factory, "SELECT COUNT(*) FROM task_completion_events;"));
+            Assert.Equal(0, await ReadScalarAsync(factory, "SELECT COUNT(*) FROM focus_sessions;"));
+            Assert.Equal("ok", await ReadTextScalarAsync(factory, "PRAGMA integrity_check;"));
+            Assert.Equal(0, await ReadScalarAsync(factory, "SELECT COUNT(*) FROM pragma_foreign_key_check;"));
         }
         finally
         {
@@ -460,6 +503,16 @@ public sealed class SqliteStorageTests
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT version FROM schema_version;";
         return Convert.ToInt32(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+    }
+
+    private static async Task<string> ReadTextScalarAsync(SqliteConnectionFactory factory, string sql)
+    {
+        await using var connection = factory.CreateConnection();
+        await connection.OpenAsync();
+        await SqliteDatabaseInitializer.ConfigureConnectionAsync(connection, default);
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        return Convert.ToString(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture) ?? string.Empty;
     }
 
     private static async Task SetSchemaVersionAsync(SqliteConnectionFactory factory, int version)

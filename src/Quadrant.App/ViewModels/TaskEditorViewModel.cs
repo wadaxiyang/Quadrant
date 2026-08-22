@@ -15,6 +15,7 @@ public partial class TaskEditorViewModel : ObservableObject
     private readonly TimeZoneInfo timeZone;
     private readonly DateTimeOffset? originalReminderAt;
     private readonly bool allowInbox;
+    private readonly ReminderPreset defaultReminderPreset;
     private readonly RecurrenceKind originalRecurrenceKind;
     private readonly int originalRecurrenceInterval;
     private readonly string? originalRecurrenceSeriesId;
@@ -28,12 +29,14 @@ public partial class TaskEditorViewModel : ObservableObject
         IClock clock,
         TaskItem? task = null,
         TimeZoneInfo? timeZone = null,
-        bool allowInbox = false)
+        bool allowInbox = false,
+        ReminderPreset defaultReminderPreset = ReminderPreset.None)
     {
         Quadrants = quadrants.OrderBy(quadrant => quadrant.Id).ToArray();
         this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
         this.timeZone = timeZone ?? clock.LocalTimeZone;
         this.allowInbox = allowInbox;
+        this.defaultReminderPreset = defaultReminderPreset;
         originalReminderAt = task?.ReminderAt;
         originalRecurrenceKind = task?.RecurrenceKind ?? RecurrenceKind.None;
         originalRecurrenceInterval = task?.RecurrenceInterval ?? 1;
@@ -172,6 +175,10 @@ public partial class TaskEditorViewModel : ObservableObject
         if (value is null && ReminderPreset is not ReminderPreset.None and not ReminderPreset.Custom)
         {
             ReminderPreset = ReminderPreset.None;
+        }
+        else if (value is not null && !IsEdit && ReminderPreset == ReminderPreset.None && defaultReminderPreset != ReminderPreset.Custom)
+        {
+            ReminderPreset = defaultReminderPreset;
         }
     }
 

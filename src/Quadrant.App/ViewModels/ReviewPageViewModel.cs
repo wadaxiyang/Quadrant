@@ -23,6 +23,7 @@ public partial class ReviewPageViewModel : ObservableObject, IDisposable
     private readonly IReviewQueryService queryService;
     private readonly IAppChangeHub appChangeHub;
     private readonly IReviewInsightService insightService;
+    private readonly DayOfWeek weekStart;
     private IDisposable? subscription;
     private CancellationTokenSource? cancellation;
     private CancellationTokenSource? debounceCancellation;
@@ -31,11 +32,12 @@ public partial class ReviewPageViewModel : ObservableObject, IDisposable
     private bool isActive;
     private bool isDirty = true;
 
-    public ReviewPageViewModel(IReviewQueryService queryService, IAppChangeHub appChangeHub, ReviewRange defaultRange = ReviewRange.SevenDays, IReviewInsightService? insightService = null)
+    public ReviewPageViewModel(IReviewQueryService queryService, IAppChangeHub appChangeHub, ReviewRange defaultRange = ReviewRange.SevenDays, IReviewInsightService? insightService = null, DayOfWeek weekStart = DayOfWeek.Monday)
     {
         this.queryService = queryService ?? throw new ArgumentNullException(nameof(queryService));
         this.appChangeHub = appChangeHub ?? throw new ArgumentNullException(nameof(appChangeHub));
         this.insightService = insightService ?? new ReviewInsightService();
+        this.weekStart = weekStart;
         SelectedRange = defaultRange;
     }
 
@@ -103,7 +105,7 @@ public partial class ReviewPageViewModel : ObservableObject, IDisposable
         ErrorMessage = null;
         try
         {
-            var dashboard = await queryService.GetDashboardAsync(SelectedRange, DayOfWeek.Monday, 20, token);
+            var dashboard = await queryService.GetDashboardAsync(SelectedRange, weekStart, 20, token);
             if (token.IsCancellationRequested || generation != requestGeneration || !isActive) return;
             Dashboard = dashboard;
             Replace(RecentCompleted, dashboard.RecentCompleted.Select(item =>

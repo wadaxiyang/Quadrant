@@ -35,6 +35,8 @@ public partial class MainWindow : FluentWindow
 
     public bool IsCloseToTray { get; set; } = true;
 
+    public void SetSidebarIconSize(double size) => RootNavigationView.Resources["NavigationViewLeftIconSize"] = size;
+
     public void ConfigureGlobalHotkey(Quadrant.Infrastructure.Windows.GlobalHotkeyService service) =>
         globalHotkeyService = service;
 
@@ -150,6 +152,10 @@ public partial class MainWindow : FluentWindow
         {
             page.DataContext = DataContext;
         }
+
+        // The app intentionally has no back-navigation experience. Keeping the WPF UI
+        // journal would retain each discarded Page and its visual tree after navigation.
+        sender.ClearJournal();
     }
 
     private async void Completed_Click(object sender, RoutedEventArgs e)
@@ -181,7 +187,7 @@ public partial class MainWindow : FluentWindow
         try
         {
             var viewModel = (MainViewModel)DataContext;
-            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock)) { Owner = this };
+            var editor = new TaskEditorWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock, defaultReminderPreset: viewModel.Settings.DefaultReminder)) { Owner = this };
             if (editor.ShowDialog() == true && editor.DraftResult is { } draft)
             {
                 await viewModel.CreateAsync(draft);
@@ -250,7 +256,11 @@ public partial class MainWindow : FluentWindow
         var viewModel = (MainViewModel)DataContext;
         try
         {
-            var editor = new QuickAddWindow(new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock, allowInbox: true))
+            var editorViewModel = new TaskEditorViewModel(viewModel.Quadrants.Select(ToDefinition), viewModel.Clock, allowInbox: true, defaultReminderPreset: viewModel.Settings.DefaultReminder)
+            {
+                QuadrantId = viewModel.Settings.QuickCaptureQuadrantId
+            };
+            var editor = new QuickAddWindow(editorViewModel)
             {
                 Owner = IsVisible ? this : null
             };

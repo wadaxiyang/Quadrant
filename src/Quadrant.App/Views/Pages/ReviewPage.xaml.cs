@@ -17,7 +17,9 @@ public partial class ReviewPage : Page
         {
             viewModel = new ReviewPageViewModel(
                 main.ReviewQueryService ?? throw new InvalidOperationException("Review query service is unavailable."),
-                main.AppChangeHub);
+                main.AppChangeHub,
+                main.Settings.ReviewDefaultRange,
+                weekStart: main.Settings.WeekStart);
             DataContext = viewModel;
         }
 

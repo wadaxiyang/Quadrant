@@ -10,6 +10,8 @@ public sealed class WindowsReminderScheduler : IReminderScheduler
 {
     internal const string ScheduleGroup = "Quadrant";
     private readonly IReminderScheduleStore store;
+    private bool enabled = true;
+    private bool soundEnabled = true;
 
     public WindowsReminderScheduler()
         : this(new WindowsReminderScheduleStore())
@@ -21,16 +23,22 @@ public sealed class WindowsReminderScheduler : IReminderScheduler
         this.store = store ?? throw new ArgumentNullException(nameof(store));
     }
 
+    public void Configure(bool isEnabled, bool isSoundEnabled)
+    {
+        enabled = isEnabled;
+        soundEnabled = isSoundEnabled;
+    }
+
     public Task ScheduleAsync(TaskItem task, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(task);
         cancellationToken.ThrowIfCancellationRequested();
-        if (!ShouldSchedule(task, DateTimeOffset.Now))
+        if (!enabled || !ShouldSchedule(task, DateTimeOffset.Now))
         {
             return Task.CompletedTask;
         }
 
-        store.Add(task);
+        store.Add(task, soundEnabled);
         return Task.CompletedTask;
     }
 
@@ -62,6 +70,15 @@ public sealed class WindowsReminderScheduler : IReminderScheduler
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(activeTasks);
+        if (!enabled)
+        {
+            foreach (var scheduled in store.GetAll().Where(item => item.Group == ScheduleGroup))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                store.Remove(scheduled);
+            }
+            return Task.FromResult(new MissedReminderResult([]));
+        }
         var missed = new List<TaskItem>();
         var desired = new Dictionary<string, TaskItem>(StringComparer.Ordinal);
         foreach (var task in activeTasks)
@@ -110,7 +127,7 @@ public sealed class WindowsReminderScheduler : IReminderScheduler
             cancellationToken.ThrowIfCancellationRequested();
             if (!retained.Contains(tag))
             {
-                store.Add(task);
+                store.Add(task, soundEnabled);
             }
         }
 
@@ -122,7 +139,7 @@ public sealed class WindowsReminderScheduler : IReminderScheduler
     private static bool ShouldSchedule(TaskItem task, DateTimeOffset now) =>
         !task.IsCompleted && task.ReminderAt is { } reminderAt && reminderAt > now;
 
-    internal static ScheduledToastNotification BuildScheduledNotification(TaskItem task)
+    internal static ScheduledToastNotification BuildScheduledNotification(TaskItem task, bool soundEnabled = true)
     {
         var taskId = task.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
         var builder = new AppNotificationBuilder()
@@ -146,6 +163,7 @@ public sealed class WindowsReminderScheduler : IReminderScheduler
                 .AddArgument("action", "open")
                 .AddArgument("taskId", taskId));
 
+        if (!soundEnabled) builder.MuteAudio();
         var document = new XmlDocument();
         document.LoadXml(builder.BuildNotification().Payload);
         var scheduled = new ScheduledToastNotification(document, task.ReminderAt!.Value)
@@ -169,7 +187,7 @@ internal interface IReminderScheduleStore
 {
     IReadOnlyList<ScheduledReminderEntry> GetAll();
 
-    void Add(TaskItem task);
+    void Add(TaskItem task, bool soundEnabled = true);
 
     void Remove(ScheduledReminderEntry scheduled);
 }
@@ -186,8 +204,8 @@ internal sealed class WindowsReminderScheduleStore : IReminderScheduleStore
             .Select(item => new ScheduledReminderEntry(item.Tag, item.Group, item.DeliveryTime, item))
             .ToArray();
 
-    public void Add(TaskItem task) =>
-        notifier.Value.AddToSchedule(WindowsReminderScheduler.BuildScheduledNotification(task));
+    public void Add(TaskItem task, bool soundEnabled = true) =>
+        notifier.Value.AddToSchedule(WindowsReminderScheduler.BuildScheduledNotification(task, soundEnabled));
 
     public void Remove(ScheduledReminderEntry scheduled) =>
         notifier.Value.RemoveFromSchedule((ScheduledToastNotification)scheduled.NativeToken);

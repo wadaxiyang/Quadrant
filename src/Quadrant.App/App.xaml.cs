@@ -11,8 +11,10 @@ public partial class App : System.Windows.Application
     private readonly Quadrant.Infrastructure.Windows.TrayService trayService = new();
     private readonly ShutdownCoordinator shutdownCoordinator = new();
     private Quadrant.Infrastructure.Storage.SqliteSettingsRepository? settingsRepository;
+    private Quadrant.Infrastructure.Storage.SqliteDataMaintenanceService? dataMaintenanceService;
     private Quadrant.Infrastructure.Windows.RegistryStartupService? startupService;
     private Quadrant.Core.Models.AppSettings? currentSettings;
+    private string databasePath = string.Empty;
     private System.Drawing.Icon? trayIcon;
     private Quadrant.Infrastructure.Notifications.NotificationActivation? pendingActivation;
     private bool isWatchingSystemTheme;
@@ -54,6 +56,7 @@ public partial class App : System.Windows.Application
 #endif
 
         var pathProvider = new Quadrant.Infrastructure.Storage.LocalAppDataPathProvider();
+        databasePath = pathProvider.DatabasePath;
         var connectionFactory = new Quadrant.Infrastructure.Storage.SqliteConnectionFactory(pathProvider.DatabasePath);
         var initializer = new Quadrant.Infrastructure.Storage.SqliteDatabaseInitializer(connectionFactory);
         try
@@ -74,6 +77,8 @@ public partial class App : System.Windows.Application
             return;
         }
         startupService = new Quadrant.Infrastructure.Windows.RegistryStartupService();
+        reminderScheduler.Configure(currentSettings.TaskRemindersEnabled, currentSettings.NotificationSoundEnabled);
+        notificationService.Configure(currentSettings.TaskRemindersEnabled, currentSettings.FocusNotificationsEnabled, currentSettings.NotificationSoundEnabled);
 
         var taskRepository = new Quadrant.Infrastructure.Storage.SqliteTaskRepository(connectionFactory);
         var quadrantRepository = new Quadrant.Infrastructure.Storage.SqliteQuadrantRepository(connectionFactory);
@@ -85,6 +90,7 @@ public partial class App : System.Windows.Application
             diagnosticLogger,
             appChangeHub);
         var clock = new Quadrant.Infrastructure.Windows.SystemClock();
+        dataMaintenanceService = new Quadrant.Infrastructure.Storage.SqliteDataMaintenanceService(connectionFactory, clock);
         var todayQueryService = new Quadrant.Core.Services.TodayQueryService(taskRepository, clock);
         var reviewQueryService = new Quadrant.Infrastructure.Storage.SqliteReviewQueryService(connectionFactory, clock);
         var focusRepository = new Quadrant.Infrastructure.Storage.SqliteFocusSessionRepository(connectionFactory);
@@ -96,7 +102,7 @@ public partial class App : System.Windows.Application
             try { notificationService.ShowFocusCompleted(session, pomodoroTimerService.SuggestedNextKind); }
             catch (Exception exception) { diagnosticLogger.Warning("Focus completion notification failed; session remains completed.", exception); }
         };
-        var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock, appChangeHub, todayQueryService, focusTimerService, pomodoroTimerService, focusSessionService, reviewQueryService);
+        var viewModel = new ViewModels.MainViewModel(taskService, quadrantRepository, clock, appChangeHub, todayQueryService, focusTimerService, pomodoroTimerService, focusSessionService, reviewQueryService, currentSettings);
         try
         {
             await viewModel.LoadAsync();
@@ -149,6 +155,7 @@ public partial class App : System.Windows.Application
             trayIcon = null;
         }
         mainWindow.IsCloseToTray = currentSettings.CloseToTray;
+        mainWindow.SetSidebarIconSize(currentSettings.SidebarIconSize);
         // EnsureHandle creates the HWND and raises SourceInitialized without making
         // the managed window visible, so background startup can register the global
         // hotkey without flashing or stealing foreground focus.
@@ -216,12 +223,41 @@ public partial class App : System.Windows.Application
         var viewModel = (ViewModels.MainViewModel)mainWindow.DataContext;
         var settingsWindow = new Views.SettingsWindow(new ViewModels.SettingsViewModel(
             currentSettings,
-            viewModel.Quadrants.Select(quadrant => new Quadrant.Core.Models.QuadrantDefinition(quadrant.Id, quadrant.Name, quadrant.Subtitle))))
+            viewModel.Quadrants.Select(quadrant => new Quadrant.Core.Models.QuadrantDefinition(quadrant.Id, quadrant.Name, quadrant.Subtitle)),
+            databasePath,
+            dataMaintenanceService))
         {
             Owner = mainWindow
         };
 
-        if (settingsWindow.ShowDialog() == true &&
+        var settingsResult = settingsWindow.ShowDialog();
+        if (settingsWindow.ResetPerformed)
+        {
+            try
+            {
+                startupService.SetEnabled(false, false);
+                reminderScheduler.Configure(false, false);
+                await reminderScheduler.ReconcileAsync([], viewModel.Clock.LocalNow);
+                currentSettings = await settingsRepository.GetAsync();
+                reminderScheduler.Configure(currentSettings.TaskRemindersEnabled, currentSettings.NotificationSoundEnabled);
+                notificationService.Configure(currentSettings.TaskRemindersEnabled, currentSettings.FocusNotificationsEnabled, currentSettings.NotificationSoundEnabled);
+                ApplyTheme(currentSettings.Theme);
+                ConfigureSystemThemeWatcher(mainWindow, currentSettings.Theme);
+                mainWindow.IsCloseToTray = currentSettings.CloseToTray;
+                mainWindow.SetSidebarIconSize(currentSettings.SidebarIconSize);
+                viewModel.UpdateSettings(currentSettings);
+                await viewModel.LoadAsync();
+                mainWindow.ShowFeedback("数据已重置", "任务、历史、象限和设置已恢复到初始状态。");
+            }
+            catch (Exception exception)
+            {
+                diagnosticLogger.Error("Reset completed but application state refresh failed.", exception);
+                System.Windows.MessageBox.Show("数据已重置，但界面刷新失败。请重新启动 Quadrant。", "需要重新启动", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            }
+            return;
+        }
+
+        if (settingsResult == true &&
             settingsWindow.DesiredSettings is { } desiredSettings &&
             settingsWindow.DesiredQuadrants is { } desiredQuadrants)
         {
@@ -232,28 +268,42 @@ public partial class App : System.Windows.Application
                 // restore the previous registry state so the UI and startup entry do
                 // not silently disagree.
                 startupService.SetEnabled(desiredSettings.LaunchAtStartup, desiredSettings.StartMinimized);
-                await settingsRepository.SaveAsync(desiredSettings, desiredQuadrants);
-                currentSettings = desiredSettings;
-                ApplyTheme(currentSettings.Theme);
-                ConfigureSystemThemeWatcher(mainWindow, currentSettings.Theme);
-                mainWindow.IsCloseToTray = currentSettings.CloseToTray;
-                viewModel.UpdateDefinitions(desiredQuadrants);
-                mainWindow.ShowFeedback("设置已保存", "主题和四象限设置已更新。");
+                try
+                {
+                    await settingsRepository.SaveAsync(desiredSettings, desiredQuadrants);
+                }
+                catch
+                {
+                    startupService.SetEnabled(previousSettings.LaunchAtStartup, previousSettings.StartMinimized);
+                    throw;
+                }
             }
             catch (Exception exception)
             {
-                try
-                {
-                    startupService.SetEnabled(previousSettings.LaunchAtStartup, previousSettings.StartMinimized);
-                }
-                catch (Exception rollbackException)
-                {
-                    diagnosticLogger.Warning("Startup setting rollback failed.", rollbackException);
-                }
-
                 diagnosticLogger.Warning("Applying settings failed; keeping the current session alive.", exception);
                 System.Windows.MessageBox.Show(exception.Message, "设置应用失败", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                return;
             }
+
+            currentSettings = desiredSettings;
+            ApplyTheme(currentSettings.Theme);
+            ConfigureSystemThemeWatcher(mainWindow, currentSettings.Theme);
+            mainWindow.IsCloseToTray = currentSettings.CloseToTray;
+            mainWindow.SetSidebarIconSize(currentSettings.SidebarIconSize);
+            viewModel.UpdateSettings(currentSettings);
+            viewModel.UpdateDefinitions(desiredQuadrants);
+            reminderScheduler.Configure(currentSettings.TaskRemindersEnabled, currentSettings.NotificationSoundEnabled);
+            notificationService.Configure(currentSettings.TaskRemindersEnabled, currentSettings.FocusNotificationsEnabled, currentSettings.NotificationSoundEnabled);
+            try
+            {
+                var reconciliation = await reminderScheduler.ReconcileAsync(viewModel.ActiveTasks, viewModel.Clock.LocalNow);
+                viewModel.SetPossiblyMissedReminders(reconciliation.Tasks);
+            }
+            catch (Exception exception)
+            {
+                diagnosticLogger.Warning("Reminder settings were saved, but Windows schedule reconciliation failed.", exception);
+            }
+            mainWindow.ShowFeedback("设置已保存", "新建任务、Focus、Review 与通知将使用新设置。");
         }
     }
 
@@ -410,7 +460,7 @@ public partial class App : System.Windows.Application
                     viewModel.PomodoroTimerService.SuggestedNextKind is Quadrant.Core.Enums.PomodoroKind.LongBreak
                         ? Quadrant.Core.Enums.PomodoroKind.LongBreak
                         : Quadrant.Core.Enums.PomodoroKind.ShortBreak,
-                    new Quadrant.Core.Models.PomodoroSettings());
+                    currentSettings?.Pomodoro ?? new Quadrant.Core.Models.PomodoroSettings());
                 mainWindow.ShowFromTray();
             }
             else

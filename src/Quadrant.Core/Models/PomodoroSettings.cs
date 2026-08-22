@@ -1,6 +1,12 @@
 namespace Quadrant.Core.Models;
 
-public sealed record PomodoroSettings(int FocusMinutes = 25, int ShortBreakMinutes = 5, int LongBreakMinutes = 15, int LongBreakInterval = 4)
+public sealed record PomodoroSettings(
+    int FocusMinutes = 25,
+    int ShortBreakMinutes = 5,
+    int LongBreakMinutes = 15,
+    int LongBreakInterval = 4,
+    bool AutoStartBreak = false,
+    bool AutoStartFocus = false)
 {
     public void Validate()
     {

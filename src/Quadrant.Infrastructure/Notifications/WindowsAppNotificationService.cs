@@ -8,8 +8,18 @@ namespace Quadrant.Infrastructure.Notifications;
 public sealed class WindowsAppNotificationService : IDisposable
 {
     private bool isRegistered;
+    private bool taskNotificationsEnabled = true;
+    private bool focusNotificationsEnabled = true;
+    private bool soundEnabled = true;
 
     public event EventHandler<NotificationActivation>? ActivationReceived;
+
+    public void Configure(bool taskEnabled, bool focusEnabled, bool isSoundEnabled)
+    {
+        taskNotificationsEnabled = taskEnabled;
+        focusNotificationsEnabled = focusEnabled;
+        soundEnabled = isSoundEnabled;
+    }
 
     public void Register()
     {
@@ -26,6 +36,7 @@ public sealed class WindowsAppNotificationService : IDisposable
     public void ShowTaskNotification(TaskItem task)
     {
         ArgumentNullException.ThrowIfNull(task);
+        if (!taskNotificationsEnabled) return;
 
         var builder = new AppNotificationBuilder()
             .AddArgument("action", "open")
@@ -45,12 +56,14 @@ public sealed class WindowsAppNotificationService : IDisposable
                 .AddArgument("action", "open")
                 .AddArgument("taskId", task.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)));
 
+        if (!soundEnabled) builder.MuteAudio();
         AppNotificationManager.Default.Show(builder.BuildNotification());
     }
 
     public void ShowFocusCompleted(FocusSession session, PomodoroKind? suggestedNextKind)
     {
         ArgumentNullException.ThrowIfNull(session);
+        if (!focusNotificationsEnabled) return;
         var isBreak = session.PomodoroKind is PomodoroKind.ShortBreak or PomodoroKind.LongBreak;
         var title = isBreak ? "休息结束" : "专注结束";
         var detail = isBreak ? "准备开始下一次专注。" : suggestedNextKind is PomodoroKind.LongBreak ? "本轮完成，建议开始长休息。" : "做得好，建议开始短休息。";
@@ -60,6 +73,7 @@ public sealed class WindowsAppNotificationService : IDisposable
         {
             builder.AddButton(new AppNotificationButton("开始休息").AddArgument("action", "startbreak").AddArgument("sessionId", session.Id));
         }
+        if (!soundEnabled) builder.MuteAudio();
         AppNotificationManager.Default.Show(builder.BuildNotification());
     }
 

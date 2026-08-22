@@ -1,3 +1,67 @@
-using System.Windows;using System.Windows.Controls;using System.Windows.Threading;using Quadrant.App.ViewModels;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Threading;
+using Quadrant.App.ViewModels;
+
 namespace Quadrant.App.Views.Pages;
-public partial class FocusPage:Page{private DispatcherTimer? timer;public FocusPage()=>InitializeComponent();private async void Page_Loaded(object s,RoutedEventArgs e){if(DataContext is MainViewModel main){DataContext=new FocusPageViewModel(main.ActiveTasks,main.FocusTimerService,main.PomodoroTimerService,main.FocusSessionService);}var vm=(FocusPageViewModel)DataContext;await vm.ActivateAsync();timer=new DispatcherTimer{Interval=TimeSpan.FromSeconds(1)};timer.Tick+=(_,_)=>vm.Refresh();timer.Start();}private void Page_Unloaded(object s,RoutedEventArgs e){timer?.Stop();timer=null;}private async void Start_Click(object s,RoutedEventArgs e)=>await ((FocusPageViewModel)DataContext).StartAsync();private async void Pause_Click(object s,RoutedEventArgs e)=>await ((FocusPageViewModel)DataContext).PauseAsync();private async void Resume_Click(object s,RoutedEventArgs e)=>await ((FocusPageViewModel)DataContext).ResumeAsync();private async void Stop_Click(object s,RoutedEventArgs e)=>await ((FocusPageViewModel)DataContext).StopAsync();private async void Cancel_Click(object s,RoutedEventArgs e)=>await ((FocusPageViewModel)DataContext).CancelAsync();}
+
+public partial class FocusPage : Page
+{
+    private DispatcherTimer? timer;
+
+    public FocusPage() => InitializeComponent();
+
+    private async void Page_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel main)
+        {
+            DataContext = new FocusPageViewModel(
+                main.ActiveTasks,
+                main.FocusTimerService,
+                main.PomodoroTimerService,
+                main.FocusSessionService,
+                main.Settings.Pomodoro);
+        }
+
+        await ViewModel.ActivateAsync();
+        UpdateTimerState();
+    }
+
+    private void Page_Unloaded(object sender, RoutedEventArgs e) => StopDisplayTimer();
+
+    private async void Start_Click(object sender, RoutedEventArgs e) { await ViewModel.StartAsync(); UpdateTimerState(); }
+    private async void Pause_Click(object sender, RoutedEventArgs e) { await ViewModel.PauseAsync(); UpdateTimerState(); }
+    private async void Resume_Click(object sender, RoutedEventArgs e) { await ViewModel.ResumeAsync(); UpdateTimerState(); }
+    private async void Stop_Click(object sender, RoutedEventArgs e) { await ViewModel.StopAsync(); UpdateTimerState(); }
+    private async void Cancel_Click(object sender, RoutedEventArgs e) { await ViewModel.CancelAsync(); UpdateTimerState(); }
+
+    private FocusPageViewModel ViewModel => (FocusPageViewModel)DataContext;
+
+    private void UpdateTimerState()
+    {
+        if (!IsLoaded || !ViewModel.IsRunning)
+        {
+            StopDisplayTimer();
+            return;
+        }
+
+        if (timer is not null) return;
+        timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += DisplayTimer_Tick;
+        timer.Start();
+    }
+
+    private void DisplayTimer_Tick(object? sender, EventArgs e)
+    {
+        ViewModel.Refresh();
+        UpdateTimerState();
+    }
+
+    private void StopDisplayTimer()
+    {
+        if (timer is null) return;
+        timer.Stop();
+        timer.Tick -= DisplayTimer_Tick;
+        timer = null;
+    }
+}
