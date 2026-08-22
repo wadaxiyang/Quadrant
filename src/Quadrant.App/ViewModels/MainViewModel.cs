@@ -131,19 +131,53 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task MoveTask(MoveTaskRequest request)
+    private Task MoveTask(MoveTaskRequest request) => MoveTaskAsync(request);
+
+    public async Task<TaskItem?> MoveTaskAsync(MoveTaskRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
-            var moved = await taskService.MoveTaskAsync(request.TaskId, request.TargetQuadrantId);
+            var moved = await taskService.MoveTaskAsync(request.TaskId, request.TargetQuadrantId, cancellationToken);
             if (moved is not null && !moved.IsCompleted)
             {
                 UpsertActiveTask(moved);
             }
+
+            return moved;
         }
         catch (Exception exception)
         {
             ReportRecoverableError("任务移动失败", exception);
+            return null;
+        }
+    }
+
+    public async Task<TaskItem?> RestoreMovedTaskAsync(
+        long taskId,
+        int expectedQuadrantId,
+        int targetQuadrantId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var current = await taskService.GetByIdAsync(taskId, cancellationToken);
+            if (current is null || current.IsCompleted || current.QuadrantId != expectedQuadrantId)
+            {
+                return null;
+            }
+
+            var restored = await taskService.MoveTaskAsync(taskId, targetQuadrantId, cancellationToken);
+            if (restored is not null && !restored.IsCompleted)
+            {
+                UpsertActiveTask(restored);
+            }
+
+            return restored;
+        }
+        catch (Exception exception)
+        {
+            ReportRecoverableError("撤销任务移动失败", exception);
+            return null;
         }
     }
 

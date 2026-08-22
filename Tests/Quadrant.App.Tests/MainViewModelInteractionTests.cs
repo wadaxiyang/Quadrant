@@ -35,6 +35,66 @@ public sealed class MainViewModelInteractionTests
         Assert.Equal([2], requested);
     }
 
+    [Fact]
+    public async Task Quadrant_move_can_be_conditionally_restored()
+    {
+        var taskService = DispatchProxy.Create<ITaskService, StatefulTaskServiceProxy>();
+        var taskServiceProxy = (StatefulTaskServiceProxy)(object)taskService;
+        taskServiceProxy.Current = CreateTask(1);
+        var viewModel = CreateViewModel(taskService);
+
+        var moved = await viewModel.MoveTaskAsync(new MoveTaskRequest(7, 2));
+        var restored = await viewModel.RestoreMovedTaskAsync(7, 2, 1);
+
+        Assert.Equal(2, moved?.QuadrantId);
+        Assert.Equal(1, restored?.QuadrantId);
+        Assert.Equal(2, taskServiceProxy.MoveCount);
+    }
+
+    [Fact]
+    public async Task Quadrant_move_undo_does_not_overwrite_a_later_move()
+    {
+        var taskService = DispatchProxy.Create<ITaskService, StatefulTaskServiceProxy>();
+        var taskServiceProxy = (StatefulTaskServiceProxy)(object)taskService;
+        taskServiceProxy.Current = CreateTask(3);
+        var viewModel = CreateViewModel(taskService);
+
+        var restored = await viewModel.RestoreMovedTaskAsync(7, 2, 1);
+
+        Assert.Null(restored);
+        Assert.Equal(3, taskServiceProxy.Current.QuadrantId);
+        Assert.Equal(0, taskServiceProxy.MoveCount);
+    }
+
+    private static MainViewModel CreateViewModel(ITaskService taskService)
+    {
+        var clock = new FixedClock();
+        var focusSessions = Proxy<IFocusSessionService>();
+        var viewModel = new MainViewModel(
+            taskService,
+            Proxy<IQuadrantRepository>(),
+            clock,
+            new AppChangeHub(),
+            Proxy<ITodayQueryService>(),
+            Proxy<IFocusTimerService>(),
+            new PomodoroTimerService(focusSessions, clock, Proxy<IFocusCompletionScheduler>()),
+            focusSessions);
+        viewModel.UpdateDefinitions(Quadrants);
+        return viewModel;
+    }
+
+    private static TaskItem CreateTask(int quadrantId) => new(
+        7,
+        "Task",
+        quadrantId,
+        null,
+        null,
+        null,
+        false,
+        null,
+        DateTimeOffset.UnixEpoch,
+        DateTimeOffset.UnixEpoch);
+
     private static T Proxy<T>() where T : class => DispatchProxy.Create<T, ThrowingProxy>();
 
     private static IReadOnlyList<QuadrantDefinition> Quadrants { get; } =
@@ -46,6 +106,37 @@ public sealed class MainViewModelInteractionTests
     {
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) =>
             throw new NotSupportedException(targetMethod?.Name);
+    }
+
+    private class StatefulTaskServiceProxy : DispatchProxy
+    {
+        public TaskItem Current { get; set; } = null!;
+        public int MoveCount { get; private set; }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(ITaskService.GetByIdAsync))
+            {
+                var taskId = (long)args![0]!;
+                return Task.FromResult<TaskItem?>(Current.Id == taskId ? Current : null);
+            }
+
+            if (targetMethod?.Name == nameof(ITaskService.MoveTaskAsync))
+            {
+                var taskId = (long)args![0]!;
+                var targetQuadrantId = (int)args[1]!;
+                if (Current.Id != taskId)
+                {
+                    return Task.FromResult<TaskItem?>(null);
+                }
+
+                MoveCount++;
+                Current = Current with { QuadrantId = targetQuadrantId };
+                return Task.FromResult<TaskItem?>(Current);
+            }
+
+            throw new NotSupportedException(targetMethod?.Name);
+        }
     }
 
     private sealed class FixedClock : IClock

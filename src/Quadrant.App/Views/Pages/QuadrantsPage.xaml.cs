@@ -269,10 +269,9 @@ public partial class QuadrantsPage : Page
         }
         else
         {
-            var viewModel = RequireMainViewModel();
-            if (viewModel.MoveTaskCommand.CanExecute(new MoveTaskRequest(taskId, targetQuadrantId)))
+            if (e.Data.GetData(SourceQuadrantIdFormat) is int sourceQuadrantId)
             {
-                await viewModel.MoveTaskCommand.ExecuteAsync(new MoveTaskRequest(taskId, targetQuadrantId));
+                await MoveQuadrantTaskAsync(taskId, sourceQuadrantId, targetQuadrantId);
             }
         }
 
@@ -424,6 +423,30 @@ public partial class QuadrantsPage : Page
             }
 
             await main.RefreshActiveTaskAsync(restored.Id);
+            var sourceName = main.Quadrants.FirstOrDefault(quadrant => quadrant.Id == sourceQuadrantId)?.Name ?? $"Q{sourceQuadrantId}";
+            window.ShowFeedback("已撤销移动", $"任务已恢复到 {sourceName}。", ControlAppearance.Success, SymbolRegular.ArrowUndo24);
+        });
+    }
+
+    private async Task MoveQuadrantTaskAsync(long taskId, int sourceQuadrantId, int targetQuadrantId)
+    {
+        var main = RequireMainViewModel();
+        var moved = await main.MoveTaskAsync(new MoveTaskRequest(taskId, targetQuadrantId));
+        if (moved is null || Window.GetWindow(this) is not MainWindow window)
+        {
+            return;
+        }
+
+        var targetName = main.Quadrants.FirstOrDefault(quadrant => quadrant.Id == targetQuadrantId)?.Name ?? $"Q{targetQuadrantId}";
+        window.ShowUndoFeedback("任务已移动", $"已移至 {targetName}。", async () =>
+        {
+            var restored = await main.RestoreMovedTaskAsync(moved.Id, targetQuadrantId, sourceQuadrantId);
+            if (restored is null)
+            {
+                window.ShowFeedback("无法撤销", "任务状态已经发生变化。", ControlAppearance.Caution, SymbolRegular.Alert24);
+                return;
+            }
+
             var sourceName = main.Quadrants.FirstOrDefault(quadrant => quadrant.Id == sourceQuadrantId)?.Name ?? $"Q{sourceQuadrantId}";
             window.ShowFeedback("已撤销移动", $"任务已恢复到 {sourceName}。", ControlAppearance.Success, SymbolRegular.ArrowUndo24);
         });

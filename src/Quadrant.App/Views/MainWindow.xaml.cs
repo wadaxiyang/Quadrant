@@ -3,14 +3,16 @@ using System.Windows.Interop;
 using Quadrant.App.ViewModels;
 using Quadrant.App.Views.Pages;
 using Quadrant.Core.Models;
-using Wpf.Ui;
 using Wpf.Ui.Controls;
 
 namespace Quadrant.App.Views;
 
 public partial class MainWindow : FluentWindow
 {
-    private readonly SnackbarService snackbarService = new();
+    private static readonly TimeSpan FeedbackSnackbarTimeout = TimeSpan.FromSeconds(2.5);
+    private static readonly TimeSpan UndoSnackbarTimeout = TimeSpan.FromSeconds(3.5);
+    private readonly SemaphoreSlim snackbarGate = new(1, 1);
+    private long snackbarRequestId;
     private Quadrant.Infrastructure.Windows.GlobalHotkeyService? globalHotkeyService;
     private HwndSource? windowSource;
     private bool quickAddOpen;
@@ -22,7 +24,6 @@ public partial class MainWindow : FluentWindow
     public MainWindow()
     {
         InitializeComponent();
-        snackbarService.SetSnackbarPresenter(SnackbarPresenter);
         Loaded += MainWindow_Loaded;
         SourceInitialized += MainWindow_SourceInitialized;
         Closed += MainWindow_Closed;
@@ -58,6 +59,7 @@ public partial class MainWindow : FluentWindow
 
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
+        Interlocked.Increment(ref snackbarRequestId);
         if (windowSource is not null)
         {
             windowSource.RemoveHook(WindowSourceHook);
@@ -115,8 +117,15 @@ public partial class MainWindow : FluentWindow
         ControlAppearance appearance = ControlAppearance.Success,
         SymbolRegular symbol = SymbolRegular.CheckmarkCircle24)
     {
-        SnackbarPresenter.HideCurrent();
-        snackbarService.Show(title, message, appearance, new SymbolIcon(symbol), TimeSpan.FromSeconds(4));
+        ReplaceSnackbar(new Snackbar(SnackbarPresenter)
+        {
+            Title = title,
+            Content = message,
+            Appearance = appearance,
+            Icon = new SymbolIcon(symbol),
+            IsCloseButtonEnabled = false,
+            Timeout = FeedbackSnackbarTimeout
+        });
     }
 
     public void ShowUndoFeedback(string title, string message, Func<Task> undoAction)
@@ -136,7 +145,7 @@ public partial class MainWindow : FluentWindow
             Margin = new Thickness(12, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center
         };
-        System.Windows.Automation.AutomationProperties.SetName(undoButton, "撤销任务分类");
+        System.Windows.Automation.AutomationProperties.SetName(undoButton, "撤销上一步操作");
 
         var content = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
         content.Children.Add(messageText);
@@ -148,7 +157,8 @@ public partial class MainWindow : FluentWindow
             Content = content,
             Appearance = ControlAppearance.Success,
             Icon = new SymbolIcon(SymbolRegular.ArrowUndo24),
-            Timeout = TimeSpan.FromSeconds(8)
+            IsCloseButtonEnabled = false,
+            Timeout = UndoSnackbarTimeout
         };
         var invoked = false;
         undoButton.Click += async (_, _) =>
@@ -159,7 +169,8 @@ public partial class MainWindow : FluentWindow
             }
 
             invoked = true;
-            await SnackbarPresenter.HideCurrent();
+            await DismissSnackbarAsync(snackbar);
+
             try
             {
                 await undoAction();
@@ -169,7 +180,54 @@ public partial class MainWindow : FluentWindow
                 await ShowRecoverableErrorAsync("撤销失败", exception);
             }
         };
-        snackbar.Show(true);
+        ReplaceSnackbar(snackbar);
+    }
+
+    private void ReplaceSnackbar(Snackbar snackbar)
+    {
+        var requestId = Interlocked.Increment(ref snackbarRequestId);
+        _ = ReplaceSnackbarAsync(snackbar, requestId);
+    }
+
+    private async Task ReplaceSnackbarAsync(Snackbar snackbar, long requestId)
+    {
+        await snackbarGate.WaitAsync();
+        try
+        {
+            await SnackbarPresenter.HideCurrent();
+            if (requestId != Interlocked.Read(ref snackbarRequestId))
+            {
+                return;
+            }
+
+            // Queueing after the current item has fully closed starts display synchronously,
+            // while keeping this gate free so the next request can replace it immediately.
+            snackbar.Show();
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"Snackbar display failed: {exception}");
+        }
+        finally
+        {
+            snackbarGate.Release();
+        }
+    }
+
+    private async Task DismissSnackbarAsync(Snackbar snackbar)
+    {
+        await snackbarGate.WaitAsync();
+        try
+        {
+            if (ReferenceEquals(SnackbarPresenter.Content, snackbar))
+            {
+                await SnackbarPresenter.HideCurrent();
+            }
+        }
+        finally
+        {
+            snackbarGate.Release();
+        }
     }
 
     private IntPtr WindowSourceHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
