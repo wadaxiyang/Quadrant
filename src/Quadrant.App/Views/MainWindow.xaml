@@ -36,9 +36,6 @@
                                        IsActive="True"
                                        TargetPageType="{x:Type pages:QuadrantsPage}"
                                        Icon="{ui:SymbolIcon Grid24}" />
-                <ui:NavigationViewItem Content="Inbox"
-                                       TargetPageType="{x:Type pages:InboxPage}"
-                                       Icon="{ui:SymbolIcon Archive32}" />
                 <ui:NavigationViewItem Content="Today"
                                        TargetPageType="{x:Type pages:TodayPage}"
                                        Icon="{ui:SymbolIcon CalendarClock24}" />
