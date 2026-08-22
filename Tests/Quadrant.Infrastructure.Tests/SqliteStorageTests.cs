@@ -336,6 +336,23 @@ public sealed class SqliteStorageTests
     }
 
     [Fact]
+    public async Task Focus_repository_accepts_an_active_inbox_task_and_snapshots_its_title()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var task = await database.Tasks.CreateAsync(new TaskDraft("Inbox focus", null), DateTimeOffset.UtcNow);
+        var sessions = new SqliteFocusSessionRepository(database.Factory);
+        var start = DateTimeOffset.UtcNow;
+        var running = new FocusSession("inbox-focus", task.Id, FocusMode.Stopwatch, start, start, null, null, 0,
+            FocusStatus.Running, null, DateOnly.FromDateTime(start.Date), null, null);
+
+        var created = await sessions.CreateIfNoCurrentAsync(running);
+
+        Assert.NotNull(created);
+        Assert.Equal("Inbox focus", created.TaskTitleSnapshot);
+        Assert.Null(created.QuadrantSnapshot);
+    }
+
+    [Fact]
     public async Task Focus_repository_summarizes_only_productive_completed_sessions_for_the_local_day()
     {
         await using var database = await TestDatabase.CreateAsync();

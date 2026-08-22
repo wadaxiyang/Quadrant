@@ -3,129 +3,180 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-      Loaded="Page_Loaded"
-      Unloaded="Page_Unloaded">
+      Loaded="Page_Loaded" Unloaded="Page_Unloaded">
     <Grid Margin="{StaticResource PageContentMargin}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
         <Grid Style="{StaticResource PageHeaderContainerStyle}">
             <StackPanel Style="{StaticResource PageHeaderTitleStackStyle}">
                 <TextBlock Style="{StaticResource PageTitleTextStyle}" Text="Focus" />
-                <TextBlock Margin="{StaticResource PageSubtitleMargin}" Style="{StaticResource PageSubtitleTextStyle}" Text="专注于当前任务" />
+                <TextBlock Margin="{StaticResource PageSubtitleMargin}" Style="{StaticResource PageSubtitleTextStyle}" Text="选择一项任务，进入专注状态" />
             </StackPanel>
         </Grid>
 
         <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <StackPanel MaxWidth="760" HorizontalAlignment="Center">
-                <Border Style="{StaticResource HeroSurfaceStyle}">
-                    <StackPanel>
-                        <TextBlock HorizontalAlignment="Center" Style="{StaticResource SectionSubtitleTextStyle}" Text="当前任务" />
-                        <ComboBox Width="520" MaxWidth="520" Margin="0,8,0,0" HorizontalAlignment="Center"
-                                  automation:AutomationProperties.Name="当前专注任务"
-                                  IsEnabled="{Binding CanConfigureSession}"
-                                  ItemsSource="{Binding TaskOptions}"
-                                  SelectedItem="{Binding SelectedTaskOption}">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Margin="4,2">
-                                        <TextBlock Style="{StaticResource BodyStrongTextStyle}" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Margin="0,2,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                                   Style="{StaticResource CaptionTextStyle}" Text="{Binding Metadata}" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
+            <Grid MaxWidth="1180" MinHeight="560" HorizontalAlignment="Stretch">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="300" /></Grid.ColumnDefinitions>
 
-                        <Border Width="280" Margin="0,24,0,0" HorizontalAlignment="Center" Style="{StaticResource HomeFilterGroupStyle}">
+                <Border Grid.Column="0" Style="{StaticResource HeroSurfaceStyle}">
+                    <StackPanel VerticalAlignment="Center">
+                        <Border Width="68" Height="68" HorizontalAlignment="Center"
+                                Background="{DynamicResource SubtleFillColorSecondaryBrush}" CornerRadius="{StaticResource RadiusMedium}">
+                            <ui:SymbolIcon HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="42"
+                                           Foreground="{DynamicResource SystemAccentColorPrimaryBrush}" Symbol="Clock24" />
+                        </Border>
+
+                        <TextBlock Margin="0,14,0,0" HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Style="{StaticResource SectionSubtitleTextStyle}" Text="当前任务" />
+                        <Border MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Stretch" Style="{StaticResource SectionSurfaceStyle}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock automation:AutomationProperties.Name="当前专注任务" Style="{StaticResource CardTitleTextStyle}"
+                                               Text="{Binding SelectedTaskTitle}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Margin="0,3,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                               Style="{StaticResource CaptionTextStyle}" Text="{Binding SelectedTaskMetadata}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Appearance="Transparent"
+                                           Content="清除" IsEnabled="{Binding CanConfigureSession}"
+                                           Visibility="{Binding HasSelectedTask, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                           Click="ClearTask_Click" />
+                            </Grid>
+                        </Border>
+
+                        <Border Width="300" Margin="0,22,0,0" HorizontalAlignment="Center" Style="{StaticResource HomeFilterGroupStyle}">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
-                                <ui:Button Grid.Column="0" MinHeight="34" Content="Pomodoro" IsEnabled="{Binding CanConfigureSession}"
+                                <ui:Button Grid.Column="0" MinHeight="36" Content="Pomodoro" IsEnabled="{Binding CanConfigureSession}"
                                            automation:AutomationProperties.Name="Pomodoro 模式" Click="PomodoroMode_Click">
                                     <ui:Button.Style>
                                         <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
                                             <Setter Property="Appearance" Value="Transparent" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsPomodoroMode}" Value="True"><Setter Property="Appearance" Value="Primary" /></DataTrigger>
-                                            </Style.Triggers>
+                                            <Style.Triggers><DataTrigger Binding="{Binding IsPomodoroMode}" Value="True"><Setter Property="Appearance" Value="Primary" /></DataTrigger></Style.Triggers>
                                         </Style>
                                     </ui:Button.Style>
                                 </ui:Button>
-                                <ui:Button Grid.Column="1" MinHeight="34" Content="Stopwatch" IsEnabled="{Binding CanConfigureSession}"
+                                <ui:Button Grid.Column="1" MinHeight="36" Content="Stopwatch" IsEnabled="{Binding CanConfigureSession}"
                                            automation:AutomationProperties.Name="Stopwatch 模式" Click="StopwatchMode_Click">
                                     <ui:Button.Style>
                                         <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
                                             <Setter Property="Appearance" Value="Transparent" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsStopwatchMode}" Value="True"><Setter Property="Appearance" Value="Primary" /></DataTrigger>
-                                            </Style.Triggers>
+                                            <Style.Triggers><DataTrigger Binding="{Binding IsStopwatchMode}" Value="True"><Setter Property="Appearance" Value="Primary" /></DataTrigger></Style.Triggers>
                                         </Style>
                                     </ui:Button.Style>
                                 </ui:Button>
                             </Grid>
                         </Border>
 
-                        <TextBlock Margin="0,24,0,0" automation:AutomationProperties.LiveSetting="Polite"
+                        <TextBlock Margin="0,18,0,0" automation:AutomationProperties.LiveSetting="Polite"
                                    Style="{StaticResource TimerTextStyle}" Text="{Binding TimerText}" />
-                        <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        <TextBlock Margin="0,2,0,0" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                    Style="{StaticResource BodyTextStyle}" Text="{Binding StatusText}" />
-                        <ProgressBar Width="440" Height="4" Margin="0,20,0,0" HorizontalAlignment="Center"
+                        <ProgressBar MaxWidth="520" Height="4" Margin="24,16,24,0" HorizontalAlignment="Stretch"
                                      automation:AutomationProperties.Name="Pomodoro 进度"
                                      Maximum="{Binding ProgressMaximum}" Value="{Binding ProgressValue, Mode=OneWay}"
                                      Visibility="{Binding IsPomodoroMode, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-                        <StackPanel Margin="0,24,0,0" HorizontalAlignment="Center"
+                        <StackPanel Margin="0,20,0,0" HorizontalAlignment="Center"
                                     Visibility="{Binding IsIdle, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <ui:Button MinWidth="156" MinHeight="40" Appearance="Primary" Content="开始专注"
+                            <ui:Button MinWidth="172" MinHeight="42" Appearance="Primary" Content="开始专注"
                                        Icon="{ui:SymbolIcon Play24}" Click="Start_Click" />
                         </StackPanel>
-
-                        <StackPanel Margin="0,24,0,0" HorizontalAlignment="Center"
+                        <StackPanel Margin="0,20,0,0" HorizontalAlignment="Center"
                                     Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <ui:Button MinWidth="156" MinHeight="40" Appearance="Primary" Content="暂停"
+                            <ui:Button MinWidth="172" MinHeight="42" Appearance="Primary" Content="暂停"
                                        Icon="{ui:SymbolIcon Pause24}" Click="Pause_Click" />
-                            <StackPanel Margin="0,12,0,0" HorizontalAlignment="Center" Orientation="Horizontal">
-                                <ui:Button MinWidth="104" Appearance="Secondary" Content="结束专注" Icon="{ui:SymbolIcon Stop24}" Click="Stop_Click" />
+                            <StackPanel Margin="0,10,0,0" HorizontalAlignment="Center" Orientation="Horizontal">
+                                <ui:Button MinWidth="110" Appearance="Secondary" Content="结束专注" Icon="{ui:SymbolIcon Stop24}" Click="Stop_Click" />
                                 <ui:Button MinWidth="80" Margin="8,0,0,0" Appearance="Transparent" Content="取消" Click="Cancel_Click" />
                             </StackPanel>
                         </StackPanel>
-
-                        <StackPanel Margin="0,24,0,0" HorizontalAlignment="Center"
+                        <StackPanel Margin="0,20,0,0" HorizontalAlignment="Center"
                                     Visibility="{Binding IsPaused, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <ui:Button MinWidth="156" MinHeight="40" Appearance="Primary" Content="继续"
+                            <ui:Button MinWidth="172" MinHeight="42" Appearance="Primary" Content="继续"
                                        Icon="{ui:SymbolIcon Play24}" Click="Resume_Click" />
-                            <StackPanel Margin="0,12,0,0" HorizontalAlignment="Center" Orientation="Horizontal">
-                                <ui:Button MinWidth="104" Appearance="Secondary" Content="结束专注" Icon="{ui:SymbolIcon Stop24}" Click="Stop_Click" />
+                            <StackPanel Margin="0,10,0,0" HorizontalAlignment="Center" Orientation="Horizontal">
+                                <ui:Button MinWidth="110" Appearance="Secondary" Content="结束专注" Icon="{ui:SymbolIcon Stop24}" Click="Stop_Click" />
                                 <ui:Button MinWidth="80" Margin="8,0,0,0" Appearance="Transparent" Content="取消" Click="Cancel_Click" />
                             </StackPanel>
                         </StackPanel>
 
-                        <TextBlock MaxWidth="520" Margin="0,16,0,0" HorizontalAlignment="Center" TextAlignment="Center"
+                        <TextBlock MaxWidth="520" Margin="0,12,0,0" HorizontalAlignment="Center" TextAlignment="Center"
                                    Style="{StaticResource ValidationTextStyle}" Text="{Binding ErrorMessage}" TextWrapping="Wrap"
                                    Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                        <Border MaxWidth="560" Margin="0,20,0,0" Padding="14,10" HorizontalAlignment="Stretch"
+                                Style="{StaticResource SectionSurfaceStyle}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <ui:SymbolIcon Width="28" Height="28" VerticalAlignment="Center" FontSize="22"
+                                               Foreground="{DynamicResource SystemAccentColorPrimaryBrush}" Symbol="Clock24" />
+                                <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource BodyStrongTextStyle}" Text="Today" />
+                                    <TextBlock Margin="0,2,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                               Style="{StaticResource CaptionTextStyle}" Text="已完成的有效专注" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="2" VerticalAlignment="Center" Style="{StaticResource BodyStrongTextStyle}"
+                                           Text="{Binding TodaySummaryText}" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </Border>
 
-                <Border Margin="0,16,0,0" Style="{StaticResource SectionSurfaceStyle}">
+                <Border Grid.Column="2" Padding="16" Style="{StaticResource SectionSurfaceStyle}">
                     <Grid>
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                        <ui:SymbolIcon Width="32" Height="32" VerticalAlignment="Center" FontSize="22"
-                                       Foreground="{DynamicResource SystemAccentColorPrimaryBrush}" Symbol="Clock24" />
-                        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="Today" />
-                            <TextBlock Margin="0,2,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Style="{StaticResource CaptionTextStyle}" Text="已完成的有效专注" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                            <TextBlock HorizontalAlignment="Right" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding TodaySummaryText}" />
-                            <TextBlock Margin="0,2,0,0" HorizontalAlignment="Right" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Style="{StaticResource CaptionTextStyle}" Text="Stopwatch 与 Pomodoro Focus" />
-                        </StackPanel>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="选择任务" />
+                                <TextBlock Margin="0,3,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           Style="{StaticResource CaptionTextStyle}" Text="{Binding SelectedSourceDescription}" />
+                            </StackPanel>
+                            <ComboBox Grid.Column="1" Width="112" Margin="8,0,0,0" automation:AutomationProperties.Name="任务来源"
+                                      DisplayMemberPath="Title" ItemsSource="{Binding TaskSources}" SelectedItem="{Binding SelectedTaskSource}" />
+                        </Grid>
+                        <Separator Grid.Row="1" Margin="0,14,0,10" />
+
+                        <Grid Grid.Row="2">
+                            <ListBox ItemsSource="{Binding FilteredTaskOptions}"
+                                     SelectedItem="{Binding SelectedTaskOption, Mode=OneWay}"
+                                     IsEnabled="{Binding CanConfigureSession}"
+                                     Style="{StaticResource QuadrantTaskListStyle}"
+                                     SelectionChanged="TaskPicker_SelectionChanged"
+                                     automation:AutomationProperties.Name="可专注任务列表">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="2,4">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource BodyStrongTextStyle}" Text="{Binding Title}"
+                                                           TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Margin="0,3,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                           Style="{StaticResource CaptionTextStyle}" Text="{Binding Metadata}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <ui:SymbolIcon Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="Clock24" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"
+                                        Visibility="{Binding IsFilteredTaskListEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <ui:SymbolIcon HorizontalAlignment="Center" FontSize="30"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="Archive24" />
+                                <TextBlock Margin="0,10,0,0" HorizontalAlignment="Center"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           Style="{StaticResource BodyTextStyle}" Text="这里暂时没有任务" />
+                                <TextBlock Margin="0,3,0,0" HorizontalAlignment="Center"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           Style="{StaticResource CaptionTextStyle}" Text="切换上方来源继续选择" />
+                            </StackPanel>
+                        </Grid>
                     </Grid>
                 </Border>
-            </StackPanel>
+            </Grid>
         </ScrollViewer>
     </Grid>
 </Page>

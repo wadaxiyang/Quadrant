@@ -18,7 +18,7 @@ public sealed class FocusPageViewModelTests
         var viewModel = CreateViewModel([task], day, new PomodoroSettings(FocusMinutes: 40));
 
         Assert.Equal("40:00", viewModel.TimerText);
-        Assert.Equal("Q2 · Today · 预计 45 分钟", viewModel.TaskOptions[1].Metadata);
+        Assert.Equal("Q2 · Today · 预计 45 分钟", viewModel.TaskOptions[0].Metadata);
         Assert.True(viewModel.IsPomodoroMode);
 
         viewModel.Mode = FocusMode.Stopwatch;
@@ -26,6 +26,28 @@ public sealed class FocusPageViewModelTests
         Assert.Equal("00:00", viewModel.TimerText);
         Assert.True(viewModel.IsStopwatchMode);
         Assert.True(viewModel.CanConfigureSession);
+    }
+
+    [Fact]
+    public void Task_picker_filters_inbox_today_and_quadrants_and_selects_for_focus()
+    {
+        var day = new DateOnly(2026, 8, 22);
+        var inbox = new TaskItem(1, "Capture", null, null, null, null, false, null, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch);
+        var q1 = new TaskItem(2, "Urgent", 1, null, null, null, false, null, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch);
+        var q2 = new TaskItem(3, "Plan", 2, null, null, null, false, null, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, day);
+        var viewModel = CreateViewModel([inbox, q1, q2], day, new PomodoroSettings(), todayTaskIds: [1, 3]);
+
+        Assert.Equal(["Capture", "Plan"], viewModel.FilteredTaskOptions.Select(option => option.Title));
+
+        viewModel.SelectedTaskSource = viewModel.TaskSources.Single(source => source.Source == FocusTaskSource.Inbox);
+        Assert.Equal(["Capture"], viewModel.FilteredTaskOptions.Select(option => option.Title));
+
+        viewModel.SelectTask(inbox.Id, revealSource: false);
+        Assert.Equal(inbox.Id, viewModel.SelectedTask?.Id);
+        Assert.Equal("Inbox", viewModel.SelectedTaskOption!.Metadata);
+
+        viewModel.SelectedTaskSource = viewModel.TaskSources.Single(source => source.Source == FocusTaskSource.Quadrant1);
+        Assert.Equal(["Urgent"], viewModel.FilteredTaskOptions.Select(option => option.Title));
     }
 
     [Fact]
@@ -47,13 +69,14 @@ public sealed class FocusPageViewModelTests
         IReadOnlyList<TaskItem> tasks,
         DateOnly day,
         PomodoroSettings settings,
-        IFocusSessionService? sessions = null)
+        IFocusSessionService? sessions = null,
+        IEnumerable<long>? todayTaskIds = null)
     {
         sessions ??= DispatchProxy.Create<IFocusSessionService, FocusSessionServiceProxy>();
         var stopwatch = DispatchProxy.Create<IFocusTimerService, FocusTimerServiceProxy>();
         var clock = new FixedClock(day);
         var scheduler = DispatchProxy.Create<IFocusCompletionScheduler, ThrowingProxy>();
-        return new FocusPageViewModel(tasks, stopwatch, new PomodoroTimerService(sessions, clock, scheduler), sessions, settings, day);
+        return new FocusPageViewModel(tasks, stopwatch, new PomodoroTimerService(sessions, clock, scheduler), sessions, settings, day, todayTaskIds);
     }
 
     private class FocusSessionServiceProxy : DispatchProxy

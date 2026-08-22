@@ -27,9 +27,9 @@ public sealed class FocusSessionService : IFocusSessionService
         {
             linkedTask = await taskRepository.GetByIdAsync(taskId, cancellationToken)
                 ?? throw new TaskValidationException("Focus task was not found.");
-            if (linkedTask.IsCompleted || linkedTask.QuadrantId is null)
+            if (linkedTask.IsCompleted)
             {
-                throw new TaskValidationException("Focus task must be active and classified.");
+                throw new TaskValidationException("Focus task must be active.");
             }
         }
         var now = clock.UtcNow;

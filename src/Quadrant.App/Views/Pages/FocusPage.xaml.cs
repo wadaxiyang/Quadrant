@@ -17,13 +17,14 @@ public partial class FocusPage : Page
         var main = request?.MainViewModel ?? DataContext as MainViewModel;
         if (main is not null)
         {
-            var focusViewModel = new FocusPageViewModel(
-                main.ActiveTasks,
+            var focusViewModel = await FocusPageViewModel.CreateAsync(
+                main.TaskService,
+                main.TodayQueryService,
                 main.FocusTimerService,
                 main.PomodoroTimerService,
                 main.FocusSessionService,
                 main.Settings.Pomodoro,
-                main.Clock.LocalDate);
+                main.Clock);
             if (request is not null)
             {
                 focusViewModel.SelectTask(request.TaskId);
@@ -43,6 +44,14 @@ public partial class FocusPage : Page
     private async void Resume_Click(object sender, RoutedEventArgs e) { await ViewModel.ResumeAsync(); UpdateTimerState(); }
     private async void Stop_Click(object sender, RoutedEventArgs e) { await ViewModel.StopAsync(); UpdateTimerState(); }
     private async void Cancel_Click(object sender, RoutedEventArgs e) { await ViewModel.CancelAsync(); UpdateTimerState(); }
+    private void ClearTask_Click(object sender, RoutedEventArgs e) => ViewModel.SelectTask(null);
+    private void TaskPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ViewModel.CanConfigureSession && e.AddedItems.OfType<FocusTaskOption>().FirstOrDefault() is { } option)
+        {
+            ViewModel.SelectTask(option.Task.Id, revealSource: false);
+        }
+    }
     private void PomodoroMode_Click(object sender, RoutedEventArgs e) { if (ViewModel.CanConfigureSession) ViewModel.Mode = Quadrant.Core.Enums.FocusMode.Pomodoro; }
     private void StopwatchMode_Click(object sender, RoutedEventArgs e) { if (ViewModel.CanConfigureSession) ViewModel.Mode = Quadrant.Core.Enums.FocusMode.Stopwatch; }
 

@@ -27,12 +27,17 @@ public sealed class FocusSessionServiceTests
     }
 
     [Fact]
-    public async Task Start_rejects_inbox_completed_and_second_active_session()
+    public async Task Start_accepts_active_inbox_but_rejects_completed_and_second_active_session()
     {
         var now = DateTimeOffset.UtcNow; var sessions = new FakeSessions(); var service = new FocusSessionService(sessions, new FakeTasks(new TaskItem(1, "Inbox", null, null, null, null, false, null, now, now)), new FixedClock(now), new AppChangeHub());
-        await Assert.ThrowsAsync<TaskValidationException>(() => service.StartAsync(new FocusSessionStartRequest(1, FocusMode.Stopwatch)));
-        await service.StartAsync(new FocusSessionStartRequest(null, FocusMode.Stopwatch));
+        var inbox = await service.StartAsync(new FocusSessionStartRequest(1, FocusMode.Stopwatch));
+        Assert.Equal("Inbox", inbox.TaskTitleSnapshot);
+        Assert.Null(inbox.QuadrantSnapshot);
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(new FocusSessionStartRequest(null, FocusMode.Stopwatch)));
+
+        var completedTask = new TaskItem(2, "Done", 1, null, null, null, true, now, now, now);
+        var completedService = new FocusSessionService(new FakeSessions(), new FakeTasks(completedTask), new FixedClock(now), new AppChangeHub());
+        await Assert.ThrowsAsync<TaskValidationException>(() => completedService.StartAsync(new FocusSessionStartRequest(2, FocusMode.Stopwatch)));
     }
 
     [Fact]

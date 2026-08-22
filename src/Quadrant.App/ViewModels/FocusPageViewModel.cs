@@ -13,9 +13,37 @@ public partial class FocusPageViewModel : ObservableObject
     private readonly IFocusSessionService sessions;
     private readonly PomodoroSettings settings;
     private readonly DateOnly localDate;
+    private readonly HashSet<long> todayTaskIds;
+
+    public static async Task<FocusPageViewModel> CreateAsync(
+        ITaskService taskService,
+        ITodayQueryService todayQueryService,
+        IFocusTimerService stopwatch,
+        PomodoroTimerService pomodoro,
+        IFocusSessionService sessions,
+        PomodoroSettings settings,
+        IClock clock,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(taskService);
+        ArgumentNullException.ThrowIfNull(todayQueryService);
+        ArgumentNullException.ThrowIfNull(clock);
+
+        var activeTask = taskService.GetActiveAsync(cancellationToken);
+        var inboxTask = taskService.GetInboxAsync(cancellationToken: cancellationToken);
+        var todayTask = todayQueryService.GetSnapshotAsync(cancellationToken);
+        await Task.WhenAll(activeTask, inboxTask, todayTask);
+
+        var today = await todayTask;
+        var todayTaskIds = today.Overdue.Concat(today.PlannedToday).Concat(today.DueToday).Concat(today.NeedsReschedule)
+            .Select(task => task.Id);
+        var tasks = (await activeTask).Concat(await inboxTask).DistinctBy(task => task.Id).ToArray();
+        return new FocusPageViewModel(tasks, stopwatch, pomodoro, sessions, settings, clock.LocalDate, todayTaskIds);
+    }
 
     public FocusPageViewModel(IReadOnlyList<TaskItem> tasks, IFocusTimerService stopwatch, PomodoroTimerService pomodoro,
-        IFocusSessionService sessions, PomodoroSettings? settings = null, DateOnly? localDate = null)
+        IFocusSessionService sessions, PomodoroSettings? settings = null, DateOnly? localDate = null,
+        IEnumerable<long>? todayTaskIds = null)
     {
         ArgumentNullException.ThrowIfNull(tasks);
         this.stopwatch = stopwatch ?? throw new ArgumentNullException(nameof(stopwatch));
@@ -23,22 +51,37 @@ public partial class FocusPageViewModel : ObservableObject
         this.sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
         this.settings = settings ?? new PomodoroSettings();
         this.localDate = localDate ?? DateOnly.FromDateTime(DateTime.Today);
+        this.todayTaskIds = todayTaskIds?.ToHashSet() ?? [];
 
-        Tasks = tasks.Where(task => !task.IsCompleted && task.QuadrantId is not null).ToArray();
-        TaskOptions =
+        Tasks = tasks.Where(task => !task.IsCompleted).DistinctBy(task => task.Id).ToArray();
+        TaskOptions = Tasks.Select(task => new FocusTaskOption(task, task.Title, FormatTaskMetadata(task, this.localDate))).ToArray();
+        TaskSources =
         [
-            new FocusTaskOption(null, "不关联任务", "适合临时专注"),
-            .. Tasks.Select(task => new FocusTaskOption(task, task.Title, FormatTaskMetadata(task, this.localDate)))
+            new(FocusTaskSource.Inbox, "Inbox", "未分类任务"),
+            new(FocusTaskSource.Today, "Today", "今天需要处理"),
+            new(FocusTaskSource.Quadrant1, "Q1", "重要且紧急"),
+            new(FocusTaskSource.Quadrant2, "Q2", "重要不紧急"),
+            new(FocusTaskSource.Quadrant3, "Q3", "紧急不重要"),
+            new(FocusTaskSource.Quadrant4, "Q4", "不重要不紧急")
         ];
-        SelectedTaskOption = TaskOptions[0];
+        SelectedTaskSource = TaskSources[1];
         ApplyIdleTimer();
     }
 
     public IReadOnlyList<TaskItem> Tasks { get; }
     public IReadOnlyList<FocusTaskOption> TaskOptions { get; }
-    public TaskItem? SelectedTask => SelectedTaskOption.Task;
+    public IReadOnlyList<FocusTaskSourceOption> TaskSources { get; }
+    public TaskItem? SelectedTask => SelectedTaskOption?.Task;
+    public IReadOnlyList<FocusTaskOption> FilteredTaskOptions => TaskOptions.Where(IsInSelectedSource).ToArray();
+    public bool HasFilteredTasks => FilteredTaskOptions.Count > 0;
+    public bool IsFilteredTaskListEmpty => !HasFilteredTasks;
+    public bool HasSelectedTask => SelectedTaskOption is not null;
+    public string SelectedTaskTitle => SelectedTaskOption?.Title ?? "未关联任务";
+    public string SelectedTaskMetadata => SelectedTaskOption?.Metadata ?? "从右侧选择任务，或直接开始临时专注";
+    public string SelectedSourceDescription => $"{SelectedTaskSource.Description} · {FilteredTaskOptions.Count} 项";
 
-    [ObservableProperty] public partial FocusTaskOption SelectedTaskOption { get; set; }
+    [ObservableProperty] public partial FocusTaskOption? SelectedTaskOption { get; private set; }
+    [ObservableProperty] public partial FocusTaskSourceOption SelectedTaskSource { get; set; }
     [ObservableProperty] public partial FocusMode Mode { get; set; } = FocusMode.Pomodoro;
     [ObservableProperty] public partial string TimerText { get; private set; } = "25:00";
     [ObservableProperty] public partial FocusStatus? Status { get; private set; }
@@ -73,8 +116,31 @@ public partial class FocusPageViewModel : ObservableObject
 
     partial void OnErrorMessageChanged(string? value) => OnPropertyChanged(nameof(HasError));
 
-    public void SelectTask(long? taskId) =>
-        SelectedTaskOption = TaskOptions.FirstOrDefault(option => option.Task?.Id == taskId) ?? TaskOptions[0];
+    partial void OnSelectedTaskOptionChanged(FocusTaskOption? value)
+    {
+        OnPropertyChanged(nameof(SelectedTask));
+        OnPropertyChanged(nameof(HasSelectedTask));
+        OnPropertyChanged(nameof(SelectedTaskTitle));
+        OnPropertyChanged(nameof(SelectedTaskMetadata));
+    }
+
+    partial void OnSelectedTaskSourceChanged(FocusTaskSourceOption value)
+    {
+        OnPropertyChanged(nameof(FilteredTaskOptions));
+        OnPropertyChanged(nameof(HasFilteredTasks));
+        OnPropertyChanged(nameof(IsFilteredTaskListEmpty));
+        OnPropertyChanged(nameof(SelectedSourceDescription));
+        OnPropertyChanged(nameof(SelectedTaskOption));
+    }
+
+    public void SelectTask(long? taskId, bool revealSource = true)
+    {
+        SelectedTaskOption = taskId is null ? null : TaskOptions.FirstOrDefault(option => option.Task.Id == taskId);
+        if (revealSource && SelectedTaskOption is { Task: var task })
+        {
+            SelectedTaskSource = TaskSources.First(source => source.Source == SourceFor(task));
+        }
+    }
 
     public async Task ActivateAsync()
     {
@@ -219,11 +285,31 @@ public partial class FocusPageViewModel : ObservableObject
     private static string FormatTaskMetadata(TaskItem task, DateOnly localDate)
     {
         var parts = new List<string>();
-        if (task.QuadrantId is { } quadrantId) parts.Add($"Q{quadrantId}");
+        parts.Add(task.QuadrantId is { } quadrantId ? $"Q{quadrantId}" : "Inbox");
         if (task.PlannedDate == localDate) parts.Add("Today");
         if (task.EstimatedMinutes is { } minutes) parts.Add($"预计 {minutes} 分钟");
         return string.Join(" · ", parts);
     }
+
+    private bool IsInSelectedSource(FocusTaskOption option) => SelectedTaskSource.Source switch
+    {
+        FocusTaskSource.Inbox => option.Task.QuadrantId is null,
+        FocusTaskSource.Today => todayTaskIds.Contains(option.Task.Id),
+        FocusTaskSource.Quadrant1 => option.Task.QuadrantId == 1,
+        FocusTaskSource.Quadrant2 => option.Task.QuadrantId == 2,
+        FocusTaskSource.Quadrant3 => option.Task.QuadrantId == 3,
+        FocusTaskSource.Quadrant4 => option.Task.QuadrantId == 4,
+        _ => false
+    };
+
+    private static FocusTaskSource SourceFor(TaskItem task) => task.QuadrantId switch
+    {
+        1 => FocusTaskSource.Quadrant1,
+        2 => FocusTaskSource.Quadrant2,
+        3 => FocusTaskSource.Quadrant3,
+        4 => FocusTaskSource.Quadrant4,
+        _ => FocusTaskSource.Inbox
+    };
 
     private static string FormatTimer(int seconds) => $"{seconds / 60:D2}:{seconds % 60:D2}";
 
@@ -236,4 +322,16 @@ public partial class FocusPageViewModel : ObservableObject
     }
 }
 
-public sealed record FocusTaskOption(TaskItem? Task, string Title, string Metadata);
+public sealed record FocusTaskOption(TaskItem Task, string Title, string Metadata);
+
+public sealed record FocusTaskSourceOption(FocusTaskSource Source, string Title, string Description);
+
+public enum FocusTaskSource
+{
+    Inbox = 1,
+    Today = 2,
+    Quadrant1 = 3,
+    Quadrant2 = 4,
+    Quadrant3 = 5,
+    Quadrant4 = 6
+}

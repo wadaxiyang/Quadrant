@@ -21,9 +21,9 @@ public sealed class SqliteFocusSessionRepository(SqliteConnectionFactory connect
         {
             var snapshot = await ReadTaskSnapshotAsync(c, tx, taskId, cancellationToken)
                 ?? throw new Quadrant.Core.Services.TaskValidationException("Focus task was not found.");
-            if (snapshot.IsCompleted || snapshot.QuadrantId is null)
+            if (snapshot.IsCompleted)
             {
-                throw new Quadrant.Core.Services.TaskValidationException("Focus task must be active and classified.");
+                throw new Quadrant.Core.Services.TaskValidationException("Focus task must be active.");
             }
             value = value with { TaskTitleSnapshot = snapshot.Title, QuadrantSnapshot = snapshot.QuadrantId };
         }
