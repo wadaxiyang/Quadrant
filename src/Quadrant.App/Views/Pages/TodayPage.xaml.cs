@@ -14,6 +14,13 @@ public partial class TodayPage : Page
     private void Page_Unloaded(object sender, RoutedEventArgs e) => viewModel?.Deactivate();
     private async void Retry_Click(object sender, RoutedEventArgs e) { if (viewModel is not null) await viewModel.LoadAsync(); }
     private async void Complete_Click(object sender, RoutedEventArgs e) => await MutateAsync((TaskItem)((FrameworkElement)sender).Tag, task => main!.TaskService.SetCompletedAsync(task.Id, true));
+    private void StartFocus_Click(object sender, RoutedEventArgs e)
+    {
+        if (main is not null && ((FrameworkElement)sender).Tag is TaskItem task)
+        {
+            main.FocusTaskCommand.Execute(task.Id);
+        }
+    }
     private async void Today_Click(object sender, RoutedEventArgs e) => await MutateAsync((TaskItem)((FrameworkElement)sender).Tag, task => main!.TaskService.PlanForTodayAsync(task.Id));
     private async void Tomorrow_Click(object sender, RoutedEventArgs e) => await MutateAsync((TaskItem)((FrameworkElement)sender).Tag, task => main!.TaskService.PlanForDateAsync(task.Id, main!.Clock.LocalDate.AddDays(1)));
     private async void Remove_Click(object sender, RoutedEventArgs e) => await MutateAsync((TaskItem)((FrameworkElement)sender).Tag, task => main!.TaskService.RemovePlanAsync(task.Id));

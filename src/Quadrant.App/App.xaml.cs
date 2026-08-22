@@ -91,9 +91,9 @@ public partial class App : System.Windows.Application
             appChangeHub);
         var clock = new Quadrant.Infrastructure.Windows.SystemClock();
         dataMaintenanceService = new Quadrant.Infrastructure.Storage.SqliteDataMaintenanceService(connectionFactory, clock);
-        var todayQueryService = new Quadrant.Core.Services.TodayQueryService(taskRepository, clock);
-        var reviewQueryService = new Quadrant.Infrastructure.Storage.SqliteReviewQueryService(connectionFactory, clock);
         var focusRepository = new Quadrant.Infrastructure.Storage.SqliteFocusSessionRepository(connectionFactory);
+        var todayQueryService = new Quadrant.Core.Services.TodayQueryService(taskRepository, focusRepository, clock);
+        var reviewQueryService = new Quadrant.Infrastructure.Storage.SqliteReviewQueryService(connectionFactory, clock);
         var focusSessionService = new Quadrant.Core.Services.FocusSessionService(focusRepository, taskRepository, clock, appChangeHub);
         var focusTimerService = new Quadrant.Core.Services.FocusTimerService(focusSessionService, clock);
         var pomodoroTimerService = new Quadrant.Core.Services.PomodoroTimerService(focusSessionService, clock, new Quadrant.Core.Services.SystemFocusCompletionScheduler());

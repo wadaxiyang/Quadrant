@@ -6,11 +6,16 @@ namespace Quadrant.Core.Services;
 public sealed class TodayQueryService : ITodayQueryService
 {
     private readonly ITodayTaskRepository repository;
+    private readonly IFocusSessionRepository focusSessionRepository;
     private readonly IClock clock;
 
-    public TodayQueryService(ITodayTaskRepository repository, IClock clock)
+    public TodayQueryService(
+        ITodayTaskRepository repository,
+        IFocusSessionRepository focusSessionRepository,
+        IClock clock)
     {
         this.repository = repository ?? throw new ArgumentNullException(nameof(repository));
+        this.focusSessionRepository = focusSessionRepository ?? throw new ArgumentNullException(nameof(focusSessionRepository));
         this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
     }
 
@@ -19,7 +24,11 @@ public sealed class TodayQueryService : ITodayQueryService
         var now = clock.LocalNow;
         var timeZone = clock.LocalTimeZone;
         var localToday = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, timeZone).Date);
-        var candidates = await repository.GetTodayCandidatesAsync(localToday, cancellationToken);
+        var candidatesTask = repository.GetTodayCandidatesAsync(localToday, cancellationToken);
+        var focusSummaryTask = focusSessionRepository.GetProductiveSummaryAsync(localToday, cancellationToken);
+        await Task.WhenAll(candidatesTask, focusSummaryTask);
+        var candidates = await candidatesTask;
+        var focusSummary = await focusSummaryTask;
         var assigned = new HashSet<long>();
 
         var overdue = Assign(candidates.Where(task => IsOverdue(task, now)), assigned);
@@ -35,7 +44,7 @@ public sealed class TodayQueryService : ITodayQueryService
             needsReschedule,
             all.Length,
             all.Aggregate(0L, (total, task) => checked(total + (task.EstimatedMinutes ?? 0))),
-            FocusedSecondsToday: 0);
+            FocusedSecondsToday: focusSummary.TotalSeconds);
     }
 
     private static IReadOnlyList<TaskItem> Assign(IEnumerable<TaskItem> source, HashSet<long> assigned) =>

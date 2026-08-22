@@ -27,6 +27,9 @@ public partial class TodayPageViewModel : ObservableObject, IDisposable
     public ObservableCollection<TaskItem> NeedsReschedule { get; } = [];
     public int UniqueTaskCount { get; private set; }
     public long EstimatedMinutesTotal { get; private set; }
+    public long FocusedSecondsToday { get; private set; }
+    public string EstimatedTimeText => FormatMinutes(EstimatedMinutesTotal);
+    public string FocusedTimeText => FormatSeconds(FocusedSecondsToday);
     public bool HasOverdue => Overdue.Count > 0;
     public bool HasPlannedToday => PlannedToday.Count > 0;
     public bool HasDueToday => DueToday.Count > 0;
@@ -57,7 +60,9 @@ public partial class TodayPageViewModel : ObservableObject, IDisposable
             if (token.IsCancellationRequested || generation != requestGeneration) return;
             Replace(Overdue, snapshot.Overdue); Replace(PlannedToday, snapshot.PlannedToday);
             Replace(DueToday, snapshot.DueToday); Replace(NeedsReschedule, snapshot.NeedsReschedule);
-            UniqueTaskCount = snapshot.UniqueTaskCount; EstimatedMinutesTotal = snapshot.EstimatedMinutesTotal;
+            UniqueTaskCount = snapshot.UniqueTaskCount;
+            EstimatedMinutesTotal = snapshot.EstimatedMinutesTotal;
+            FocusedSecondsToday = snapshot.FocusedSecondsToday;
             NotifyState();
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
@@ -74,13 +79,42 @@ public partial class TodayPageViewModel : ObservableObject, IDisposable
 
     private void OnChange(AppChange change)
     {
-        if (change.Kind == AppChangeKind.FocusSessionCompleted || synchronizationContext is null) return;
+        if (synchronizationContext is null) return;
         synchronizationContext.Post(_ => _ = LoadAsync(), null);
     }
     private static void Replace(ObservableCollection<TaskItem> target, IReadOnlyList<TaskItem> source)
     { target.Clear(); foreach (var task in source) target.Add(task); }
     private void NotifyState()
-    { OnPropertyChanged(nameof(UniqueTaskCount)); OnPropertyChanged(nameof(EstimatedMinutesTotal)); OnPropertyChanged(nameof(HasOverdue)); OnPropertyChanged(nameof(HasPlannedToday)); OnPropertyChanged(nameof(HasDueToday)); OnPropertyChanged(nameof(HasNeedsReschedule)); OnPropertyChanged(nameof(IsEmpty)); OnPropertyChanged(nameof(HasError)); }
+    {
+        OnPropertyChanged(nameof(UniqueTaskCount));
+        OnPropertyChanged(nameof(EstimatedMinutesTotal));
+        OnPropertyChanged(nameof(FocusedSecondsToday));
+        OnPropertyChanged(nameof(EstimatedTimeText));
+        OnPropertyChanged(nameof(FocusedTimeText));
+        OnPropertyChanged(nameof(HasOverdue));
+        OnPropertyChanged(nameof(HasPlannedToday));
+        OnPropertyChanged(nameof(HasDueToday));
+        OnPropertyChanged(nameof(HasNeedsReschedule));
+        OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(HasError));
+    }
+
+    private static string FormatMinutes(long minutes) => minutes switch
+    {
+        <= 0 => "0 分钟",
+        < 60 => $"{minutes} 分钟",
+        _ when minutes % 60 == 0 => $"{minutes / 60} 小时",
+        _ => $"{minutes / 60} 小时 {minutes % 60} 分"
+    };
+
+    private static string FormatSeconds(long seconds) => seconds switch
+    {
+        <= 0 => "0 分钟",
+        < 60 => "< 1 分钟",
+        < 3600 => $"{seconds / 60} 分钟",
+        _ when seconds % 3600 < 60 => $"{seconds / 3600} 小时",
+        _ => $"{seconds / 3600} 小时 {(seconds % 3600) / 60} 分"
+    };
     partial void OnIsLoadingChanged(bool value) => OnPropertyChanged(nameof(IsEmpty));
     partial void OnErrorMessageChanged(string? value) { OnPropertyChanged(nameof(HasError)); OnPropertyChanged(nameof(IsEmpty)); }
 }

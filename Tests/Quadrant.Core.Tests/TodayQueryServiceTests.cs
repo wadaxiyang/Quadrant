@@ -20,7 +20,7 @@ public sealed class TodayQueryServiceTests
             CreateTask(4, planned: new DateOnly(2026, 8, 20), estimate: 60),
             CreateTask(5, due: now.AddHours(4), estimate: 70),
             CreateTask(6, planned: new DateOnly(2026, 8, 21), estimate: null, quadrantId: null)
-        ]), new FakeClock(now, timeZone));
+        ]), new FakeFocusRepository(new FocusDaySummary(3_900, 2)), new FakeClock(now, timeZone));
 
         var snapshot = await service.GetSnapshotAsync();
 
@@ -30,7 +30,7 @@ public sealed class TodayQueryServiceTests
         Assert.Equal([4L], snapshot.NeedsReschedule.Select(task => task.Id));
         Assert.Equal(6, snapshot.UniqueTaskCount);
         Assert.Equal(250, snapshot.EstimatedMinutesTotal);
-        Assert.Equal(0, snapshot.FocusedSecondsToday);
+        Assert.Equal(3_900, snapshot.FocusedSecondsToday);
     }
 
     [Fact]
@@ -39,7 +39,10 @@ public sealed class TodayQueryServiceTests
         var timeZone = TimeZoneInfo.CreateCustomTimeZone("West", TimeSpan.FromHours(-7), "West", "West");
         var now = new DateTimeOffset(2026, 8, 21, 0, 30, 0, TimeSpan.FromHours(-7));
         var dueAtNow = now;
-        var service = new TodayQueryService(new FakeRepository([CreateTask(1, due: dueAtNow)]), new FakeClock(now, timeZone));
+        var service = new TodayQueryService(
+            new FakeRepository([CreateTask(1, due: dueAtNow)]),
+            new FakeFocusRepository(FocusDaySummary.Empty),
+            new FakeClock(now, timeZone));
 
         var snapshot = await service.GetSnapshotAsync();
 
@@ -60,6 +63,16 @@ public sealed class TodayQueryServiceTests
             RequestedDate = localToday;
             return Task.FromResult(tasks);
         }
+    }
+
+    private sealed class FakeFocusRepository(FocusDaySummary summary) : IFocusSessionRepository
+    {
+        public Task<FocusSession?> GetCurrentAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<FocusSession?> CreateIfNoCurrentAsync(FocusSession session, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<FocusSession?> GetByIdAsync(string id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<FocusSession?> TransitionAsync(FocusSession session, Quadrant.Core.Enums.FocusStatus expectedStatus, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<FocusSession>> GetRecentAsync(int limit = 5, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<FocusDaySummary> GetProductiveSummaryAsync(DateOnly localDate, CancellationToken cancellationToken = default) => Task.FromResult(summary);
     }
 
     private sealed class FakeClock(DateTimeOffset now, TimeZoneInfo timeZone) : IClock

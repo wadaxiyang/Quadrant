@@ -1,15 +1,143 @@
-<Page x:Class="Quadrant.App.Views.Pages.TodayPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml" Loaded="Page_Loaded" Unloaded="Page_Unloaded">
-  <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="24,16,24,24">
-    <TextBlock Style="{StaticResource TitleLargeTextStyle}" Text="Today" />
-    <TextBlock Margin="0,4,0,16" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="计划、到期与需要重新安排的任务" />
-    <ui:InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Message="计划日期不会自动移动；请明确选择 Today、Tomorrow 或移除计划。" />
-    <StackPanel Margin="0,16,0,0" Orientation="Horizontal"><ui:InfoBadge Value="{Binding UniqueTaskCount}" /><TextBlock Margin="8,0,20,0" VerticalAlignment="Center" Text="项任务" /><TextBlock VerticalAlignment="Center" Text="{Binding EstimatedMinutesTotal, StringFormat=预计 {0} 分钟}" /></StackPanel>
-    <StackPanel Margin="0,20,0,0" Visibility="{Binding HasOverdue, Converter={StaticResource BooleanToVisibilityConverter}}"><TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="已逾期" /><ui:ListView ItemsSource="{Binding Overdue}" ItemTemplate="{DynamicResource TodayTaskTemplate}" Style="{StaticResource QuadrantTaskListStyle}" /></StackPanel>
-    <StackPanel Margin="0,20,0,0" Visibility="{Binding HasPlannedToday, Converter={StaticResource BooleanToVisibilityConverter}}"><TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="计划于今天" /><ui:ListView ItemsSource="{Binding PlannedToday}" ItemTemplate="{DynamicResource TodayTaskTemplate}" Style="{StaticResource QuadrantTaskListStyle}" /></StackPanel>
-    <StackPanel Margin="0,20,0,0" Visibility="{Binding HasDueToday, Converter={StaticResource BooleanToVisibilityConverter}}"><TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="今天到期" /><ui:ListView ItemsSource="{Binding DueToday}" ItemTemplate="{DynamicResource TodayTaskTemplate}" Style="{StaticResource QuadrantTaskListStyle}" /></StackPanel>
-    <StackPanel Margin="0,20,0,0" Visibility="{Binding HasNeedsReschedule, Converter={StaticResource BooleanToVisibilityConverter}}"><TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="需要重新安排" /><ui:ListView ItemsSource="{Binding NeedsReschedule}" ItemTemplate="{DynamicResource TodayTaskTemplate}" Style="{StaticResource QuadrantTaskListStyle}" /></StackPanel>
-    <StackPanel HorizontalAlignment="Center" Margin="0,40,0,0" Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}"><TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="今天没有计划任务" /><TextBlock Margin="0,8,0,0" Style="{StaticResource CaptionTextStyle}" Text="在 Home 或 Inbox 中把任务添加到 Today。" /></StackPanel>
-    <ui:Button Margin="0,16,0,0" HorizontalAlignment="Left" Content="重试" Click="Retry_Click" Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}" />
-  </StackPanel></ScrollViewer>
-  <Page.Resources><DataTemplate x:Key="TodayTaskTemplate"><Border Padding="12" Margin="0,8,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock FontWeight="SemiBold" Text="{Binding Title}"/><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding DueAt, StringFormat=截止 {0:g}}"/><ui:SymbolIcon Margin="8,0,0,0" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="ArrowRepeatAll20" ToolTip="重复任务：完成后创建下一项" AutomationProperties.Name="重复任务"><ui:SymbolIcon.Style><Style TargetType="ui:SymbolIcon"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding RecurrenceKind}" Value="Daily"><Setter Property="Visibility" Value="Visible"/></DataTrigger><DataTrigger Binding="{Binding RecurrenceKind}" Value="Weekly"><Setter Property="Visibility" Value="Visible"/></DataTrigger><DataTrigger Binding="{Binding RecurrenceKind}" Value="Monthly"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></ui:SymbolIcon.Style></ui:SymbolIcon></StackPanel></StackPanel><StackPanel Grid.Column="1" Orientation="Horizontal"><ui:Button Tag="{Binding}" Click="Complete_Click" ToolTip="完成" Icon="{ui:SymbolIcon CheckmarkCircle24}"/><ui:Button Margin="6,0,0,0" Tag="{Binding}" Click="Today_Click" Content="Today"/><ui:Button Margin="6,0,0,0" Tag="{Binding}" Click="Tomorrow_Click" Content="Tomorrow"/><ui:Button Margin="6,0,0,0" Tag="{Binding}" Click="Remove_Click" ToolTip="移除计划" Icon="{ui:SymbolIcon Delete24}"/></StackPanel></Grid></Border></DataTemplate></Page.Resources>
+<Page x:Class="Quadrant.App.Views.Pages.TodayPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Loaded="Page_Loaded"
+      Unloaded="Page_Unloaded">
+    <Page.Resources>
+        <Style x:Key="TodayMetricLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style x:Key="TodayMetricValueStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextStyle}">
+            <Setter Property="Margin" Value="0,4,0,0" />
+            <Setter Property="FontSize" Value="16" />
+        </Style>
+        <Style x:Key="TodaySectionIconStyle" TargetType="ui:SymbolIcon">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style x:Key="TodayMetadataTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Style>
+
+        <DataTemplate x:Key="TodayTaskTemplate">
+            <Border x:Name="TaskRow" Style="{StaticResource TaskRowSurfaceStyle}" AutomationProperties.Name="{Binding Title}">
+                <Border.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="开始专注" Tag="{Binding}" Click="StartFocus_Click"><MenuItem.Icon><ui:SymbolIcon Symbol="Play24" /></MenuItem.Icon></MenuItem>
+                        <Separator />
+                        <MenuItem Header="计划为今天" Tag="{Binding}" Click="Today_Click"><MenuItem.Icon><ui:SymbolIcon Symbol="CalendarCheckmark24" /></MenuItem.Icon></MenuItem>
+                        <MenuItem Header="计划为明天" Tag="{Binding}" Click="Tomorrow_Click"><MenuItem.Icon><ui:SymbolIcon Symbol="CalendarAdd24" /></MenuItem.Icon></MenuItem>
+                        <MenuItem Header="移除计划" Tag="{Binding}" Click="Remove_Click"><MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon></MenuItem>
+                    </ContextMenu>
+                </Border.ContextMenu>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <CheckBox Grid.Column="0" Margin="0,2,10,0" VerticalAlignment="Top" Tag="{Binding}" Click="Complete_Click" AutomationProperties.Name="标记任务完成" ToolTip="完成任务" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock MaxHeight="40" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding Title}" TextTrimming="CharacterEllipsis" TextWrapping="Wrap" />
+                        <WrapPanel Margin="0,5,0,0">
+                            <Border Style="{StaticResource TaskMetadataChipStyle}"><TextBlock x:Name="QuadrantMetadata" Style="{StaticResource TodayMetadataTextStyle}" Text="{Binding QuadrantId, StringFormat=Q{0}}" /></Border>
+                            <Border x:Name="DueMetadataChip" Style="{StaticResource TaskMetadataChipStyle}">
+                                <StackPanel Orientation="Horizontal"><ui:SymbolIcon Margin="0,0,4,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CalendarClock24" /><TextBlock Style="{StaticResource TodayMetadataTextStyle}" Text="{Binding DueAt, StringFormat=截止 {0:MM-dd HH:mm}}" /></StackPanel>
+                            </Border>
+                            <Border x:Name="EstimateMetadataChip" Style="{StaticResource TaskMetadataChipStyle}">
+                                <StackPanel Orientation="Horizontal"><ui:SymbolIcon Margin="0,0,4,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="Clock24" /><TextBlock Style="{StaticResource TodayMetadataTextStyle}" Text="{Binding EstimatedMinutes, StringFormat=预计 {0} 分钟}" /></StackPanel>
+                            </Border>
+                            <Border x:Name="RecurrenceMetadataChip" Style="{StaticResource TaskMetadataChipStyle}" ToolTip="完成后会创建下一项任务">
+                                <StackPanel Orientation="Horizontal"><ui:SymbolIcon Margin="0,0,4,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="ArrowRepeatAll24" /><TextBlock x:Name="RecurrenceMetadata" Style="{StaticResource TodayMetadataTextStyle}" /></StackPanel>
+                            </Border>
+                        </WrapPanel>
+                    </StackPanel>
+                    <StackPanel x:Name="RowActions" Grid.Column="2" Margin="12,0,0,0" Orientation="Horizontal" VerticalAlignment="Top" Visibility="Hidden">
+                        <ui:Button Appearance="Primary" Padding="10,5" Tag="{Binding}" Click="StartFocus_Click" Icon="{ui:SymbolIcon Play24}" Content="开始专注" AutomationProperties.Name="在 Focus 中打开任务" />
+                        <ui:DropDownButton Margin="4,0,0,0" Style="{StaticResource TaskRowActionButtonStyle}" Tag="{Binding}" Icon="{ui:SymbolIcon MoreHorizontal24}" AutomationProperties.Name="更多任务操作" ToolTip="更多">
+                            <ui:DropDownButton.Flyout>
+                                <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="计划为今天" Tag="{Binding}" Click="Today_Click"><MenuItem.Icon><ui:SymbolIcon Symbol="CalendarCheckmark24" /></MenuItem.Icon></MenuItem>
+                                    <MenuItem Header="计划为明天" Tag="{Binding}" Click="Tomorrow_Click"><MenuItem.Icon><ui:SymbolIcon Symbol="CalendarAdd24" /></MenuItem.Icon></MenuItem>
+                                    <MenuItem Header="移除计划" Tag="{Binding}" Click="Remove_Click"><MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon></MenuItem>
+                                </ContextMenu>
+                            </ui:DropDownButton.Flyout>
+                        </ui:DropDownButton>
+                    </StackPanel>
+                </Grid>
+            </Border>
+            <DataTemplate.Triggers>
+                <Trigger SourceName="TaskRow" Property="IsMouseOver" Value="True"><Setter TargetName="RowActions" Property="Visibility" Value="Visible" /></Trigger>
+                <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType={x:Type ListBoxItem}}}" Value="True"><Setter TargetName="RowActions" Property="Visibility" Value="Visible" /></DataTrigger>
+                <DataTrigger Binding="{Binding QuadrantId}" Value="{x:Null}"><Setter TargetName="QuadrantMetadata" Property="Text" Value="Inbox" /></DataTrigger>
+                <DataTrigger Binding="{Binding DueAt}" Value="{x:Null}"><Setter TargetName="DueMetadataChip" Property="Visibility" Value="Collapsed" /></DataTrigger>
+                <DataTrigger Binding="{Binding EstimatedMinutes}" Value="{x:Null}"><Setter TargetName="EstimateMetadataChip" Property="Visibility" Value="Collapsed" /></DataTrigger>
+                <DataTrigger Binding="{Binding RecurrenceKind}" Value="None"><Setter TargetName="RecurrenceMetadataChip" Property="Visibility" Value="Collapsed" /></DataTrigger>
+                <DataTrigger Binding="{Binding RecurrenceKind}" Value="Daily"><Setter TargetName="RecurrenceMetadata" Property="Text" Value="每天" /></DataTrigger>
+                <DataTrigger Binding="{Binding RecurrenceKind}" Value="Weekly"><Setter TargetName="RecurrenceMetadata" Property="Text" Value="每周" /></DataTrigger>
+                <DataTrigger Binding="{Binding RecurrenceKind}" Value="Monthly"><Setter TargetName="RecurrenceMetadata" Property="Text" Value="每月" /></DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24,16,24,24">
+            <Grid Style="{StaticResource PageHeaderContainerStyle}">
+                <StackPanel Style="{StaticResource PageHeaderTitleStackStyle}">
+                    <TextBlock Style="{StaticResource TitleLargeTextStyle}" Text="Today" />
+                    <TextBlock Margin="0,4,0,0" Style="{StaticResource PageSubtitleTextStyle}" Text="今天的计划、到期与执行" />
+                </StackPanel>
+            </Grid>
+
+            <Border Style="{StaticResource SectionSurfaceStyle}" Padding="0">
+                <Grid Margin="16,12">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="1" /><ColumnDefinition Width="*" /><ColumnDefinition Width="1" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <StackPanel><TextBlock Style="{StaticResource TodayMetricLabelStyle}" Text="任务" /><TextBlock Style="{StaticResource TodayMetricValueStyle}" Text="{Binding UniqueTaskCount, StringFormat={}{0} 项}" /></StackPanel>
+                    <Border Grid.Column="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+                    <StackPanel Grid.Column="2" Margin="16,0"><TextBlock Style="{StaticResource TodayMetricLabelStyle}" Text="预计时长" /><TextBlock Style="{StaticResource TodayMetricValueStyle}" Text="{Binding EstimatedTimeText}" /></StackPanel>
+                    <Border Grid.Column="3" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+                    <StackPanel Grid.Column="4" Margin="16,0,0,0"><TextBlock Style="{StaticResource TodayMetricLabelStyle}" Text="今日专注" /><TextBlock Style="{StaticResource TodayMetricValueStyle}" Text="{Binding FocusedTimeText}" /></StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Margin="0,16,0,0" Style="{StaticResource SectionSurfaceStyle}" Visibility="{Binding HasOverdue, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><ui:SymbolIcon Style="{StaticResource TodaySectionIconStyle}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Symbol="Alert24" /><TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="已逾期" /><ui:InfoBadge Grid.Column="2" Style="{StaticResource QuadrantCountBadgeStyle}" Value="{Binding Overdue.Count}" /></Grid>
+                    <Separator Margin="0,0,0,6" /><ui:ListView ItemsSource="{Binding Overdue}" ItemTemplate="{StaticResource TodayTaskTemplate}" Style="{StaticResource QuadrantTaskListStyle}" />
+                </StackPanel>
+            </Border>
+
+            <Border Margin="0,16,0,0" Style="{StaticResource SectionSurfaceStyle}" Visibility="{Binding HasPlannedToday, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><ui:SymbolIcon Style="{StaticResource TodaySectionIconStyle}" Symbol="CalendarCheckmark24" /><TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="计划于今天" /><ui:InfoBadge Grid.Column="2" Style="{StaticResource QuadrantCountBadgeStyle}" Value="{Binding PlannedToday.Count}" /></Grid>
+                    <Separator Margin="0,0,0,6" /><ui:ListView ItemsSource="{Binding PlannedToday}" ItemTemplate="{StaticResource TodayTaskTemplate}" Style="{StaticResource QuadrantTaskListStyle}" />
+                </StackPanel>
+            </Border>
+
+            <Border Margin="0,16,0,0" Style="{StaticResource SectionSurfaceStyle}" Visibility="{Binding HasDueToday, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><ui:SymbolIcon Style="{StaticResource TodaySectionIconStyle}" Symbol="CalendarClock24" /><TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="今天到期" /><ui:InfoBadge Grid.Column="2" Style="{StaticResource QuadrantCountBadgeStyle}" Value="{Binding DueToday.Count}" /></Grid>
+                    <Separator Margin="0,0,0,6" /><ui:ListView ItemsSource="{Binding DueToday}" ItemTemplate="{StaticResource TodayTaskTemplate}" Style="{StaticResource QuadrantTaskListStyle}" />
+                </StackPanel>
+            </Border>
+
+            <Border Margin="0,16,0,0" Style="{StaticResource SectionSurfaceStyle}" Visibility="{Binding HasNeedsReschedule, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><ui:SymbolIcon Style="{StaticResource TodaySectionIconStyle}" Symbol="ArrowRepeatAll24" /><TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="需要重新安排" /><ui:InfoBadge Grid.Column="2" Style="{StaticResource QuadrantCountBadgeStyle}" Value="{Binding NeedsReschedule.Count}" /></Grid>
+                    <Separator Margin="0,0,0,6" /><ui:ListView ItemsSource="{Binding NeedsReschedule}" ItemTemplate="{StaticResource TodayTaskTemplate}" Style="{StaticResource QuadrantTaskListStyle}" />
+                </StackPanel>
+            </Border>
+
+            <Border Margin="0,48,0,0" Padding="32,28" HorizontalAlignment="Center" Style="{StaticResource SectionSurfaceStyle}" Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel Width="360" HorizontalAlignment="Center">
+                    <ui:SymbolIcon HorizontalAlignment="Center" FontSize="36" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CalendarEmpty24" />
+                    <TextBlock Margin="0,14,0,0" HorizontalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="今天没有计划任务" />
+                    <TextBlock Margin="0,6,0,0" HorizontalAlignment="Center" TextAlignment="Center" Style="{StaticResource PageSubtitleTextStyle}" Text="从四象限或 Inbox 把任务添加到 Today" />
+                </StackPanel>
+            </Border>
+
+            <Border Margin="0,24,0,0" Style="{StaticResource SectionSurfaceStyle}" Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel HorizontalAlignment="Center"><ui:SymbolIcon HorizontalAlignment="Center" FontSize="28" Foreground="{DynamicResource SystemFillColorCautionBrush}" Symbol="Alert24" /><TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding ErrorMessage}" /><ui:Button Margin="0,12,0,0" Appearance="Primary" Content="重试" Click="Retry_Click" /></StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
 </Page>
