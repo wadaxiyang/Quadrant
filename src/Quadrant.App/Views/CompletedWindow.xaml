@@ -21,8 +21,8 @@
                 <TextBlock Style="{StaticResource TitleLargeTextStyle}" Text="已完成任务" />
                 <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="恢复仍需处理的任务，或永久清理记录" />
             </StackPanel>
-            <ListBox Grid.Row="1" Margin="0,16,0,0" ItemsSource="{Binding CompletedTasks}" Style="{StaticResource QuadrantTaskListStyle}">
-                <ListBox.ItemTemplate>
+            <ui:ListView Grid.Row="1" Margin="0,16,0,0" ItemsSource="{Binding CompletedTasks}" Style="{StaticResource QuadrantTaskListStyle}">
+                <ui:ListView.ItemTemplate>
                     <DataTemplate>
                         <Border Style="{StaticResource TaskCardStyle}" Margin="{StaticResource TaskCardBottomMargin}">
                             <Grid>
@@ -42,8 +42,8 @@
                             </Grid>
                         </Border>
                     </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+                </ui:ListView.ItemTemplate>
+            </ui:ListView>
         </Grid>
     </Grid>
 </ui:FluentWindow>

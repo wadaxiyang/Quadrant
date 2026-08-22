@@ -130,13 +130,13 @@
                         <Separator Grid.Row="1" Margin="0,14,0,10" />
 
                         <Grid Grid.Row="2">
-                            <ListBox ItemsSource="{Binding FilteredTaskOptions}"
+                            <ui:ListView ItemsSource="{Binding FilteredTaskOptions}"
                                      SelectedItem="{Binding SelectedTaskOption, Mode=OneWay}"
                                      IsEnabled="{Binding CanConfigureSession}"
                                      Style="{StaticResource QuadrantTaskListStyle}"
                                      SelectionChanged="TaskPicker_SelectionChanged"
                                      automation:AutomationProperties.Name="可专注任务列表">
-                                <ListBox.ItemTemplate>
+                                <ui:ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Grid Margin="2,4">
                                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
@@ -150,8 +150,8 @@
                                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="Clock24" />
                                         </Grid>
                                     </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                                </ui:ListView.ItemTemplate>
+                            </ui:ListView>
 
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"
                                         Visibility="{Binding IsFilteredTaskListEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">

@@ -71,8 +71,8 @@
                     </Grid>
 
                     <Grid Grid.Row="1" Tag="DropContent">
-                        <ListBox x:Name="InboxList" ItemsSource="{Binding Tasks}" Style="{StaticResource QuadrantTaskListStyle}" AutomationProperties.Name="Home Inbox 未分类任务列表">
-                            <ListBox.ItemTemplate>
+                        <ui:ListView x:Name="InboxList" ItemsSource="{Binding Tasks}" Style="{StaticResource QuadrantTaskListStyle}" AutomationProperties.Name="Home Inbox 未分类任务列表">
+                            <ui:ListView.ItemTemplate>
                                 <DataTemplate>
                                     <Border Style="{StaticResource TaskRowSurfaceStyle}"
                                             Cursor="Hand"
@@ -121,8 +121,8 @@
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
+                            </ui:ListView.ItemTemplate>
+                        </ui:ListView>
 
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <ui:ProgressRing Width="28" Height="28" IsIndeterminate="True" />
@@ -159,7 +159,7 @@
                         </Grid>
                         <Grid Grid.Row="1">
                             <Grid Tag="DropContent">
-                                <ListBox ItemsSource="{Binding Quadrants[0].Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}" Style="{StaticResource QuadrantTaskListStyle}" />
+                                <ui:ListView ItemsSource="{Binding Quadrants[0].Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}" Style="{StaticResource QuadrantTaskListStyle}" />
                                 <StackPanel MaxWidth="220" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Quadrants[0].IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <ui:SymbolIcon HorizontalAlignment="Center" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CheckmarkCircle20" />
                                     <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextStyle}" Text="这里暂时没有任务" />
@@ -183,7 +183,7 @@
                         </Grid>
                         <Grid Grid.Row="1">
                             <Grid Tag="DropContent">
-                                <ListBox ItemsSource="{Binding Quadrants[1].Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}" Style="{StaticResource QuadrantTaskListStyle}" />
+                                <ui:ListView ItemsSource="{Binding Quadrants[1].Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}" Style="{StaticResource QuadrantTaskListStyle}" />
                                 <StackPanel MaxWidth="220" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Quadrants[1].IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <ui:SymbolIcon HorizontalAlignment="Center" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CheckmarkCircle20" />
                                     <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextStyle}" Text="这里暂时没有任务" />
@@ -207,7 +207,7 @@
                         </Grid>
                         <Grid Grid.Row="1">
                             <Grid Tag="DropContent">
-                                <ListBox ItemsSource="{Binding Quadrants[2].Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}" Style="{StaticResource QuadrantTaskListStyle}" />
+                                <ui:ListView ItemsSource="{Binding Quadrants[2].Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}" Style="{StaticResource QuadrantTaskListStyle}" />
                                 <StackPanel MaxWidth="220" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Quadrants[2].IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <ui:SymbolIcon HorizontalAlignment="Center" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CheckmarkCircle20" />
                                     <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextStyle}" Text="这里暂时没有任务" />
@@ -231,7 +231,7 @@
                         </Grid>
                         <Grid Grid.Row="1">
                             <Grid Tag="DropContent">
-                                <ListBox ItemsSource="{Binding Quadrants[3].Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}" Style="{StaticResource QuadrantTaskListStyle}" />
+                                <ui:ListView ItemsSource="{Binding Quadrants[3].Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}" Style="{StaticResource QuadrantTaskListStyle}" />
                                 <StackPanel MaxWidth="220" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Quadrants[3].IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <ui:SymbolIcon HorizontalAlignment="Center" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CheckmarkCircle20" />
                                     <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextStyle}" Text="这里暂时没有任务" />
