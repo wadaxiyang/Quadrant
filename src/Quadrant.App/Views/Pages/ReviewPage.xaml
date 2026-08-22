@@ -8,279 +8,204 @@
       Unloaded="Page_Unloaded"
       SizeChanged="Page_SizeChanged"
       PreviewMouseWheel="Page_PreviewMouseWheel">
-  <Page.Resources>
-    <Style x:Key="ReviewSectionCardStyle" TargetType="Border" BasedOn="{StaticResource QuadrantPanelStyle}">
-      <Setter Property="Margin" Value="0,0,12,12"/>
-      <Setter Property="MinHeight" Value="176"/>
-    </Style>
-    <Style x:Key="ReviewEmptyTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
-      <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
-      <Setter Property="Margin" Value="0,12,0,0"/>
-    </Style>
-  </Page.Resources>
+    <Page.Resources>
+        <ItemsPanelTemplate x:Key="ReviewPrimaryKpiWidePanel"><UniformGrid Rows="1" Columns="4" /></ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="ReviewPrimaryKpiNarrowPanel"><UniformGrid Columns="2" /></ItemsPanelTemplate>
 
-  <Grid Margin="24,16,24,24">
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-    <Grid>
-      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-      <StackPanel>
-        <TextBlock Style="{StaticResource TitleLargeTextStyle}" Text="Review"/>
-        <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding RangeSubtitle}"/>
-      </StackPanel>
-      <ComboBox Grid.Column="1" Width="132" VerticalAlignment="Center"
-                ItemsSource="{Binding RangeChoices}" DisplayMemberPath="Label" SelectedValuePath="Value"
-                SelectedValue="{Binding SelectedRange}" AutomationProperties.Name="Review 统计范围"/>
-      <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,12,0,0" Orientation="Horizontal">
-        <ui:Button Padding="12,6" Content="总览" Click="OverviewAnchor_Click" AutomationProperties.Name="转到 Review 总览"/>
-        <ui:Button Margin="8,0,0,0" Padding="12,6" Content="分布" Click="DistributionAnchor_Click" AutomationProperties.Name="转到象限分布"/>
-        <ui:Button Margin="8,0,0,0" Padding="12,6" Content="活动" Click="ActivityAnchor_Click" AutomationProperties.Name="转到活动"/>
-        <ui:Button Margin="8,0,0,0" Padding="12,6" Content="近期完成" Click="RecentAnchor_Click" AutomationProperties.Name="转到近期完成"/>
-      </StackPanel>
-    </Grid>
+        <Style x:Key="ReviewSectionCardStyle" TargetType="Border" BasedOn="{StaticResource SectionSurfaceStyle}">
+            <Setter Property="Margin" Value="0,0,0,16" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+        </Style>
+        <Style x:Key="ReviewEmptyTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="Margin" Value="0,12,0,0" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="ReviewSectionIconStyle" TargetType="ui:SymbolIcon">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style x:Key="ReviewKpiIconStyle" TargetType="ui:SymbolIcon">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemAccentColorPrimaryBrush}" />
+        </Style>
 
-    <ScrollViewer x:Name="DashboardScrollViewer" Grid.Row="1" Margin="0,20,0,0"
-                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                  CanContentScroll="False" PanningMode="VerticalOnly">
-      <StackPanel x:Name="DashboardContent">
-        <Border x:Name="OverviewAnchor" Height="0" IsHitTestVisible="False"/>
-        <ItemsControl ItemsSource="{Binding PrimaryKpis}">
-          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <Border Width="176" MinHeight="104" Margin="0,0,12,12" Padding="12"
-                      Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                      BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
-                <StackPanel>
-                  <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding Label}"/>
-                  <TextBlock Margin="0,4,0,0" FontSize="24" FontWeight="SemiBold" Text="{Binding Value}"/>
-                  <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding Comparison}"/>
-                </StackPanel>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <ItemsControl ItemsSource="{Binding CurrentStateKpis}">
-          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <Border Width="176" MinHeight="88" Margin="0,0,12,12" Padding="12"
-                      Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                      BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
-                <StackPanel>
-                  <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding Label}"/>
-                  <TextBlock Margin="0,4,0,0" FontSize="24" FontWeight="SemiBold" Text="{Binding Value}"/>
-                  <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding Comparison}"/>
-                </StackPanel>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        <DataTemplate x:Key="ReviewPrimaryKpiTemplate">
+            <Border Margin="0,0,12,12" Style="{StaticResource SectionSurfaceStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding Label}" />
+                        <TextBlock Margin="0,6,0,0" Style="{StaticResource MetricValueTextStyle}" Text="{Binding Value}" />
+                        <TextBlock Margin="0,6,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding Comparison}" />
+                    </StackPanel>
+                    <ui:SymbolIcon x:Name="KpiIcon" Grid.Column="1" Style="{StaticResource ReviewKpiIconStyle}" Symbol="CheckmarkCircle24" />
+                </Grid>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Label}" Value="专注时间"><Setter TargetName="KpiIcon" Property="Symbol" Value="Timer24" /></DataTrigger>
+                <DataTrigger Binding="{Binding Label}" Value="专注次数"><Setter TargetName="KpiIcon" Property="Symbol" Value="Clock24" /></DataTrigger>
+                <DataTrigger Binding="{Binding Label}" Value="平均专注"><Setter TargetName="KpiIcon" Property="Symbol" Value="DataBarVertical24" /></DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
 
-        <Border Margin="0,0,0,12" Padding="16" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8"
-                Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
-          <StackPanel>
-            <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="还没有活动记录"/>
-            <TextBlock Margin="0,8,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                       Text="完成任务或结束专注后，这里会形成可回顾的统计。"/>
-          </StackPanel>
-        </Border>
+        <DataTemplate x:Key="ReviewCurrentStateKpiTemplate">
+            <Grid Margin="16,12">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <ui:SymbolIcon x:Name="StateIcon" Style="{StaticResource ReviewSectionIconStyle}" Symbol="MailInbox24" />
+                <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding Label}" />
+                <TextBlock Grid.Column="2" Margin="16,0,0,0" VerticalAlignment="Center" FontSize="24" FontWeight="SemiBold" Text="{Binding Value}" />
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Label}" Value="当前已逾期">
+                    <Setter TargetName="StateIcon" Property="Symbol" Value="Warning24" />
+                    <Setter TargetName="StateIcon" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
 
-        <Grid x:Name="SectionGrid">
-          <Grid.ColumnDefinitions><ColumnDefinition x:Name="LeftSectionColumn" Width="*"/><ColumnDefinition x:Name="RightSectionColumn" Width="*"/></Grid.ColumnDefinitions>
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-          </Grid.RowDefinitions>
+        <DataTemplate x:Key="ReviewInsightTemplate">
+            <Grid Margin="0,0,0,12" AutomationProperties.Name="{Binding Text}">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <Border Width="32" Height="32" Background="{DynamicResource SubtleFillColorSecondaryBrush}" CornerRadius="{StaticResource RadiusSmall}">
+                    <ui:SymbolIcon x:Name="InsightIcon" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="18" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="Lightbulb24" />
+                </Border>
+                <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}" Text="{Binding Text}" TextWrapping="Wrap" />
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="CompletionChange"><Setter TargetName="InsightIcon" Property="Symbol" Value="ArrowTrendingLines24" /></DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="ImportantWorkShare"><Setter TargetName="InsightIcon" Property="Symbol" Value="DataPie24" /></DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="HighestCompletionQuadrant"><Setter TargetName="InsightIcon" Property="Symbol" Value="CheckmarkCircle24" /></DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="HighestFocusQuadrant"><Setter TargetName="InsightIcon" Property="Symbol" Value="Timer24" /></DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="MostActiveDay"><Setter TargetName="InsightIcon" Property="Symbol" Value="CalendarDay24" /></DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="FocusChange"><Setter TargetName="InsightIcon" Property="Symbol" Value="ArrowTrendingLines24" /></DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="AverageSession"><Setter TargetName="InsightIcon" Property="Symbol" Value="Clock24" /></DataTrigger>
+                <DataTrigger Binding="{Binding Tone}" Value="Positive"><Setter TargetName="InsightIcon" Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" /></DataTrigger>
+                <DataTrigger Binding="{Binding Tone}" Value="Attention"><Setter TargetName="InsightIcon" Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" /></DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </Page.Resources>
 
-          <Border x:Name="ComparisonCard" Style="{StaticResource ReviewSectionCardStyle}">
-            <StackPanel>
-              <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="本期与上期"/>
-              <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding Comparisons}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <review:ComparisonBarGroup Margin="0,0,0,12" MetricName="{Binding MetricName}" CurrentLabel="{Binding CurrentLabel}"
-                      PreviousLabel="{Binding PreviousLabel}" CurrentValue="{Binding CurrentValue}" PreviousValue="{Binding PreviousValue}"
-                      CurrentText="{Binding CurrentText}" PreviousText="{Binding PreviousText}" DeltaText="{Binding DeltaText}"/>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <TextBlock Text="全部时间范围不提供上一周期比较。">
-                <TextBlock.Style>
-                  <Style TargetType="TextBlock" BasedOn="{StaticResource ReviewEmptyTextStyle}">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                    <Style.Triggers><DataTrigger Binding="{Binding HasPreviousPeriod}" Value="False"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                  </Style>
-                </TextBlock.Style>
-              </TextBlock>
+    <Grid Margin="{StaticResource PageContentMargin}">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+
+        <Grid Style="{StaticResource PageHeaderContainerStyle}">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <StackPanel Style="{StaticResource PageHeaderTitleStackStyle}">
+                <TextBlock Style="{StaticResource TitleLargeTextStyle}" Text="Review" />
+                <TextBlock Margin="{StaticResource PageSubtitleMargin}" Style="{StaticResource PageSubtitleTextStyle}" Text="{Binding RangeSubtitle}" />
             </StackPanel>
-          </Border>
-
-          <Border x:Name="CompletedCard" Grid.Column="1" Style="{StaticResource ReviewSectionCardStyle}">
-            <StackPanel>
-              <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="按象限完成"/>
-              <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding CompletedQuadrantRows}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <review:MetricBar Margin="0,0,0,12" QuadrantId="{Binding QuadrantId}" Label="{Binding Label}" SecondaryLabel="{Binding SecondaryLabel}"
-                                      ProgressValue="{Binding ProgressValue}" PercentageText="{Binding PercentageText}" ValueText="{Binding ValueText}"/>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-          </Border>
-
-          <Border x:Name="ActivityCard" Grid.Row="1" Style="{StaticResource ReviewSectionCardStyle}">
-            <StackPanel>
-              <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="活动"/>
-                <ComboBox Grid.Column="1" Width="96" ItemsSource="{Binding ActivityChoices}" DisplayMemberPath="Label" SelectedValuePath="Value"
-                          SelectedValue="{Binding SelectedActivityMode}" AutomationProperties.Name="活动指标"/>
-              </Grid>
-              <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding ActivityItems}">
-                <ItemsControl.Style>
-                  <Style TargetType="ItemsControl">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                    <Style.Triggers><DataTrigger Binding="{Binding IsSevenDayRange}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                  </Style>
-                </ItemsControl.Style>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <Grid Margin="0,0,0,8">
-                      <Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="*"/><ColumnDefinition Width="72"/></Grid.ColumnDefinitions>
-                      <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="{Binding DisplayLabel}"/>
-                      <ProgressBar Grid.Column="1" Height="8" Margin="8,0" VerticalAlignment="Center" Maximum="100" Value="{Binding RelativeValue}"
-                                   Foreground="{DynamicResource AccentFillColorDefaultBrush}" ToolTip="{Binding ToolTipText}" IsHitTestVisible="False"/>
-                      <TextBlock Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="{Binding ValueText}"/>
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding ActivityItems}">
-                <ItemsControl.Style>
-                  <Style TargetType="ItemsControl">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                    <Style.Triggers><DataTrigger Binding="{Binding IsActivityStrip}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                  </Style>
-                </ItemsControl.Style>
-                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <ProgressBar Width="12" Height="64" Margin="0,0,4,8" Orientation="Vertical" Maximum="100" Value="{Binding RelativeValue}"
-                                 Foreground="{DynamicResource AccentFillColorDefaultBrush}" ToolTip="{Binding ToolTipText}" IsHitTestVisible="False"
-                                 AutomationProperties.Name="{Binding ToolTipText}"/>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-          </Border>
-
-          <Border x:Name="FocusBreakdownCard" Grid.Row="1" Grid.Column="1" Style="{StaticResource ReviewSectionCardStyle}">
-            <StackPanel>
-              <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="按象限专注"/>
-              <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding FocusQuadrantRows}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <review:MetricBar Margin="0,0,0,12" QuadrantId="{Binding QuadrantId}" Label="{Binding Label}" SecondaryLabel="{Binding SecondaryLabel}"
-                                      ProgressValue="{Binding ProgressValue}" PercentageText="{Binding PercentageText}" ValueText="{Binding ValueText}"/>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <TextBlock Text="这个范围内没有已完成的有效专注记录。">
-                <TextBlock.Style>
-                  <Style TargetType="TextBlock" BasedOn="{StaticResource ReviewEmptyTextStyle}">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                    <Style.Triggers><DataTrigger Binding="{Binding HasFocusData}" Value="False"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                  </Style>
-                </TextBlock.Style>
-              </TextBlock>
-            </StackPanel>
-          </Border>
-
-          <Border x:Name="InsightsCard" Grid.Row="2" Style="{StaticResource ReviewSectionCardStyle}">
-            <StackPanel>
-              <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="洞察"/>
-              <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding InsightItems}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <Grid Margin="0,0,0,12">
-                      <Grid.ColumnDefinitions><ColumnDefinition Width="4"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                      <Border Background="{DynamicResource AccentFillColorDefaultBrush}" CornerRadius="4"/>
-                      <TextBlock Grid.Column="1" Margin="12,0,0,0" Style="{StaticResource BodyTextStyle}" Text="{Binding Text}" TextWrapping="Wrap"/>
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <TextBlock Text="积累更多完成或专注记录后，这里会出现简短洞察。">
-                <TextBlock.Style>
-                  <Style TargetType="TextBlock" BasedOn="{StaticResource ReviewEmptyTextStyle}">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                    <Style.Triggers><DataTrigger Binding="{Binding HasInsights}" Value="False"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                  </Style>
-                </TextBlock.Style>
-              </TextBlock>
-            </StackPanel>
-          </Border>
-
-          <Border x:Name="FocusSummaryCard" Grid.Row="2" Grid.Column="1" Style="{StaticResource ReviewSectionCardStyle}">
-            <StackPanel>
-              <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="专注摘要"/>
-              <Grid Margin="0,12,0,0">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                <TextBlock Style="{StaticResource CaptionTextStyle}" Text="总专注"/><TextBlock Grid.Column="1" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding FocusTotalText}"/>
-                <TextBlock Grid.Row="1" Margin="0,8,0,0" Style="{StaticResource CaptionTextStyle}" Text="有效次数"/><TextBlock Grid.Row="1" Grid.Column="1" Margin="0,8,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding FocusSessionsText}"/>
-                <TextBlock Grid.Row="2" Margin="0,8,0,0" Style="{StaticResource CaptionTextStyle}" Text="平均每次"/><TextBlock Grid.Row="2" Grid.Column="1" Margin="0,8,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding FocusAverageText}"/>
-                <TextBlock Grid.Row="3" Margin="0,8,0,0" Style="{StaticResource CaptionTextStyle}" Text="最长一次"/><TextBlock Grid.Row="3" Grid.Column="1" Margin="0,8,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding FocusLongestText}"/>
-              </Grid>
-              <Separator Margin="0,16,0,12"/>
-              <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="专注最多的任务"/>
-              <TextBlock Margin="0,4,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding MostFocusedTaskTitle}" TextTrimming="CharacterEllipsis"/>
-              <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionTextStyle}" Text="{Binding MostFocusedTaskDetail}"/>
-              <TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="专注最多的象限"/>
-              <TextBlock Margin="0,4,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding MostFocusedQuadrantText}"/>
-            </StackPanel>
-          </Border>
+            <ComboBox Grid.Column="1" Width="132" VerticalAlignment="Center" ItemsSource="{Binding RangeChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding SelectedRange}" AutomationProperties.Name="Review 统计范围" />
         </Grid>
 
-        <Border x:Name="RecentCompletedCard" Margin="0,0,12,0" Padding="16" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
-          <StackPanel>
-            <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="近期完成"/>
-            <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding RecentCompleted}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <Grid Margin="0,0,0,8" AutomationProperties.Name="{Binding Title}">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
-                    <TextBlock Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding MetadataText}"/>
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
+        <ScrollViewer x:Name="DashboardScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False" PanningMode="VerticalOnly">
+            <StackPanel x:Name="DashboardContent">
+                <ItemsControl x:Name="PrimaryKpiItems" ItemsSource="{Binding PrimaryKpis}" ItemTemplate="{StaticResource ReviewPrimaryKpiTemplate}" ItemsPanel="{StaticResource ReviewPrimaryKpiWidePanel}" />
+
+                <Border Margin="0,4,12,20" Padding="0" Style="{StaticResource SectionSurfaceStyle}">
+                    <ItemsControl ItemsSource="{Binding CurrentStateKpis}" ItemTemplate="{StaticResource ReviewCurrentStateKpiTemplate}">
+                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Rows="1" Columns="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </Border>
+
+                <Border Margin="0,0,12,20" Style="{StaticResource SectionSurfaceStyle}" Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel HorizontalAlignment="Center">
+                        <ui:SymbolIcon HorizontalAlignment="Center" FontSize="32" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="DataBarVertical24" />
+                        <TextBlock Margin="0,12,0,0" HorizontalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="还没有活动记录" />
+                        <TextBlock Margin="0,6,0,0" HorizontalAlignment="Center" TextAlignment="Center" Style="{StaticResource PageSubtitleTextStyle}" Text="完成任务或结束专注后，这里会形成可回顾的统计" />
+                    </StackPanel>
+                </Border>
+
+                <Grid x:Name="SectionGrid">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="LeftSectionColumn" Width="*" />
+                        <ColumnDefinition x:Name="SectionGapColumn" Width="16" />
+                        <ColumnDefinition x:Name="RightSectionColumn" Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Border x:Name="ComparisonCard" Style="{StaticResource ReviewSectionCardStyle}">
+                        <StackPanel>
+                            <Grid Margin="{StaticResource SectionHeaderBottomMargin}"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><ui:SymbolIcon Style="{StaticResource ReviewSectionIconStyle}" Symbol="ArrowTrendingLines24" /><TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="本期与上期" /></Grid>
+                            <ItemsControl ItemsSource="{Binding Comparisons}"><ItemsControl.ItemTemplate><DataTemplate><review:ComparisonBarGroup Margin="0,0,0,12" MetricName="{Binding MetricName}" CurrentLabel="{Binding CurrentLabel}" PreviousLabel="{Binding PreviousLabel}" CurrentValue="{Binding CurrentValue}" PreviousValue="{Binding PreviousValue}" CurrentText="{Binding CurrentText}" PreviousText="{Binding PreviousText}" DeltaText="{Binding DeltaText}" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                            <TextBlock Text="全部时间范围不提供上一周期比较。"><TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource ReviewEmptyTextStyle}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding HasPreviousPeriod}" Value="False"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="CompletedCard" Grid.Column="2" Style="{StaticResource ReviewSectionCardStyle}">
+                        <StackPanel>
+                            <Grid Margin="{StaticResource SectionHeaderBottomMargin}"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><ui:SymbolIcon Style="{StaticResource ReviewSectionIconStyle}" Symbol="CheckmarkCircle24" /><TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="按象限完成" /></Grid>
+                            <ItemsControl ItemsSource="{Binding CompletedQuadrantRows}"><ItemsControl.ItemTemplate><DataTemplate><review:MetricBar Margin="0,0,0,12" QuadrantId="{Binding QuadrantId}" Label="{Binding Label}" SecondaryLabel="{Binding SecondaryLabel}" ProgressValue="{Binding ProgressValue}" PercentageText="{Binding PercentageText}" ValueText="{Binding ValueText}" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="ActivityCard" Grid.Row="1" Style="{StaticResource ReviewSectionCardStyle}">
+                        <StackPanel>
+                            <Grid Margin="{StaticResource SectionHeaderBottomMargin}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <ui:SymbolIcon Style="{StaticResource ReviewSectionIconStyle}" Symbol="CalendarDay24" />
+                                <TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="活动" />
+                                <ComboBox Grid.Column="2" Width="96" ItemsSource="{Binding ActivityChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding SelectedActivityMode}" AutomationProperties.Name="活动指标" />
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding ActivityItems}">
+                                <ItemsControl.Style><Style TargetType="ItemsControl"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding IsSevenDayRange}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></ItemsControl.Style>
+                                <ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="48" /><ColumnDefinition Width="*" /><ColumnDefinition Width="72" /></Grid.ColumnDefinitions><TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="{Binding DisplayLabel}" /><ProgressBar Grid.Column="1" Height="8" Margin="8,0" VerticalAlignment="Center" Maximum="100" Value="{Binding RelativeValue}" Foreground="{DynamicResource AccentFillColorDefaultBrush}" ToolTip="{Binding ToolTipText}" IsHitTestVisible="False" /><TextBlock Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="{Binding ValueText}" /></Grid></DataTemplate></ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <ItemsControl ItemsSource="{Binding ActivityItems}">
+                                <ItemsControl.Style><Style TargetType="ItemsControl"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding IsActivityStrip}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></ItemsControl.Style>
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate><DataTemplate><ProgressBar Width="12" Height="64" Margin="0,0,4,8" Orientation="Vertical" Maximum="100" Value="{Binding RelativeValue}" Foreground="{DynamicResource AccentFillColorDefaultBrush}" ToolTip="{Binding ToolTipText}" IsHitTestVisible="False" AutomationProperties.Name="{Binding ToolTipText}" /></DataTemplate></ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="FocusBreakdownCard" Grid.Row="1" Grid.Column="2" Style="{StaticResource ReviewSectionCardStyle}">
+                        <StackPanel>
+                            <Grid Margin="{StaticResource SectionHeaderBottomMargin}"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><ui:SymbolIcon Style="{StaticResource ReviewSectionIconStyle}" Symbol="Timer24" /><TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="按象限专注" /></Grid>
+                            <ItemsControl ItemsSource="{Binding FocusQuadrantRows}"><ItemsControl.ItemTemplate><DataTemplate><review:MetricBar Margin="0,0,0,12" QuadrantId="{Binding QuadrantId}" Label="{Binding Label}" SecondaryLabel="{Binding SecondaryLabel}" ProgressValue="{Binding ProgressValue}" PercentageText="{Binding PercentageText}" ValueText="{Binding ValueText}" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                            <TextBlock Text="这个范围内没有已完成的有效专注记录。"><TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource ReviewEmptyTextStyle}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding HasFocusData}" Value="False"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="InsightsCard" Grid.Row="2" Style="{StaticResource ReviewSectionCardStyle}">
+                        <StackPanel>
+                            <Grid Margin="{StaticResource SectionHeaderBottomMargin}"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><ui:SymbolIcon Style="{StaticResource ReviewSectionIconStyle}" Symbol="Lightbulb24" /><TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="洞察" /></Grid>
+                            <ItemsControl ItemsSource="{Binding InsightItems}" ItemTemplate="{StaticResource ReviewInsightTemplate}" />
+                            <TextBlock Text="积累更多完成或专注记录后，这里会出现简短洞察。"><TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource ReviewEmptyTextStyle}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding HasInsights}" Value="False"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="FocusSummaryCard" Grid.Row="2" Grid.Column="2" Style="{StaticResource ReviewSectionCardStyle}">
+                        <StackPanel>
+                            <Grid Margin="{StaticResource SectionHeaderBottomMargin}"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><ui:SymbolIcon Style="{StaticResource ReviewSectionIconStyle}" Symbol="Clock24" /><TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="专注摘要" /></Grid>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><TextBlock Style="{StaticResource CaptionTextStyle}" Text="总专注" /><TextBlock Grid.Column="1" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding FocusTotalText}" /><TextBlock Grid.Row="1" Margin="0,8,0,0" Style="{StaticResource CaptionTextStyle}" Text="有效次数" /><TextBlock Grid.Row="1" Grid.Column="1" Margin="0,8,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding FocusSessionsText}" /><TextBlock Grid.Row="2" Margin="0,8,0,0" Style="{StaticResource CaptionTextStyle}" Text="平均每次" /><TextBlock Grid.Row="2" Grid.Column="1" Margin="0,8,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding FocusAverageText}" /><TextBlock Grid.Row="3" Margin="0,8,0,0" Style="{StaticResource CaptionTextStyle}" Text="最长一次" /><TextBlock Grid.Row="3" Grid.Column="1" Margin="0,8,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding FocusLongestText}" /></Grid>
+                            <Separator Margin="0,16,0,12" />
+                            <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="专注最多的任务" /><TextBlock Margin="0,4,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding MostFocusedTaskTitle}" TextTrimming="CharacterEllipsis" /><TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionTextStyle}" Text="{Binding MostFocusedTaskDetail}" /><TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="专注最多的象限" /><TextBlock Margin="0,4,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="{Binding MostFocusedQuadrantText}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border x:Name="RecentCompletedCard" Margin="0,0,0,0" Style="{StaticResource SectionSurfaceStyle}">
+                    <StackPanel>
+                        <Grid Margin="{StaticResource SectionHeaderBottomMargin}"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><ui:SymbolIcon Style="{StaticResource ReviewSectionIconStyle}" Symbol="CheckmarkCircle24" /><TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="近期完成" /></Grid>
+                        <ItemsControl ItemsSource="{Binding RecentCompleted}"><ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,0,0,10" AutomationProperties.Name="{Binding Title}"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Style="{StaticResource BodyTextStyle}" Text="{Binding Title}" TextTrimming="CharacterEllipsis" /><TextBlock Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding MetadataText}" /></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="1" Background="{DynamicResource ApplicationBackgroundBrush}" Opacity="0.92" Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><ui:ProgressRing IsIndeterminate="True" /><TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionTextStyle}" Text="正在加载 Review…" /></StackPanel>
         </Border>
-      </StackPanel>
-    </ScrollViewer>
-
-    <Border Grid.Row="1" Background="{DynamicResource ApplicationBackgroundBrush}" Opacity="0.92"
-            Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
-      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-        <ui:ProgressRing IsIndeterminate="True"/>
-        <TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionTextStyle}" Text="正在加载 Review…"/>
-      </StackPanel>
-    </Border>
-
-    <Border Grid.Row="1" Background="{DynamicResource ApplicationBackgroundBrush}" Opacity="0.96"
-            Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}">
-      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-        <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="Review 加载失败"/>
-        <TextBlock Margin="0,8,0,0" Style="{StaticResource CaptionTextStyle}" Text="{Binding ErrorMessage}"/>
-        <ui:Button Margin="0,12,0,0" Content="重试" Click="Retry_Click" AutomationProperties.Name="重试加载 Review"/>
-      </StackPanel>
-    </Border>
-  </Grid>
+        <Border Grid.Row="1" Background="{DynamicResource ApplicationBackgroundBrush}" Opacity="0.96" Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><ui:SymbolIcon HorizontalAlignment="Center" FontSize="28" Foreground="{DynamicResource SystemFillColorCautionBrush}" Symbol="Warning24" /><TextBlock Margin="0,8,0,0" Style="{StaticResource SectionTitleTextStyle}" Text="Review 加载失败" /><TextBlock Margin="0,8,0,0" Style="{StaticResource CaptionTextStyle}" Text="{Binding ErrorMessage}" /><ui:Button Margin="0,12,0,0" Appearance="Primary" Content="重试" Click="Retry_Click" AutomationProperties.Name="重试加载 Review" /></StackPanel>
+        </Border>
+    </Grid>
 </Page>

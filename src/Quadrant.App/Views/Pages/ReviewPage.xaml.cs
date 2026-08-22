@@ -39,21 +39,15 @@ public partial class ReviewPage : Page
         e.Handled = true;
     }
 
-    private void OverviewAnchor_Click(object sender, RoutedEventArgs e) => ScrollTo(OverviewAnchor);
-    private void DistributionAnchor_Click(object sender, RoutedEventArgs e) => ScrollTo(CompletedCard);
-    private void ActivityAnchor_Click(object sender, RoutedEventArgs e) => ScrollTo(ActivityCard);
-    private void RecentAnchor_Click(object sender, RoutedEventArgs e) => ScrollTo(RecentCompletedCard);
-
-    private void ScrollTo(FrameworkElement target)
-    {
-        var offset = target.TranslatePoint(new System.Windows.Point(0, 0), DashboardContent).Y;
-        DashboardScrollViewer.ScrollToVerticalOffset(Math.Clamp(offset, 0, DashboardScrollViewer.ScrollableHeight));
-    }
-
     private void ApplyResponsiveLayout(double width)
     {
         var narrow = width < 720;
+        var kpiPanelKey = width < 1000 ? "ReviewPrimaryKpiNarrowPanel" : "ReviewPrimaryKpiWidePanel";
+        var kpiPanel = (ItemsPanelTemplate)Resources[kpiPanelKey];
+        if (!ReferenceEquals(PrimaryKpiItems.ItemsPanel, kpiPanel)) PrimaryKpiItems.ItemsPanel = kpiPanel;
+
         LeftSectionColumn.Width = new GridLength(1, GridUnitType.Star);
+        SectionGapColumn.Width = narrow ? new GridLength(0) : new GridLength(16);
         RightSectionColumn.Width = narrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
 
         if (narrow)
@@ -68,11 +62,11 @@ public partial class ReviewPage : Page
         else
         {
             SetPosition(ComparisonCard, 0, 0);
-            SetPosition(CompletedCard, 0, 1);
+            SetPosition(CompletedCard, 0, 2);
             SetPosition(ActivityCard, 1, 0);
-            SetPosition(FocusBreakdownCard, 1, 1);
+            SetPosition(FocusBreakdownCard, 1, 2);
             SetPosition(InsightsCard, 2, 0);
-            SetPosition(FocusSummaryCard, 2, 1);
+            SetPosition(FocusSummaryCard, 2, 2);
         }
     }
 
