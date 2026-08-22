@@ -113,27 +113,26 @@
                                AutomationProperties.Name="移除 Today 计划"
                                ToolTip="移除 Today 计划"
                                Visibility="Collapsed" />
-                    <Menu Margin="4,0,0,0" Padding="0" Background="Transparent">
-                        <MenuItem Width="32"
-                                  Height="32"
-                                  Padding="8"
-                                  AutomationProperties.Name="更多任务操作"
-                                  ToolTip="更多">
-                            <MenuItem.Header>
-                                <ui:SymbolIcon FontSize="16" Symbol="MoreHorizontal24" />
-                            </MenuItem.Header>
-                            <MenuItem Header="编辑" Command="{Binding EditCommand}" CommandParameter="{Binding Id}">
-                                <MenuItem.Icon><ui:SymbolIcon Symbol="Edit24" /></MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem Header="重复" Command="{Binding EditRecurrenceCommand}" CommandParameter="{Binding Id}">
-                                <MenuItem.Icon><ui:SymbolIcon Symbol="ArrowRepeatAll24" /></MenuItem.Icon>
-                            </MenuItem>
-                            <Separator />
-                            <MenuItem Header="删除" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Command="{Binding DeleteCommand}" CommandParameter="{Binding Id}">
-                                <MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon>
-                            </MenuItem>
-                        </MenuItem>
-                    </Menu>
+                    <ui:DropDownButton Margin="4,0,0,0"
+                                       Style="{StaticResource TaskRowActionButtonStyle}"
+                                       Icon="{ui:SymbolIcon MoreHorizontal24}"
+                                       AutomationProperties.Name="更多任务操作"
+                                       ToolTip="更多">
+                        <ui:DropDownButton.Flyout>
+                            <ContextMenu>
+                                <MenuItem Header="编辑" Command="{Binding EditCommand}" CommandParameter="{Binding Id}">
+                                    <MenuItem.Icon><ui:SymbolIcon Symbol="Edit24" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="重复" Command="{Binding EditRecurrenceCommand}" CommandParameter="{Binding Id}">
+                                    <MenuItem.Icon><ui:SymbolIcon Symbol="ArrowRepeatAll24" /></MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="删除" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Command="{Binding DeleteCommand}" CommandParameter="{Binding Id}">
+                                    <MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </ui:DropDownButton.Flyout>
+                    </ui:DropDownButton>
                 </StackPanel>
             </Grid>
         </Border>

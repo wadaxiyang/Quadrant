@@ -109,15 +109,19 @@
                                                     </ui:SymbolIcon>
                                                 </StackPanel>
                                             </StackPanel>
-                                            <Menu Grid.Column="2" Margin="4,0,0,0" Padding="0" Background="Transparent">
-                                                <MenuItem Width="28" Height="28" Padding="6" AutomationProperties.Name="更多 Inbox 任务操作" ToolTip="更多">
-                                                    <MenuItem.Header><ui:SymbolIcon FontSize="16" Symbol="MoreHorizontal24" /></MenuItem.Header>
-                                                    <MenuItem Header="添加到 Today" Tag="{Binding}" Click="InboxPlanToday_Click"><MenuItem.Icon><ui:SymbolIcon Symbol="CalendarAdd24" /></MenuItem.Icon></MenuItem>
-                                                    <MenuItem Header="编辑" Tag="{Binding}" Click="InboxEdit_Click"><MenuItem.Icon><ui:SymbolIcon Symbol="Edit24" /></MenuItem.Icon></MenuItem>
-                                                    <Separator />
-                                                    <MenuItem Header="删除" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Tag="{Binding}" Click="InboxDelete_Click"><MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon></MenuItem>
-                                                </MenuItem>
-                                            </Menu>
+                                            <ui:DropDownButton Grid.Column="2" Margin="4,0,0,0"
+                                                               Style="{StaticResource TaskRowActionButtonStyle}"
+                                                               Icon="{ui:SymbolIcon MoreHorizontal24}"
+                                                               AutomationProperties.Name="更多 Inbox 任务操作" ToolTip="更多">
+                                                <ui:DropDownButton.Flyout>
+                                                    <ContextMenu>
+                                                        <MenuItem Header="添加到 Today" Tag="{Binding}" Click="InboxPlanToday_Click"><MenuItem.Icon><ui:SymbolIcon Symbol="CalendarAdd24" /></MenuItem.Icon></MenuItem>
+                                                        <MenuItem Header="编辑" Tag="{Binding}" Click="InboxEdit_Click"><MenuItem.Icon><ui:SymbolIcon Symbol="Edit24" /></MenuItem.Icon></MenuItem>
+                                                        <Separator />
+                                                        <MenuItem Header="删除" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Tag="{Binding}" Click="InboxDelete_Click"><MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon></MenuItem>
+                                                    </ContextMenu>
+                                                </ui:DropDownButton.Flyout>
+                                            </ui:DropDownButton>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
