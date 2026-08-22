@@ -3,6 +3,11 @@ and WPF UI Contributors, licensed under the MIT License.
 
 https://github.com/lepoco/wpfui
 
+Quadrant uses ScottPlot.WPF (NuGet package ScottPlot.WPF), Copyright (c)
+Scott Harden / Harden Technologies, LLC, licensed under the MIT License.
+
+https://github.com/ScottPlot/ScottPlot
+
 MIT License
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

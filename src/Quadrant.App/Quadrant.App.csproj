@@ -18,6 +18,7 @@
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="WPF-UI" />
+    <PackageReference Include="ScottPlot.WPF" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Resources\Quadrant.ico" />

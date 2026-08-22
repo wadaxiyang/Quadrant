@@ -26,6 +26,9 @@ public partial class ReviewPageViewModel : ObservableObject, IDisposable
     }
 
     public ObservableCollection<RecentCompletion> RecentCompleted { get; } = [];
+    public ObservableCollection<DateBucketPoint> CompletedTrend { get; } = [];
+    public ObservableCollection<DateBucketPoint> FocusTrend { get; } = [];
+    public event EventHandler? TrendDataChanged;
     public Array Ranges { get; } = Enum.GetValues<ReviewRange>();
     public ReviewSummary? Summary { get; private set; }
     public bool HasSummary => Summary is not null;
@@ -60,11 +63,15 @@ public partial class ReviewPageViewModel : ObservableObject, IDisposable
         {
             var summaryTask = queryService.GetSummaryAsync(SelectedRange, token);
             var recentTask = queryService.GetRecentCompletedAsync(20, token);
-            await Task.WhenAll(summaryTask, recentTask);
+            var completedTrendTask = queryService.GetCompletedTrendAsync(SelectedRange, DayOfWeek.Monday, token);
+            var focusTrendTask = queryService.GetFocusTrendAsync(SelectedRange, DayOfWeek.Monday, token);
+            await Task.WhenAll(summaryTask, recentTask, completedTrendTask, focusTrendTask);
             if (token.IsCancellationRequested || generation != requestGeneration || !isActive) return;
             Summary = summaryTask.Result;
             RecentCompleted.Clear(); foreach (var item in recentTask.Result) RecentCompleted.Add(item);
-            isDirty = false; NotifyState();
+            CompletedTrend.Clear(); foreach (var item in completedTrendTask.Result) CompletedTrend.Add(item);
+            FocusTrend.Clear(); foreach (var item in focusTrendTask.Result) FocusTrend.Add(item);
+            isDirty = false; NotifyState(); TrendDataChanged?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch { ErrorMessage = "Review 加载失败，请重试。"; NotifyState(); }

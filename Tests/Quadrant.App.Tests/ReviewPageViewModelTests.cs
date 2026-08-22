@@ -18,6 +18,8 @@ public sealed class ReviewPageViewModelTests
         {
             using var viewModel = new ReviewPageViewModel(query, hub);
             await viewModel.ActivateAsync();
+            Assert.Equal(["2026-08-20", "2026-08-21"], viewModel.CompletedTrend.Select(point => point.LabelKey));
+            Assert.Equal([1800L, 3600L], viewModel.FocusTrend.Select(point => point.Value));
             Assert.Equal("1 小时 1 分", viewModel.FocusTimeText);
             Assert.Equal("30 分", viewModel.AverageFocusText);
             Assert.Equal("3", viewModel.CurrentInboxText);
@@ -56,8 +58,8 @@ public sealed class ReviewPageViewModelTests
         public List<ReviewRange> Ranges { get; } = []; public int SummaryCalls { get; private set; } public bool FailNext { get; set; }
         public Task<ReviewSummary> GetSummaryAsync(ReviewRange range, CancellationToken cancellationToken = default) { SummaryCalls++; Ranges.Add(range); if (FailNext) { FailNext = false; throw new InvalidOperationException(); } return Task.FromResult(new ReviewSummary(2, 2, 3660, 1800, true, 3, 1)); }
         public Task<IReadOnlyList<RecentCompletion>> GetRecentCompletedAsync(int limit = 20, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<RecentCompletion>>([new("event", DateTimeOffset.UtcNow, DateOnly.FromDateTime(DateTime.Today), "已删除任务快照", null, false)]);
-        public Task<IReadOnlyList<DateBucketPoint>> GetCompletedTrendAsync(ReviewRange range, DayOfWeek weekStart, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DateBucketPoint>>([]);
-        public Task<IReadOnlyList<DateBucketPoint>> GetFocusTrendAsync(ReviewRange range, DayOfWeek weekStart, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DateBucketPoint>>([]);
+        public Task<IReadOnlyList<DateBucketPoint>> GetCompletedTrendAsync(ReviewRange range, DayOfWeek weekStart, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DateBucketPoint>>([new(new DateOnly(2026, 8, 20), "2026-08-20", 1), new(new DateOnly(2026, 8, 21), "2026-08-21", 2)]);
+        public Task<IReadOnlyList<DateBucketPoint>> GetFocusTrendAsync(ReviewRange range, DayOfWeek weekStart, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DateBucketPoint>>([new(new DateOnly(2026, 8, 20), "2026-08-20", 1800), new(new DateOnly(2026, 8, 21), "2026-08-21", 3600)]);
         public Task<IReadOnlyList<QuadrantValue>> GetCompletionByQuadrantAsync(ReviewRange range, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<QuadrantValue>>([]);
         public Task<IReadOnlyList<QuadrantValue>> GetFocusByQuadrantAsync(ReviewRange range, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<QuadrantValue>>([]);
     }
