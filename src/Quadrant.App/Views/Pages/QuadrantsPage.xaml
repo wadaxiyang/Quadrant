@@ -51,7 +51,7 @@
         <Grid x:Name="WorkspaceGrid" Grid.Row="2">
             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="InboxColumn" Width="248" />
+                <ColumnDefinition x:Name="InboxColumn" Width="280" />
                 <ColumnDefinition x:Name="InboxGapColumn" Width="16" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
@@ -60,13 +60,14 @@
                 <Grid>
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                     <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <ui:SymbolIcon Margin="0,1,8,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="Archive24" />
                         <StackPanel Grid.Column="1">
                             <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="Inbox" />
                             <TextBlock Margin="0,2,0,0" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="拖到象限分类 · 1–4 快捷键" TextWrapping="Wrap" />
                         </StackPanel>
                         <ui:InfoBadge Grid.Column="2" VerticalAlignment="Top" Value="{Binding Count}" AutomationProperties.Name="Inbox 任务数量" />
+                        <ui:Button Grid.Column="3" Style="{StaticResource QuadrantAddButtonStyle}" Command="{Binding DataContext.NewTaskCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}" Icon="{ui:SymbolIcon Add20}" ToolTip="添加到 Inbox" AutomationProperties.Name="添加任务到 Inbox" />
                     </Grid>
 
                     <Grid Grid.Row="1">
@@ -131,7 +132,6 @@
                             <ui:SymbolIcon HorizontalAlignment="Center" FontSize="28" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CheckmarkCircle24" />
                             <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextStyle}" Text="Inbox 已清空" />
                             <TextBlock Margin="0,4,0,0" TextAlignment="Center" TextWrapping="Wrap" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="快速记录的新任务会先出现在这里" />
-                            <ui:Button Margin="0,12,0,0" HorizontalAlignment="Center" Appearance="Transparent" Content="添加任务" Icon="{ui:SymbolIcon Add24}" Command="{Binding DataContext.NewTaskCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}" />
                         </StackPanel>
                         <StackPanel MaxWidth="200" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <ui:SymbolIcon HorizontalAlignment="Center" FontSize="28" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Symbol="ErrorCircle24" />
@@ -159,8 +159,7 @@
                             <StackPanel MaxWidth="220" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Quadrants[0].IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <ui:SymbolIcon HorizontalAlignment="Center" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CheckmarkCircle20" />
                                 <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextStyle}" Text="这里暂时没有任务" />
-                                <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="把任务拖到这里，或" />
-                                <ui:Button Margin="0,8,0,0" HorizontalAlignment="Center" Appearance="Transparent" Command="{Binding NewTaskInQuadrantCommand}" CommandParameter="{Binding Quadrants[0].Id}" Content="添加任务" Icon="{ui:SymbolIcon Add20}" AutomationProperties.Name="添加任务到 Q1" />
+                                <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="把任务拖到这里" />
                             </StackPanel>
                             <Border Tag="DropHint" Panel.ZIndex="2" Background="{DynamicResource SubtleFillColorSecondaryBrush}" CornerRadius="{StaticResource RadiusSmall}" Visibility="Collapsed" IsHitTestVisible="False">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><ui:SymbolIcon HorizontalAlignment="Center" FontSize="24" Symbol="ArrowDownload24" /><TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="松开以移入此象限" /></StackPanel>
@@ -182,8 +181,7 @@
                             <StackPanel MaxWidth="220" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Quadrants[1].IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <ui:SymbolIcon HorizontalAlignment="Center" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CheckmarkCircle20" />
                                 <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextStyle}" Text="这里暂时没有任务" />
-                                <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="把任务拖到这里，或" />
-                                <ui:Button Margin="0,8,0,0" HorizontalAlignment="Center" Appearance="Transparent" Command="{Binding NewTaskInQuadrantCommand}" CommandParameter="{Binding Quadrants[1].Id}" Content="添加任务" Icon="{ui:SymbolIcon Add20}" AutomationProperties.Name="添加任务到 Q2" />
+                                <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="把任务拖到这里" />
                             </StackPanel>
                             <Border Tag="DropHint" Panel.ZIndex="2" Background="{DynamicResource SubtleFillColorSecondaryBrush}" CornerRadius="{StaticResource RadiusSmall}" Visibility="Collapsed" IsHitTestVisible="False">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><ui:SymbolIcon HorizontalAlignment="Center" FontSize="24" Symbol="ArrowDownload24" /><TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="松开以移入此象限" /></StackPanel>
@@ -205,8 +203,7 @@
                             <StackPanel MaxWidth="220" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Quadrants[2].IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <ui:SymbolIcon HorizontalAlignment="Center" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CheckmarkCircle20" />
                                 <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextStyle}" Text="这里暂时没有任务" />
-                                <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="把任务拖到这里，或" />
-                                <ui:Button Margin="0,8,0,0" HorizontalAlignment="Center" Appearance="Transparent" Command="{Binding NewTaskInQuadrantCommand}" CommandParameter="{Binding Quadrants[2].Id}" Content="添加任务" Icon="{ui:SymbolIcon Add20}" AutomationProperties.Name="添加任务到 Q3" />
+                                <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="把任务拖到这里" />
                             </StackPanel>
                             <Border Tag="DropHint" Panel.ZIndex="2" Background="{DynamicResource SubtleFillColorSecondaryBrush}" CornerRadius="{StaticResource RadiusSmall}" Visibility="Collapsed" IsHitTestVisible="False">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><ui:SymbolIcon HorizontalAlignment="Center" FontSize="24" Symbol="ArrowDownload24" /><TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="松开以移入此象限" /></StackPanel>
@@ -228,8 +225,7 @@
                             <StackPanel MaxWidth="220" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Quadrants[3].IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <ui:SymbolIcon HorizontalAlignment="Center" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CheckmarkCircle20" />
                                 <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextStyle}" Text="这里暂时没有任务" />
-                                <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="把任务拖到这里，或" />
-                                <ui:Button Margin="0,8,0,0" HorizontalAlignment="Center" Appearance="Transparent" Command="{Binding NewTaskInQuadrantCommand}" CommandParameter="{Binding Quadrants[3].Id}" Content="添加任务" Icon="{ui:SymbolIcon Add20}" AutomationProperties.Name="添加任务到 Q4" />
+                                <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="把任务拖到这里" />
                             </StackPanel>
                             <Border Tag="DropHint" Panel.ZIndex="2" Background="{DynamicResource SubtleFillColorSecondaryBrush}" CornerRadius="{StaticResource RadiusSmall}" Visibility="Collapsed" IsHitTestVisible="False">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><ui:SymbolIcon HorizontalAlignment="Center" FontSize="24" Symbol="ArrowDownload24" /><TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextStyle}" Text="松开以移入此象限" /></StackPanel>

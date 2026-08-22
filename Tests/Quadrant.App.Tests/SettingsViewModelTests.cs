@@ -21,7 +21,8 @@ public sealed class SettingsViewModelTests
             AutoStartBreak = true,
             ReviewDefaultRange = ReviewRange.ThirtyDays,
             WeekStart = DayOfWeek.Sunday,
-            SidebarIconSize = 27
+            SidebarIconSize = 27,
+            CollapseSidebarOnStartup = false
         };
 
         var settings = viewModel.BuildSettings();
@@ -32,6 +33,7 @@ public sealed class SettingsViewModelTests
         Assert.True(settings.Pomodoro.AutoStartBreak);
         Assert.Equal(ReviewRange.ThirtyDays, settings.ReviewDefaultRange);
         Assert.Equal(27, settings.SidebarIconSize);
+        Assert.False(settings.CollapseSidebarOnStartup);
     }
 
     [Theory]

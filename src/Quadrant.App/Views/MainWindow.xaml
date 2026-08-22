@@ -16,14 +16,13 @@
     <ui:FluentWindow.Resources>
         <sys:Double x:Key="NavigationPaneOpenLength">220</sys:Double>
         <sys:Double x:Key="NavigationPaneCompactLength">48</sys:Double>
-        <sys:Double x:Key="NavigationPaneWideThreshold">1080</sys:Double>
     </ui:FluentWindow.Resources>
 
     <Grid>
         <ui:NavigationView x:Name="RootNavigationView"
                            TitleBar="{Binding ElementName=AppTitleBar}"
                            PaneDisplayMode="Left"
-                           IsPaneOpen="True"
+                           IsPaneOpen="False"
                            IsPaneToggleVisible="True"
                            IsBackButtonVisible="Collapsed"
                            OpenPaneLength="{StaticResource NavigationPaneOpenLength}"

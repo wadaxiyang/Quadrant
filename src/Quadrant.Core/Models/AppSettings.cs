@@ -22,7 +22,8 @@ public sealed record AppSettings(
     bool NotificationSoundEnabled = true,
     ReviewRange ReviewDefaultRange = ReviewRange.SevenDays,
     DayOfWeek WeekStart = DayOfWeek.Monday,
-    double SidebarIconSize = 24)
+    double SidebarIconSize = 24,
+    bool CollapseSidebarOnStartup = true)
 {
     public static AppSettings Default { get; } = new("System", true, false, false, "Ctrl+Alt+Q");
 

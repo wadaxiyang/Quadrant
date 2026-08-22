@@ -33,6 +33,7 @@ public partial class SettingsViewModel : ObservableObject
         ReviewDefaultRange = settings.ReviewDefaultRange;
         WeekStart = settings.WeekStart;
         SidebarIconSize = settings.SidebarIconSize;
+        CollapseSidebarOnStartup = settings.CollapseSidebarOnStartup;
         DatabasePath = databasePath;
         Quadrants = quadrants.OrderBy(item => item.Id).Select(item => new EditableQuadrantViewModel(item)).ToArray();
     }
@@ -58,6 +59,7 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] public partial ReviewRange ReviewDefaultRange { get; set; }
     [ObservableProperty] public partial DayOfWeek WeekStart { get; set; }
     [ObservableProperty] public partial double SidebarIconSize { get; set; }
+    [ObservableProperty] public partial bool CollapseSidebarOnStartup { get; set; }
 
     public string DatabasePath { get; }
     public bool HasDataMaintenance => dataMaintenanceService is not null;
@@ -84,7 +86,7 @@ public partial class SettingsViewModel : ObservableObject
             QuickCaptureQuadrantId, DefaultReminder, FocusMinutes, ShortBreakMinutes,
             LongBreakMinutes, LongBreakInterval, AutoStartBreak, AutoStartFocus,
             TaskRemindersEnabled, FocusNotificationsEnabled, NotificationSoundEnabled,
-            ReviewDefaultRange, WeekStart, SidebarIconSize);
+            ReviewDefaultRange, WeekStart, SidebarIconSize, CollapseSidebarOnStartup);
         settings.Validate();
         return settings;
     }
@@ -119,7 +121,7 @@ public partial class SettingsViewModel : ObservableObject
             QuickCaptureQuadrantId, DefaultReminder, FocusMinutes, ShortBreakMinutes,
             LongBreakMinutes, LongBreakInterval, AutoStartBreak, AutoStartFocus,
             TaskRemindersEnabled, FocusNotificationsEnabled, NotificationSoundEnabled,
-            ReviewDefaultRange, WeekStart, SidebarIconSize).Validate();
+            ReviewDefaultRange, WeekStart, SidebarIconSize, CollapseSidebarOnStartup).Validate();
     }
 
     private IDataMaintenanceService RequireDataService() => dataMaintenanceService ?? throw new InvalidOperationException("数据维护服务不可用。");

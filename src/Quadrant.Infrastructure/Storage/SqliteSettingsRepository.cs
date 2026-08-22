@@ -39,7 +39,8 @@ public sealed class SqliteSettingsRepository : ISettingsRepository
             ParseBool(values, "notification_sound_enabled", defaults.NotificationSoundEnabled),
             ParseEnum(values, "review_default_range", defaults.ReviewDefaultRange),
             ParseEnum(values, "week_start", defaults.WeekStart),
-            ParseDouble(values, "sidebar_icon_size", defaults.SidebarIconSize, 16, 32));
+            ParseDouble(values, "sidebar_icon_size", defaults.SidebarIconSize, 16, 32),
+            ParseBool(values, "collapse_sidebar_on_startup", defaults.CollapseSidebarOnStartup));
     }
 
     public async Task SaveAsync(
@@ -70,7 +71,8 @@ public sealed class SqliteSettingsRepository : ISettingsRepository
             ["notification_sound_enabled"] = settings.NotificationSoundEnabled.ToString().ToLowerInvariant(),
             ["review_default_range"] = settings.ReviewDefaultRange.ToString(),
             ["week_start"] = settings.WeekStart.ToString(),
-            ["sidebar_icon_size"] = settings.SidebarIconSize.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            ["sidebar_icon_size"] = settings.SidebarIconSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["collapse_sidebar_on_startup"] = settings.CollapseSidebarOnStartup.ToString().ToLowerInvariant()
         })
         {
             await using var command = connection.CreateCommand();

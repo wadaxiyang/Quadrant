@@ -18,14 +18,12 @@ public partial class MainWindow : FluentWindow
     private bool viewModelHandlersAttached;
     private bool initialNavigationCompleted;
     private bool dialogOpen;
-    private bool? isWideNavigationLayout;
 
     public MainWindow()
     {
         InitializeComponent();
         snackbarService.SetSnackbarPresenter(SnackbarPresenter);
         Loaded += MainWindow_Loaded;
-        SizeChanged += MainWindow_SizeChanged;
         SourceInitialized += MainWindow_SourceInitialized;
         Closed += MainWindow_Closed;
         Closing += MainWindow_Closing;
@@ -38,6 +36,8 @@ public partial class MainWindow : FluentWindow
     public bool IsCloseToTray { get; set; } = true;
 
     public void SetSidebarIconSize(double size) => RootNavigationView.Resources["NavigationViewLeftIconSize"] = size;
+
+    public void SetInitialNavigationPane(bool collapseOnStartup) => RootNavigationView.IsPaneOpen = !collapseOnStartup;
 
     public void ConfigureGlobalHotkey(Quadrant.Infrastructure.Windows.GlobalHotkeyService service) =>
         globalHotkeyService = service;
@@ -185,8 +185,6 @@ public partial class MainWindow : FluentWindow
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        UpdateNavigationPane(ActualWidth);
-
         var viewModel = (MainViewModel)DataContext;
         if (!viewModelHandlersAttached)
         {
@@ -205,22 +203,6 @@ public partial class MainWindow : FluentWindow
             RootNavigationView.Navigate(typeof(QuadrantsPage), viewModel);
             initialNavigationCompleted = true;
         }
-    }
-
-    private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e) =>
-        UpdateNavigationPane(e.NewSize.Width);
-
-    private void UpdateNavigationPane(double windowWidth)
-    {
-        var wideThreshold = (double)FindResource("NavigationPaneWideThreshold");
-        var shouldUseWideLayout = windowWidth >= wideThreshold;
-        if (isWideNavigationLayout == shouldUseWideLayout)
-        {
-            return;
-        }
-
-        isWideNavigationLayout = shouldUseWideLayout;
-        RootNavigationView.IsPaneOpen = shouldUseWideLayout;
     }
 
     private void RootNavigationView_Navigated(NavigationView sender, NavigatedEventArgs args)

@@ -156,6 +156,7 @@ public partial class App : System.Windows.Application
         }
         mainWindow.IsCloseToTray = currentSettings.CloseToTray;
         mainWindow.SetSidebarIconSize(currentSettings.SidebarIconSize);
+        mainWindow.SetInitialNavigationPane(currentSettings.CollapseSidebarOnStartup);
         // EnsureHandle creates the HWND and raises SourceInitialized without making
         // the managed window visible, so background startup can register the global
         // hotkey without flashing or stealing foreground focus.

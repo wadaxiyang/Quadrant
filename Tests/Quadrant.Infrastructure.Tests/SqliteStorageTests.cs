@@ -162,19 +162,21 @@ public sealed class SqliteStorageTests
             FocusNotificationsEnabled = false,
             ReviewDefaultRange = ReviewRange.NinetyDays,
             WeekStart = DayOfWeek.Sunday,
-            SidebarIconSize = 28
+            SidebarIconSize = 28,
+            CollapseSidebarOnStartup = false
         };
         var quadrants = await database.Quadrants.GetAllAsync();
         await database.Settings.SaveAsync(expected, quadrants);
         Assert.Equal(expected, await database.Settings.GetAsync());
 
-        await ExecuteAsync(database.Factory, "UPDATE settings SET value = 'invalid' WHERE key IN ('focus_minutes', 'review_default_range', 'task_reminders_enabled', 'sidebar_icon_size');");
+        await ExecuteAsync(database.Factory, "UPDATE settings SET value = 'invalid' WHERE key IN ('focus_minutes', 'review_default_range', 'task_reminders_enabled', 'sidebar_icon_size', 'collapse_sidebar_on_startup');");
         var loaded = await database.Settings.GetAsync();
         Assert.Equal(AppSettings.Default.FocusMinutes, loaded.FocusMinutes);
         Assert.Equal(AppSettings.Default.ReviewDefaultRange, loaded.ReviewDefaultRange);
         Assert.Equal(AppSettings.Default.TaskRemindersEnabled, loaded.TaskRemindersEnabled);
         Assert.Equal(AppSettings.Default.SidebarIconSize, loaded.SidebarIconSize);
-        Assert.Equal(4, await ReadScalarAsync(database.Factory, "SELECT COUNT(*) FROM settings WHERE value = 'invalid';"));
+        Assert.Equal(AppSettings.Default.CollapseSidebarOnStartup, loaded.CollapseSidebarOnStartup);
+        Assert.Equal(5, await ReadScalarAsync(database.Factory, "SELECT COUNT(*) FROM settings WHERE value = 'invalid';"));
     }
 
     [Fact]

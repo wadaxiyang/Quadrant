@@ -464,7 +464,7 @@ public partial class QuadrantsPage : Page
             return;
         }
 
-        InboxColumn.Width = new GridLength(248);
+        InboxColumn.Width = new GridLength(280);
         InboxGapColumn.Width = new GridLength(16);
         Grid.SetRow(InboxPanel, 1);
         Grid.SetColumn(InboxPanel, 0);

@@ -52,6 +52,7 @@
         <TextBlock Margin="0,20,0,8" Style="{StaticResource SectionTitleTextStyle}" Text="外观"/>
         <ui:Card Padding="16"><StackPanel>
           <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="220"/></Grid.ColumnDefinitions><TextBlock VerticalAlignment="Center" Style="{StaticResource BodyStrongTextStyle}" Text="主题"/><ComboBox Grid.Column="1" SelectedValuePath="Tag" SelectedValue="{Binding Theme}"><ComboBoxItem Tag="System" Content="跟随系统"/><ComboBoxItem Tag="Light" Content="浅色"/><ComboBoxItem Tag="Dark" Content="深色"/></ComboBox></Grid>
+          <ui:ToggleSwitch Margin="0,16,0,0" Content="启动时自动收起侧边栏" IsChecked="{Binding CollapseSidebarOnStartup}" AutomationProperties.Name="启动时自动收起侧边栏"/>
           <Grid Margin="0,16,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions><TextBlock Style="{StaticResource BodyStrongTextStyle}" Text="侧边栏图标大小"/><TextBlock Grid.Column="1" TextAlignment="Right" Text="{Binding SidebarIconSize, StringFormat={}{0:F0} px}"/></Grid>
           <Slider Margin="0,4,0,0" Minimum="16" Maximum="32" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding SidebarIconSize}" AutomationProperties.Name="侧边栏图标大小"/>
         </StackPanel></ui:Card>
