@@ -14,4 +14,6 @@ public interface IFocusSessionRepository
     Task<FocusSession?> TransitionAsync(FocusSession session, FocusStatus expectedStatus, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<FocusSession>> GetRecentAsync(int limit = 5, CancellationToken cancellationToken = default);
+
+    Task<FocusDaySummary> GetProductiveSummaryAsync(DateOnly localDate, CancellationToken cancellationToken = default);
 }

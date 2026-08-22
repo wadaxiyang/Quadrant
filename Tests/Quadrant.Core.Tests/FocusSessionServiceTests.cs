@@ -55,6 +55,7 @@ public sealed class FocusSessionServiceTests
         public Task<FocusSession?> GetByIdAsync(string id,CancellationToken ct=default)=>Task.FromResult(values.GetValueOrDefault(id));
         public Task<FocusSession?> TransitionAsync(FocusSession s,FocusStatus expected,CancellationToken ct=default){if(!values.TryGetValue(s.Id,out var old)||old.Status!=expected)return Task.FromResult<FocusSession?>(null);values[s.Id]=s;return Task.FromResult<FocusSession?>(s);}
         public Task<IReadOnlyList<FocusSession>> GetRecentAsync(int limit=5,CancellationToken ct=default)=>Task.FromResult<IReadOnlyList<FocusSession>>(values.Values.OrderByDescending(x=>x.StartedAtUtc).Take(limit).ToArray());
+        public Task<FocusDaySummary> GetProductiveSummaryAsync(DateOnly localDate,CancellationToken ct=default)=>Task.FromResult(FocusDaySummary.Empty);
     }
     private sealed class FakeTasks(TaskItem? task) : ITaskRepository
     {

@@ -105,5 +105,7 @@ public sealed class PomodoroTimerServiceTests
         public Task<FocusSession?> GetCurrentAsync(CancellationToken cancellationToken = default) => Task.FromResult(current);
         public Task<IReadOnlyList<FocusSession>> GetRecentAsync(int limit = 5, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<FocusSession>>([]);
+        public Task<FocusDaySummary> GetProductiveSummaryAsync(DateOnly localDate, CancellationToken cancellationToken = default) =>
+            Task.FromResult(FocusDaySummary.Empty);
     }
 }

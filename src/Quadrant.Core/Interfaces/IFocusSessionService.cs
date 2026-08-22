@@ -14,4 +14,5 @@ public interface IFocusSessionService
     Task<FocusSession> CancelAsync(string id, int durationSeconds, DateTimeOffset at, CancellationToken cancellationToken = default);
     Task<FocusSession?> GetCurrentAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<FocusSession>> GetRecentAsync(int limit = 5, CancellationToken cancellationToken = default);
+    Task<FocusDaySummary> GetProductiveSummaryAsync(DateOnly localDate, CancellationToken cancellationToken = default);
 }

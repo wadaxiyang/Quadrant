@@ -336,6 +336,33 @@ public sealed class SqliteStorageTests
     }
 
     [Fact]
+    public async Task Focus_repository_summarizes_only_productive_completed_sessions_for_the_local_day()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var task = await database.Tasks.CreateAsync(new TaskDraft("Focus", 1), DateTimeOffset.UtcNow);
+        var sessions = new SqliteFocusSessionRepository(database.Factory);
+        var day = new DateOnly(2026, 8, 22);
+        var start = new DateTimeOffset(2026, 8, 22, 8, 0, 0, TimeSpan.Zero);
+
+        async Task CompleteAsync(string id, FocusMode mode, PomodoroKind? kind, DateOnly localDate, int seconds)
+        {
+            var running = new FocusSession(id, kind is PomodoroKind.ShortBreak ? null : task.Id, mode, start, start, null, null, 0, FocusStatus.Running, kind, localDate, "Focus", kind is PomodoroKind.ShortBreak ? null : 1);
+            Assert.NotNull(await sessions.CreateIfNoCurrentAsync(running));
+            Assert.NotNull(await sessions.TransitionAsync(running with { Status = FocusStatus.Completed, DurationSeconds = seconds, ActiveSegmentStartedAtUtc = null, EndedAtUtc = start.AddSeconds(seconds) }, FocusStatus.Running));
+        }
+
+        await CompleteAsync("stopwatch", FocusMode.Stopwatch, null, day, 120);
+        await CompleteAsync("pomodoro", FocusMode.Pomodoro, PomodoroKind.Focus, day, 300);
+        await CompleteAsync("break", FocusMode.Pomodoro, PomodoroKind.ShortBreak, day, 600);
+        await CompleteAsync("other-day", FocusMode.Stopwatch, null, day.AddDays(-1), 900);
+
+        var summary = await sessions.GetProductiveSummaryAsync(day);
+
+        Assert.Equal(420, summary.TotalSeconds);
+        Assert.Equal(2, summary.SessionCount);
+    }
+
+    [Fact]
     public async Task Atomic_completion_snapshots_before_state_and_is_idempotent()
     {
         await using var database = await TestDatabase.CreateAsync();

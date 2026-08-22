@@ -47,6 +47,8 @@ public sealed class FocusSessionService : IFocusSessionService
 
     public Task<FocusSession?> GetCurrentAsync(CancellationToken cancellationToken = default) => repository.GetCurrentAsync(cancellationToken);
     public Task<IReadOnlyList<FocusSession>> GetRecentAsync(int limit = 5, CancellationToken cancellationToken = default) => repository.GetRecentAsync(limit, cancellationToken);
+    public Task<FocusDaySummary> GetProductiveSummaryAsync(DateOnly localDate, CancellationToken cancellationToken = default) =>
+        repository.GetProductiveSummaryAsync(localDate, cancellationToken);
 
     public Task<FocusSession> PauseAsync(string id, int durationSeconds, DateTimeOffset at, CancellationToken cancellationToken = default) =>
         TransitionAsync(id, FocusStatus.Running, FocusStatus.Paused, durationSeconds, at, null, cancellationToken);

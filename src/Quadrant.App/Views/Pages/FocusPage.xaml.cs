@@ -22,10 +22,11 @@ public partial class FocusPage : Page
                 main.FocusTimerService,
                 main.PomodoroTimerService,
                 main.FocusSessionService,
-                main.Settings.Pomodoro);
+                main.Settings.Pomodoro,
+                main.Clock.LocalDate);
             if (request is not null)
             {
-                focusViewModel.SelectedTask = focusViewModel.Tasks.FirstOrDefault(task => task.Id == request.TaskId);
+                focusViewModel.SelectTask(request.TaskId);
             }
 
             DataContext = focusViewModel;
@@ -42,6 +43,8 @@ public partial class FocusPage : Page
     private async void Resume_Click(object sender, RoutedEventArgs e) { await ViewModel.ResumeAsync(); UpdateTimerState(); }
     private async void Stop_Click(object sender, RoutedEventArgs e) { await ViewModel.StopAsync(); UpdateTimerState(); }
     private async void Cancel_Click(object sender, RoutedEventArgs e) { await ViewModel.CancelAsync(); UpdateTimerState(); }
+    private void PomodoroMode_Click(object sender, RoutedEventArgs e) { if (ViewModel.CanConfigureSession) ViewModel.Mode = Quadrant.Core.Enums.FocusMode.Pomodoro; }
+    private void StopwatchMode_Click(object sender, RoutedEventArgs e) { if (ViewModel.CanConfigureSession) ViewModel.Mode = Quadrant.Core.Enums.FocusMode.Stopwatch; }
 
     private FocusPageViewModel ViewModel => (FocusPageViewModel)DataContext;
 
