@@ -69,6 +69,7 @@ public partial class MainWindow : FluentWindow
             viewModel.NewTaskRequested -= NewTaskRequested;
             viewModel.EditTaskRequested -= EditTaskRequested;
             viewModel.RepeatTaskRequested -= RepeatTaskRequested;
+            viewModel.FocusTaskRequested -= FocusTaskRequested;
             viewModel.DeleteTaskRequested -= DeleteTaskRequested;
             viewModel.RecoverableError -= ViewModel_RecoverableError;
             viewModelHandlersAttached = false;
@@ -138,6 +139,7 @@ public partial class MainWindow : FluentWindow
             viewModel.NewTaskRequested += NewTaskRequested;
             viewModel.EditTaskRequested += EditTaskRequested;
             viewModel.RepeatTaskRequested += RepeatTaskRequested;
+            viewModel.FocusTaskRequested += FocusTaskRequested;
             viewModel.DeleteTaskRequested += DeleteTaskRequested;
             viewModel.RecoverableError += ViewModel_RecoverableError;
             viewModelHandlersAttached = true;
@@ -176,6 +178,12 @@ public partial class MainWindow : FluentWindow
         // The app intentionally has no back-navigation experience. Keeping the WPF UI
         // journal would retain each discarded Page and its visual tree after navigation.
         sender.ClearJournal();
+    }
+
+    private void FocusTaskRequested(object? sender, long taskId)
+    {
+        var viewModel = (MainViewModel)DataContext;
+        RootNavigationView.Navigate(typeof(FocusPage), new FocusPageNavigationRequest(viewModel, taskId));
     }
 
     private async void Completed_Click(object sender, RoutedEventArgs e)

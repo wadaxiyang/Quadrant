@@ -13,14 +13,22 @@ public partial class FocusPage : Page
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
-        if (DataContext is MainViewModel main)
+        var request = DataContext as FocusPageNavigationRequest;
+        var main = request?.MainViewModel ?? DataContext as MainViewModel;
+        if (main is not null)
         {
-            DataContext = new FocusPageViewModel(
+            var focusViewModel = new FocusPageViewModel(
                 main.ActiveTasks,
                 main.FocusTimerService,
                 main.PomodoroTimerService,
                 main.FocusSessionService,
                 main.Settings.Pomodoro);
+            if (request is not null)
+            {
+                focusViewModel.SelectedTask = focusViewModel.Tasks.FirstOrDefault(task => task.Id == request.TaskId);
+            }
+
+            DataContext = focusViewModel;
         }
 
         await ViewModel.ActivateAsync();
@@ -65,3 +73,5 @@ public partial class FocusPage : Page
         timer = null;
     }
 }
+
+public sealed record FocusPageNavigationRequest(MainViewModel MainViewModel, long TaskId);

@@ -5,14 +5,9 @@
     <converters:StringToVisibilityConverter x:Key="TaskCardStringToVisibilityConverter" />
 
     <DataTemplate x:Key="TaskCardTemplate">
-        <Border x:Name="CardSurface" Style="{StaticResource TaskCardStyle}" Margin="{StaticResource TaskCardBottomMargin}">
-            <AutomationProperties.Name>
-                <MultiBinding StringFormat="{}{0}；{1}；{2}">
-                    <Binding Path="Title" />
-                    <Binding Path="DueText" />
-                    <Binding Path="DueStatusText" />
-                </MultiBinding>
-            </AutomationProperties.Name>
+        <Border x:Name="TaskRow"
+                Style="{StaticResource TaskRowSurfaceStyle}"
+                AutomationProperties.Name="{Binding AutomationName}">
             <Border.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="编辑" Command="{Binding EditCommand}" CommandParameter="{Binding Id}">
@@ -21,14 +16,15 @@
                     <MenuItem Header="重复" Command="{Binding EditRecurrenceCommand}" CommandParameter="{Binding Id}" ToolTip="在编辑器中设置重复规则">
                         <MenuItem.Icon><ui:SymbolIcon Symbol="ArrowRepeatAll24" /></MenuItem.Icon>
                     </MenuItem>
-                    <MenuItem Header="删除" Command="{Binding DeleteCommand}" CommandParameter="{Binding Id}">
-                        <MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon>
-                    </MenuItem>
                     <Separator />
                     <MenuItem Header="添加到 Today" Command="{Binding PlanForTodayCommand}" CommandParameter="{Binding Id}">
                         <MenuItem.Icon><ui:SymbolIcon Symbol="CalendarAdd24" /></MenuItem.Icon>
                     </MenuItem>
                     <MenuItem Header="移除 Today 计划" Command="{Binding RemovePlanCommand}" CommandParameter="{Binding Id}">
+                        <MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem Header="删除" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Command="{Binding DeleteCommand}" CommandParameter="{Binding Id}">
                         <MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon>
                     </MenuItem>
                 </ContextMenu>
@@ -41,7 +37,7 @@
                 </Grid.ColumnDefinitions>
 
                 <CheckBox Grid.Column="0"
-                          Margin="0,2,12,0"
+                          Margin="0,2,8,0"
                           VerticalAlignment="Top"
                           Command="{Binding CompleteCommand}"
                           CommandParameter="{Binding Id}"
@@ -49,41 +45,116 @@
                           ToolTip="完成任务" />
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Style="{StaticResource BodyStrongTextStyle}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Text="{Binding Title}" TextWrapping="Wrap" />
-                    <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
-                        <ui:SymbolIcon Margin="0,0,6,0" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CalendarClock20" />
-                        <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding DueText}" />
-                        <TextBlock x:Name="DueStatus" Margin="8,0,0,0" Style="{StaticResource CaptionTextStyle}" Text="{Binding DueStatusText}" Visibility="{Binding DueStatusText, Converter={StaticResource TaskCardStringToVisibilityConverter}}" />
-                    </StackPanel>
-                    <StackPanel Margin="0,4,0,0" Orientation="Horizontal" Visibility="{Binding ReminderText, Converter={StaticResource TaskCardStringToVisibilityConverter}}">
-                        <ui:SymbolIcon Margin="0,0,6,0" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="ClockAlarm20" />
-                        <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding ReminderText}" />
-                    </StackPanel>
-                    <StackPanel Margin="0,4,0,0" Orientation="Horizontal" Visibility="{Binding PlanText, Converter={StaticResource TaskCardStringToVisibilityConverter}}">
-                        <ui:SymbolIcon Margin="0,0,6,0" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CalendarAdd24" />
-                        <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding PlanText}" />
-                    </StackPanel>
-                    <StackPanel Margin="0,4,0,0" Orientation="Horizontal" Visibility="{Binding EstimateText, Converter={StaticResource TaskCardStringToVisibilityConverter}}">
-                        <ui:SymbolIcon Margin="0,0,6,0" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="ClockAlarm20" />
-                        <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding EstimateText}" />
-                    </StackPanel>
-                    <StackPanel Margin="0,4,0,0" Orientation="Horizontal" Visibility="{Binding RecurrenceText, Converter={StaticResource TaskCardStringToVisibilityConverter}}" ToolTip="完成后会创建下一项任务">
-                        <ui:SymbolIcon Margin="0,0,6,0" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="ArrowRepeatAll20" />
-                        <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding RecurrenceText}" />
-                    </StackPanel>
+                    <TextBlock MaxHeight="40"
+                               Style="{StaticResource BodyStrongTextStyle}"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="{Binding Title}"
+                               TextTrimming="CharacterEllipsis"
+                               TextWrapping="Wrap" />
+                    <WrapPanel x:Name="MetadataPanel"
+                               Margin="0,4,0,0"
+                               Visibility="{Binding HasMetadata, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Border x:Name="DueChip" Style="{StaticResource TaskMetadataChipStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Margin="0,0,4,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CalendarClock20" />
+                                <TextBlock x:Name="DueMetadata" Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding DueMetadataText}" />
+                                <TextBlock x:Name="DueStatus" Margin="4,0,0,0" Style="{StaticResource CaptionTextStyle}" Text="{Binding DueStatusText}" Visibility="{Binding DueStatusText, Converter={StaticResource TaskCardStringToVisibilityConverter}}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource TaskMetadataChipStyle}" Visibility="{Binding ReminderMetadataText, Converter={StaticResource TaskCardStringToVisibilityConverter}}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Margin="0,0,4,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="ClockAlarm20" />
+                                <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding ReminderMetadataText}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource TaskMetadataChipStyle}" Visibility="{Binding PlanMetadataText, Converter={StaticResource TaskCardStringToVisibilityConverter}}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Margin="0,0,4,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="CalendarAdd24" />
+                                <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding PlanMetadataText}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource TaskMetadataChipStyle}" Visibility="{Binding EstimateMetadataText, Converter={StaticResource TaskCardStringToVisibilityConverter}}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Margin="0,0,4,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="ClockAlarm20" />
+                                <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding EstimateMetadataText}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource TaskMetadataChipStyle}" ToolTip="完成后会创建下一项任务" Visibility="{Binding RecurrenceMetadataText, Converter={StaticResource TaskCardStringToVisibilityConverter}}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Margin="0,0,4,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Symbol="ArrowRepeatAll20" />
+                                <TextBlock Style="{StaticResource CaptionTextStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding RecurrenceMetadataText}" />
+                            </StackPanel>
+                        </Border>
+                    </WrapPanel>
                 </StackPanel>
 
-                <StackPanel x:Name="HoverActions" Grid.Column="2" Margin="8,0,0,0" Orientation="Horizontal" VerticalAlignment="Top" Visibility="Collapsed">
-                    <ui:Button Appearance="Transparent" Command="{Binding EditCommand}" CommandParameter="{Binding Id}" Icon="{ui:SymbolIcon Edit20}" AutomationProperties.Name="编辑任务" ToolTip="编辑" />
-                    <ui:Button Margin="4,0,0,0" Appearance="Transparent" Command="{Binding DeleteCommand}" CommandParameter="{Binding Id}" Icon="{ui:SymbolIcon Delete20}" AutomationProperties.Name="删除任务" ToolTip="删除" />
+                <StackPanel x:Name="RowActions" Grid.Column="2" Margin="8,0,0,0" Orientation="Horizontal" VerticalAlignment="Top" Visibility="Hidden">
+                    <ui:Button Style="{StaticResource TaskRowActionButtonStyle}"
+                               Appearance="Primary"
+                               Command="{Binding FocusCommand}"
+                               CommandParameter="{Binding Id}"
+                               Icon="{ui:SymbolIcon Play24}"
+                               AutomationProperties.Name="在 Focus 中打开任务"
+                               ToolTip="Focus" />
+                    <ui:Button x:Name="PlanTodayAction"
+                               Margin="4,0,0,0"
+                               Style="{StaticResource TaskRowActionButtonStyle}"
+                               Command="{Binding PlanForTodayCommand}"
+                               CommandParameter="{Binding Id}"
+                               Icon="{ui:SymbolIcon CalendarAdd24}"
+                               AutomationProperties.Name="添加到 Today"
+                               ToolTip="添加到 Today" />
+                    <ui:Button x:Name="RemoveTodayAction"
+                               Margin="4,0,0,0"
+                               Style="{StaticResource TaskRowActionButtonStyle}"
+                               Command="{Binding RemovePlanCommand}"
+                               CommandParameter="{Binding Id}"
+                               Icon="{ui:SymbolIcon CalendarAdd24}"
+                               AutomationProperties.Name="移除 Today 计划"
+                               ToolTip="移除 Today 计划"
+                               Visibility="Collapsed" />
+                    <Menu Margin="4,0,0,0" Padding="0" Background="Transparent">
+                        <MenuItem Width="32"
+                                  Height="32"
+                                  Padding="8"
+                                  AutomationProperties.Name="更多任务操作"
+                                  ToolTip="更多">
+                            <MenuItem.Header>
+                                <ui:SymbolIcon FontSize="16" Symbol="MoreHorizontal24" />
+                            </MenuItem.Header>
+                            <MenuItem Header="编辑" Command="{Binding EditCommand}" CommandParameter="{Binding Id}">
+                                <MenuItem.Icon><ui:SymbolIcon Symbol="Edit24" /></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="重复" Command="{Binding EditRecurrenceCommand}" CommandParameter="{Binding Id}">
+                                <MenuItem.Icon><ui:SymbolIcon Symbol="ArrowRepeatAll24" /></MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem Header="删除" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Command="{Binding DeleteCommand}" CommandParameter="{Binding Id}">
+                                <MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon>
+                            </MenuItem>
+                        </MenuItem>
+                    </Menu>
                 </StackPanel>
             </Grid>
         </Border>
         <DataTemplate.Triggers>
-            <Trigger SourceName="CardSurface" Property="IsMouseOver" Value="True">
-                <Setter TargetName="HoverActions" Property="Visibility" Value="Visible" />
+            <Trigger SourceName="TaskRow" Property="IsMouseOver" Value="True">
+                <Setter TargetName="RowActions" Property="Visibility" Value="Visible" />
             </Trigger>
+            <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType={x:Type ListBoxItem}}}" Value="True">
+                <Setter TargetName="TaskRow" Property="BorderBrush" Value="{DynamicResource FocusStrokeColorOuterBrush}" />
+                <Setter TargetName="RowActions" Property="Visibility" Value="Visible" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding HasDue}" Value="False">
+                <Setter TargetName="DueChip" Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding IsPlannedForToday}" Value="True">
+                <Setter TargetName="PlanTodayAction" Property="Visibility" Value="Collapsed" />
+                <Setter TargetName="RemoveTodayAction" Property="Visibility" Value="Visible" />
+            </DataTrigger>
             <DataTrigger Binding="{Binding IsOverdue}" Value="True">
+                <Setter TargetName="DueChip" Property="Background" Value="{DynamicResource SystemFillColorCriticalBackgroundBrush}" />
+                <Setter TargetName="DueMetadata" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
                 <Setter TargetName="DueStatus" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
                 <Setter TargetName="DueStatus" Property="FontWeight" Value="SemiBold" />
             </DataTrigger>

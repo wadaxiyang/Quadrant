@@ -39,7 +39,7 @@ public partial class QuadrantsPage : Page
 
     private void TaskCard_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (e.Key is not (Key.Enter or Key.Space) || e.OriginalSource is System.Windows.Controls.Button || FindTaskCard(e.OriginalSource as DependencyObject)?.DataContext is not TaskCardViewModel task)
+        if (e.Key is not (Key.Enter or Key.Space) || IsInteractiveControl(e.OriginalSource as DependencyObject) || FindTaskCard(e.OriginalSource as DependencyObject)?.DataContext is not TaskCardViewModel task)
         {
             return;
         }
@@ -49,6 +49,26 @@ public partial class QuadrantsPage : Page
             task.CompleteCommand.Execute(task.Id);
             e.Handled = true;
         }
+    }
+
+    private static bool IsInteractiveControl(DependencyObject? source)
+    {
+        while (source is not null)
+        {
+            if (source is System.Windows.Controls.Primitives.ButtonBase or System.Windows.Controls.MenuItem or System.Windows.Controls.Menu)
+            {
+                return true;
+            }
+
+            if (source is Border border && border.DataContext is TaskCardViewModel)
+            {
+                return false;
+            }
+
+            source = source is Visual ? VisualTreeHelper.GetParent(source) : null;
+        }
+
+        return false;
     }
 
     private void TaskCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

@@ -75,6 +75,7 @@ public partial class MainViewModel : ObservableObject
     public event EventHandler? NewTaskRequested;
     public event EventHandler<TaskItem>? EditTaskRequested;
     public event EventHandler<TaskItem>? RepeatTaskRequested;
+    public event EventHandler<long>? FocusTaskRequested;
     public event EventHandler<long>? DeleteTaskRequested;
     public event EventHandler<RecoverableOperationErrorEventArgs>? RecoverableError;
 
@@ -133,6 +134,15 @@ public partial class MainViewModel : ObservableObject
         catch (Exception exception)
         {
             ReportRecoverableError("任务移动失败", exception);
+        }
+    }
+
+    [RelayCommand]
+    private void FocusTask(long id)
+    {
+        if (loadedTasks.ContainsKey(id))
+        {
+            FocusTaskRequested?.Invoke(this, id);
         }
     }
 
@@ -331,7 +341,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     private TaskCardViewModel CreateTaskCard(TaskItem task, DateTimeOffset now) =>
-        new(task, EditTaskCommand, EditRecurrenceCommand, CompleteTaskCommand, DeleteTaskCommand, PlanForTodayCommand, RemovePlanCommand, now, clock.LocalTimeZone);
+        new(task, EditTaskCommand, EditRecurrenceCommand, CompleteTaskCommand, FocusTaskCommand, DeleteTaskCommand, PlanForTodayCommand, RemovePlanCommand, now, clock.LocalTimeZone);
 
     private void EnsureQuadrants()
     {
