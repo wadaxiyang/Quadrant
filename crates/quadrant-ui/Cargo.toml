@@ -1,0 +1,20 @@
+[package]
+name = "quadrant-ui"
+description = "Slint presentation adapter for Quadrant"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+build = "build.rs"
+
+[dependencies]
+quadrant-application.workspace = true
+quadrant-domain.workspace = true
+slint.workspace = true
+
+[build-dependencies]
+slint-build.workspace = true
+
+[lints]
+workspace = true

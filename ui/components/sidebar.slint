@@ -1,0 +1,126 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from wsl-dashboard src/ui/components/sidebar.slint at
+// 948589a255a4bd8a3ff9c3de49e2e13109378fcd; navigation and icons adapted for Quadrant.
+
+import { Theme } from "../theme.slint";
+import { UiConstants } from "../constants.slint";
+import { Icons } from "../icons.slint";
+import { SidebarItem } from "common.slint";
+
+export component Sidebar inherits Rectangle {
+    in-out property <bool> collapsed: false;
+    in property <int> selected_route: 0;
+    callback route_selected(int);
+
+    width: collapsed ? UiConstants.sidebar_collapsed_width : UiConstants.sidebar_expanded_width;
+    background: Theme.sidebar_bg;
+
+    animate width {
+        duration: 200ms;
+        easing: ease-out-quad;
+    }
+
+    VerticalLayout {
+        height: 100%;
+        padding-left: 4px;
+        padding-right: 4px;
+        padding-top: 12px;
+        padding-bottom: 16px;
+        spacing: 4px;
+
+        Rectangle {
+            height: 36px;
+            border-radius: 4px;
+            background: menu_touch.has-hover ? Theme.hover_bg : transparent;
+
+            Image {
+                x: 13px;
+                y: (parent.height - self.height) / 2;
+                width: 20px;
+                height: 20px;
+                source: Icons.menu;
+                colorize: menu_touch.has-hover ? Theme.accent : Theme.icon_color_slate;
+            }
+
+            menu_touch := TouchArea {
+                clicked => { root.collapsed = !root.collapsed; }
+            }
+        }
+
+        SidebarItem {
+            icon: Icons.quadrants;
+            icon_color: Theme.icon_color_emerald;
+            text: "Quadrants";
+            selected: root.selected_route == 0;
+            collapsed: root.collapsed;
+            clicked => { root.route_selected(0); }
+        }
+
+        SidebarItem {
+            icon: Icons.today;
+            icon_color: Theme.icon_color_navigation;
+            text: "Today";
+            selected: root.selected_route == 1;
+            collapsed: root.collapsed;
+            clicked => { root.route_selected(1); }
+        }
+
+        SidebarItem {
+            icon: Icons.focus;
+            icon_color: Theme.icon_color_orange;
+            text: "Focus";
+            selected: root.selected_route == 2;
+            collapsed: root.collapsed;
+            clicked => { root.route_selected(2); }
+        }
+
+        SidebarItem {
+            icon: Icons.review;
+            icon_color: Theme.icon_color_indigo;
+            text: "Review";
+            selected: root.selected_route == 3;
+            collapsed: root.collapsed;
+            clicked => { root.route_selected(3); }
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        SidebarItem {
+            icon: Icons.completed;
+            icon_color: Theme.icon_color_success;
+            text: "Completed";
+            selected: root.selected_route == 4;
+            collapsed: root.collapsed;
+            clicked => { root.route_selected(4); }
+        }
+
+        Rectangle {
+            height: 1px;
+            width: 100%;
+            background: Theme.border_color;
+        }
+
+        Rectangle { height: 4px; }
+
+        SidebarItem {
+            icon: Icons.settings;
+            icon_color: Theme.icon_color_slate;
+            text: "Settings";
+            selected: root.selected_route == 5;
+            collapsed: root.collapsed;
+            clicked => { root.route_selected(5); }
+        }
+
+        SidebarItem {
+            icon: Icons.about;
+            icon_color: Theme.icon_color_info;
+            text: "About";
+            selected: root.selected_route == 6;
+            collapsed: root.collapsed;
+            clicked => { root.route_selected(6); }
+        }
+    }
+}

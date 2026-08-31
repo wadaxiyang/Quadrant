@@ -1,0 +1,55 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme } from "theme.slint";
+import { Sidebar } from "components/sidebar.slint";
+
+export component MainWindow inherits Window {
+    title: "Quadrant";
+    width: 1100px;
+    height: 720px;
+    background: Theme.background;
+
+    in-out property <int> current_route: 0;
+
+    HorizontalLayout {
+        spacing: 0px;
+
+        Sidebar {
+            selected_route: root.current_route;
+            route_selected(route) => { root.current_route = route; }
+        }
+
+        Rectangle {
+            background: Theme.content_bg;
+            border-color: Theme.border_color;
+            border-width: 1px;
+            border-radius: 8px;
+
+            VerticalLayout {
+                padding: 32px;
+                spacing: 8px;
+
+                Text {
+                    text: root.current_route == 0 ? "Quadrants" :
+                          root.current_route == 1 ? "Today" :
+                          root.current_route == 2 ? "Focus" :
+                          root.current_route == 3 ? "Review" :
+                          root.current_route == 4 ? "Completed" :
+                          root.current_route == 5 ? "Settings" : "About";
+                    font-size: 28px;
+                    font-weight: 600;
+                    color: Theme.text_primary;
+                }
+
+                Text {
+                    text: "M0 foundation is ready. Feature views arrive in the next milestones.";
+                    font-size: 14px;
+                    color: Theme.text_secondary;
+                }
+
+                Rectangle { vertical-stretch: 1; }
+            }
+        }
+    }
+}

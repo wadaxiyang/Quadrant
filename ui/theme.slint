@@ -1,0 +1,27 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from wsl-dashboard src/ui/theme.slint at
+// 948589a255a4bd8a3ff9c3de49e2e13109378fcd; WSL data and Windows-only fonts removed.
+
+export global Theme {
+    in property <bool> dark_mode: false;
+    out property <color> background: dark_mode ? #202020 : #f3f3f3;
+    out property <color> content_bg: dark_mode ? #1e1e1e : #ffffff;
+    out property <color> sidebar_bg: transparent;
+    out property <color> card_bg: dark_mode ? #2d2d30 : #ffffff;
+    out property <color> text_primary: dark_mode ? #eeeeee : #1a1a1a;
+    out property <color> text_secondary: dark_mode ? #bbbbbb : #666666;
+    out property <color> border_color: dark_mode ? #3e3e42 : #e6e8eb;
+    out property <color> hover_bg: dark_mode ? #2a2d2e : #eaeaea;
+    out property <color> selected_bg: dark_mode ? #37373d : #e6e6e6;
+    out property <color> accent: #0067c0;
+    out property <color> icon_color_navigation: dark_mode ? #38bdf8 : #0284c7;
+    out property <color> icon_color_success: dark_mode ? #4ade80 : #16a34a;
+    out property <color> icon_color_info: dark_mode ? #60a5fa : #2563eb;
+    out property <color> icon_color_indigo: dark_mode ? #818cf8 : #4f46e5;
+    out property <color> icon_color_orange: dark_mode ? #fb923c : #f97316;
+    out property <color> icon_color_emerald: dark_mode ? #34d399 : #059669;
+    out property <color> icon_color_slate: dark_mode ? #94a3b8 : #475569;
+}

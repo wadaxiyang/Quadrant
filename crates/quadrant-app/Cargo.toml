@@ -1,0 +1,17 @@
+[package]
+name = "quadrant-app"
+description = "Quadrant desktop application composition root"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+quadrant-application.workspace = true
+quadrant-platform.workspace = true
+quadrant-storage.workspace = true
+quadrant-ui.workspace = true
+
+[lints]
+workspace = true

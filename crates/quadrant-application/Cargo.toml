@@ -1,0 +1,14 @@
+[package]
+name = "quadrant-application"
+description = "Use cases, ports, and orchestration for Quadrant"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+quadrant-domain.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,98 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from wsl-dashboard src/ui/components/common.slint at
+// 948589a255a4bd8a3ff9c3de49e2e13109378fcd. Font glyph icons and WSL-only
+// controls were replaced by semantic SVG images.
+
+import { Theme } from "../theme.slint";
+
+export component SidebarItem inherits Rectangle {
+    in property <image> icon;
+    in property <string> text;
+    in property <color> icon_color: Theme.icon_color_slate;
+    in property <bool> selected: false;
+    in property <bool> collapsed: false;
+    callback clicked;
+
+    height: 36px;
+    border-radius: 4px;
+    background: selected ? Theme.selected_bg : (touch.has-hover ? Theme.hover_bg : transparent);
+
+    Rectangle {
+        visible: root.collapsed && touch.has-hover;
+        x: parent.width + 8px;
+        y: (parent.height - self.height) / 2;
+        width: tooltip_label.preferred-width + 16px;
+        height: 28px;
+        background: #333333;
+        border-radius: 4px;
+        z: 100;
+
+        tooltip_label := Text {
+            text: root.text;
+            color: white;
+            font-size: 12px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 13px;
+        spacing: root.collapsed ? 0px : 12px;
+        alignment: start;
+        width: 100%;
+
+        animate spacing {
+            duration: 200ms;
+            easing: ease-out-quad;
+        }
+
+        Image {
+            width: 20px;
+            height: 20px;
+            source: root.icon;
+            colorize: (root.selected || touch.has-hover) ? Theme.accent : root.icon_color;
+            image-fit: contain;
+        }
+
+        Rectangle {
+            width: root.collapsed ? 0px : item_label.preferred-width;
+            clip: true;
+
+            animate width {
+                duration: 200ms;
+                easing: ease-out-quad;
+            }
+
+            item_label := Text {
+                width: 100%;
+                text: root.text;
+                font-size: 14px;
+                font-weight: root.selected ? 600 : 400;
+                color: (root.selected || touch.has-hover) ? Theme.text_primary : Theme.text_secondary;
+                vertical-alignment: center;
+                horizontal-alignment: left;
+                overflow: elide;
+                opacity: root.collapsed && parent.width < 10px ? 0 : 1;
+                animate opacity { duration: 150ms; }
+            }
+        }
+    }
+
+    Rectangle {
+        visible: root.selected;
+        x: 0;
+        y: (parent.height - self.height) / 2;
+        width: 3px;
+        height: 16px;
+        background: Theme.accent;
+        border-radius: 1.5px;
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}

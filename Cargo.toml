@@ -1,0 +1,33 @@
+[workspace]
+members = [
+    "crates/quadrant-domain",
+    "crates/quadrant-application",
+    "crates/quadrant-storage",
+    "crates/quadrant-platform",
+    "crates/quadrant-ui",
+    "crates/quadrant-app",
+]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92"
+license = "GPL-3.0-only"
+repository = "https://github.com/wadaxiyang/Quadrant"
+
+[workspace.dependencies]
+quadrant-domain = { path = "crates/quadrant-domain" }
+quadrant-application = { path = "crates/quadrant-application" }
+quadrant-storage = { path = "crates/quadrant-storage" }
+quadrant-platform = { path = "crates/quadrant-platform" }
+quadrant-ui = { path = "crates/quadrant-ui" }
+slint = "=1.17.1"
+slint-build = "=1.17.1"
+
+[workspace.lints.rust]
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"

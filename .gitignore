@@ -1,13 +1,8 @@
-# Local project manuals and agent instructions
-/docs/
-/AGENTS.md
-
-# At the repository root, track only README.md among Markdown files
-/*.md
-!/README.md
-
 # Read-only legacy implementation
 /legacy/
+
+# Temporary upstream source checkouts used for provenance review
+/.tmp-*/
 
 # Rust build output
 /target/
