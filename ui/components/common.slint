@@ -235,6 +235,7 @@ export component FluentTextArea inherits Rectangle {
 export component SegmentButton inherits Rectangle {
     in property <string> text;
     in property <bool> selected: false;
+    in property <bool> enabled: true;
     callback clicked;
 
     min-width: 54px;
@@ -243,6 +244,7 @@ export component SegmentButton inherits Rectangle {
     border-width: 1px;
     border-color: root.selected ? Theme.accent : Theme.input_border;
     background: root.selected ? Theme.selected_bg : (segment_touch.has-hover ? Theme.hover_bg : Theme.input_bg);
+    opacity: root.enabled ? 1 : 0.5;
 
     Text {
         text: root.text;
@@ -254,6 +256,7 @@ export component SegmentButton inherits Rectangle {
     }
 
     segment_touch := TouchArea {
+        enabled: root.enabled;
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }

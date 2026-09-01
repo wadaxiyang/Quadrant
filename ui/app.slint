@@ -47,10 +47,20 @@ export component MainWindow inherits Window {
     in-out property <[TodayTaskRow]> due_today_tasks;
     in-out property <[TodayTaskRow]> needs_reschedule_tasks;
     in-out property <int> today_task_count;
+    in-out property <bool> launch_at_startup: false;
+    in-out property <bool> start_hidden: false;
+    in-out property <bool> close_to_tray: true;
+    in-out property <bool> minimize_to_tray: false;
+    in-out property <bool> autostart_supported: false;
+    in-out property <bool> tray_supported: false;
+    in-out property <bool> global_hotkey_available: false;
+    in-out property <bool> native_notifications_available: false;
+    in-out property <bool> single_instance_available: false;
 
     callback navigation_requested(int);
     callback quick_add_requested;
     callback theme_selected(ThemeMode);
+    callback desktop_settings_changed(bool, bool, bool, bool);
     callback task_move_requested(string, int);
     callback task_edit_requested(string);
     callback task_reorder_requested(string, int);
@@ -150,9 +160,25 @@ export component MainWindow inherits Window {
                     if root.current_route == 4: CompletedView { }
                     if root.current_route == 5: SettingsView {
                         theme_mode: Theme.mode;
+                        launch_at_startup: root.launch_at_startup;
+                        start_hidden: root.start_hidden;
+                        close_to_tray: root.close_to_tray;
+                        minimize_to_tray: root.minimize_to_tray;
+                        autostart_supported: root.autostart_supported;
+                        tray_supported: root.tray_supported;
+                        global_hotkey_available: root.global_hotkey_available;
+                        native_notifications_available: root.native_notifications_available;
+                        single_instance_available: root.single_instance_available;
                         theme_selected(mode) => {
                             Theme.mode = mode;
                             root.theme_selected(mode);
+                        }
+                        desktop_settings_changed(launch, start_hidden, close_to_tray, minimize_to_tray) => {
+                            root.launch_at_startup = launch;
+                            root.start_hidden = start_hidden;
+                            root.close_to_tray = close_to_tray;
+                            root.minimize_to_tray = minimize_to_tray;
+                            root.desktop_settings_changed(launch, start_hidden, close_to_tray, minimize_to_tray);
                         }
                     }
                     if root.current_route == 6: AboutView {

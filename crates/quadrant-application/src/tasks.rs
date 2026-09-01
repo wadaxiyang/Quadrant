@@ -3,9 +3,9 @@
 use std::sync::Arc;
 
 use crate::{
-    ApplicationEvent, CalendarError, Clock, NewTask, QuadrantsViewState, RepositoryError,
-    SettingsRepository, TaskIdGenerator, TaskRepository, TodayContextSource, TodayRepository,
-    TodayViewState, UiIntent, UserFacingError,
+    ApplicationEvent, AutostartService, CalendarError, Clock, DesktopSettings, NewTask,
+    QuadrantsViewState, RepositoryError, SettingsRepository, TaskIdGenerator, TaskRepository,
+    TodayContextSource, TodayRepository, TodayViewState, UiIntent, UserFacingError,
 };
 
 /// Initial/refresh projection load failure.
@@ -26,6 +26,7 @@ pub struct TaskApplication {
     tasks: Arc<dyn TaskRepository>,
     today_tasks: Arc<dyn TodayRepository>,
     settings: Arc<dyn SettingsRepository>,
+    autostart: Arc<dyn AutostartService>,
     clock: Arc<dyn Clock>,
     ids: Arc<dyn TaskIdGenerator>,
     today_context: Arc<dyn TodayContextSource>,
@@ -38,6 +39,7 @@ impl TaskApplication {
         tasks: Arc<dyn TaskRepository>,
         today_tasks: Arc<dyn TodayRepository>,
         settings: Arc<dyn SettingsRepository>,
+        autostart: Arc<dyn AutostartService>,
         clock: Arc<dyn Clock>,
         ids: Arc<dyn TaskIdGenerator>,
         today_context: Arc<dyn TodayContextSource>,
@@ -46,6 +48,7 @@ impl TaskApplication {
             tasks,
             today_tasks,
             settings,
+            autostart,
             clock,
             ids,
             today_context,
@@ -89,6 +92,7 @@ impl TaskApplication {
                 Ok(()) => Vec::new(),
                 Err(error) => vec![failure_event(&error)],
             },
+            UiIntent::SetDesktopSettings(settings) => self.apply_desktop_settings(settings),
             UiIntent::SubmitQuickAdd(submission) => {
                 let draft = match NewTask::quick_capture(submission.title, submission.placement) {
                     Ok(draft) => draft,
@@ -152,7 +156,10 @@ impl TaskApplication {
                 }
             }
             UiIntent::CompleteTask(task_id) => {
-                match self.tasks.complete_task(task_id, self.clock.now()) {
+                match self
+                    .tasks
+                    .complete_task(task_id, self.ids.generate(), self.clock.now())
+                {
                     Ok(_) => self.refresh_after_success("Task completed."),
                     Err(error) => vec![failure_event(&error)],
                 }
@@ -179,6 +186,49 @@ impl TaskApplication {
             ],
             Err(error) => vec![load_failure_event(&error)],
         }
+    }
+
+    fn apply_desktop_settings(&self, settings: DesktopSettings) -> Vec<ApplicationEvent> {
+        let previous = match self.settings.load_desktop_settings() {
+            Ok(previous) => previous,
+            Err(error) => return vec![failure_event(&error)],
+        };
+        if settings.launch_at_startup && !self.autostart.is_supported() {
+            return vec![
+                ApplicationEvent::DesktopSettingsChanged(previous),
+                ApplicationEvent::OperationFailed(UserFacingError {
+                    message: "Launch at startup is not supported on this platform.".to_owned(),
+                }),
+            ];
+        }
+        if self
+            .autostart
+            .set_enabled(settings.launch_at_startup, settings.start_hidden)
+            .is_err()
+        {
+            return vec![
+                ApplicationEvent::DesktopSettingsChanged(previous),
+                ApplicationEvent::OperationFailed(UserFacingError {
+                    message: "The startup registration could not be changed.".to_owned(),
+                }),
+            ];
+        }
+        if let Err(error) = self
+            .settings
+            .save_desktop_settings(settings, self.clock.now())
+        {
+            let _ = self
+                .autostart
+                .set_enabled(previous.launch_at_startup, previous.start_hidden);
+            return vec![
+                ApplicationEvent::DesktopSettingsChanged(previous),
+                failure_event(&error),
+            ];
+        }
+        vec![
+            ApplicationEvent::DesktopSettingsChanged(settings),
+            ApplicationEvent::OperationSucceeded("Desktop settings saved.".to_owned()),
+        ]
     }
 
     fn load_states(&self) -> Result<(QuadrantsViewState, TodayViewState), ApplicationLoadError> {

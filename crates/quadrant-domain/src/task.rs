@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{LocalDate, RecurrenceRule, ScheduledInstant, UtcTimestamp};
+use crate::{LocalDate, RecurrenceAdvanceError, RecurrenceRule, ScheduledInstant, UtcTimestamp};
 
 /// Identifies the four architectural quadrants without UI or storage coupling.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -346,6 +346,45 @@ impl Task {
         self.0.updated_at = now;
     }
 
+    /// Builds the next active occurrence without mutating this task.
+    ///
+    /// Planning dates and scheduled instants advance by the same validated
+    /// recurrence rule; timezone-aware instants retain their local wall time.
+    ///
+    /// # Errors
+    ///
+    /// Returns a recurrence/calendar error when the next occurrence cannot be represented.
+    pub fn next_recurrence_draft(&self) -> Result<Option<NewTask>, TaskDomainError> {
+        let Some(rule) = self.0.recurrence else {
+            return Ok(None);
+        };
+        let draft = NewTask {
+            title: self.0.title.clone(),
+            notes: self.0.notes.clone(),
+            placement: self.0.placement,
+            planned_on: self
+                .0
+                .planned_on
+                .map(|date| rule.advance_date(date))
+                .transpose()?,
+            due: self
+                .0
+                .due
+                .as_ref()
+                .map(|due| rule.advance_instant(due))
+                .transpose()?,
+            reminder: self
+                .0
+                .reminder
+                .as_ref()
+                .map(|reminder| rule.advance_instant(reminder))
+                .transpose()?,
+            recurrence: Some(rule),
+        };
+        draft.validate()?;
+        Ok(Some(draft))
+    }
+
     /// Completes an active task and returns the immutable history snapshot.
     ///
     /// # Errors
@@ -419,6 +458,9 @@ pub enum TaskDomainError {
     /// Reopen was requested for an active task.
     #[error("task is already active")]
     AlreadyActive,
+    /// A recurrence could not be advanced using its retained calendar semantics.
+    #[error(transparent)]
+    RecurrenceAdvance(#[from] RecurrenceAdvanceError),
 }
 
 #[cfg(test)]

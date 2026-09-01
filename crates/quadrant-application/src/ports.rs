@@ -7,7 +7,7 @@ use quadrant_domain::{
 };
 use uuid::Uuid;
 
-use crate::{ReorderDirection, ThemeMode, TodayContext};
+use crate::{DesktopSettings, ReorderDirection, ThemeMode, TodayContext};
 
 /// Semantic repository operation used for error classification.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -143,7 +143,12 @@ pub trait TaskRepository: Send + Sync {
     /// # Errors
     ///
     /// Returns a transition failure; partial state must be rolled back.
-    fn complete_task(&self, id: TaskId, now: UtcTimestamp) -> Result<Task, RepositoryError>;
+    fn complete_task(
+        &self,
+        id: TaskId,
+        next_occurrence_id: TaskId,
+        now: UtcTimestamp,
+    ) -> Result<Task, RepositoryError>;
 
     /// Reopens a completed task and reconciles its latest completion event.
     ///
@@ -211,7 +216,62 @@ pub trait SettingsRepository: Send + Sync {
         theme_mode: ThemeMode,
         now: UtcTimestamp,
     ) -> Result<(), RepositoryError>;
+
+    /// Loads desktop lifecycle settings, applying product defaults for missing keys.
+    ///
+    /// # Errors
+    ///
+    /// Returns a settings read or validation failure.
+    fn load_desktop_settings(&self) -> Result<DesktopSettings, RepositoryError>;
+
+    /// Stores the coherent desktop lifecycle settings group.
+    ///
+    /// # Errors
+    ///
+    /// Returns a settings write failure; partial settings must be rolled back.
+    fn save_desktop_settings(
+        &self,
+        settings: DesktopSettings,
+        now: UtcTimestamp,
+    ) -> Result<(), RepositoryError>;
 }
+
+/// Platform capability for registering login/startup launch behavior.
+pub trait AutostartService: Send + Sync {
+    /// Returns whether this target can configure autostart.
+    fn is_supported(&self) -> bool;
+
+    /// Applies or removes the current executable's startup registration.
+    ///
+    /// # Errors
+    ///
+    /// Returns a normalized platform error when the external registration fails.
+    fn set_enabled(&self, enabled: bool, start_hidden: bool) -> Result<(), AutostartError>;
+}
+
+/// Normalized autostart failure without leaking registry/package types.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AutostartError {
+    detail: String,
+}
+
+impl AutostartError {
+    /// Wraps diagnostic platform context.
+    #[must_use]
+    pub fn new(detail: impl fmt::Display) -> Self {
+        Self {
+            detail: detail.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for AutostartError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.detail)
+    }
+}
+
+impl Error for AutostartError {}
 
 /// Deterministic application clock boundary.
 pub trait Clock: Send + Sync {

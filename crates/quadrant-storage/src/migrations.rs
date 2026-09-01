@@ -9,11 +9,18 @@ struct Migration {
     sql: &'static str,
 }
 
-const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "initial",
-    sql: include_str!("../../../migrations/0001_initial.sql"),
-}];
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "initial",
+        sql: include_str!("../../../migrations/0001_initial.sql"),
+    },
+    Migration {
+        version: 2,
+        name: "reminder_delivery_state",
+        sql: include_str!("../../../migrations/0002_reminder_delivery_state.sql"),
+    },
+];
 
 pub(crate) fn apply(connection: &mut Connection) -> Result<(), RepositoryError> {
     connection

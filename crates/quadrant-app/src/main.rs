@@ -3,18 +3,15 @@
 use std::sync::Arc;
 
 use quadrant_application::{
-    ApplicationEvent, Clock, ReminderAlert, ReminderDelivery, ReminderDeliveryError,
-    ReminderRepository, ReminderScheduler, SettingsRepository, SystemClock, SystemThemeSource,
-    TaskApplication, TaskIdGenerator, TaskRepository, TodayContextSource, TodayRepository,
-    UiIntent, UserFacingError, UuidTaskIdGenerator,
+    ApplicationEvent, AutostartService, Clock, ReminderAlert, ReminderDelivery,
+    ReminderDeliveryError, ReminderRepository, ReminderScheduler, SettingsRepository, SystemClock,
+    SystemThemeSource, TaskApplication, TaskIdGenerator, TaskRepository, TodayContextSource,
+    TodayRepository, UiIntent, UserFacingError, UuidTaskIdGenerator,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_path = quadrant_platform::PlatformPaths.database_path()?;
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .thread_name("quadrant-application")
-        .enable_all()
-        .build()?;
+    let runtime = application_runtime()?;
     let single_instance =
         quadrant_platform::SingleInstanceCoordinator::claim(database_path.as_path())?;
     if !single_instance.is_primary() {
@@ -31,6 +28,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let today_tasks: Arc<dyn TodayRepository> = store.clone();
     let reminders: Arc<dyn ReminderRepository> = store.clone();
     let settings: Arc<dyn SettingsRepository> = store.clone();
+    let autostart: Arc<dyn AutostartService> =
+        Arc::new(quadrant_platform::PlatformAutostartService);
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
     let ids: Arc<dyn TaskIdGenerator> = Arc::new(UuidTaskIdGenerator);
     let today_context: Arc<dyn TodayContextSource> =
@@ -38,7 +37,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let application = TaskApplication::new(
         Arc::clone(&tasks),
         today_tasks,
-        settings,
+        Arc::clone(&settings),
+        Arc::clone(&autostart),
         Arc::clone(&clock),
         ids,
         today_context,
@@ -46,6 +46,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let initial_quadrants = application.load_quadrants()?;
     let initial_today = application.load_today()?;
     let theme_mode = store.load_theme_mode()?.unwrap_or_default();
+    let desktop_settings = settings.load_desktop_settings()?;
+    let autostart_reconcile_failed = reconcile_autostart(&*autostart, desktop_settings);
 
     let theme_source = quadrant_platform::PlatformThemeSource;
     let config = quadrant_ui::UiShellConfig {
@@ -53,6 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         system_theme: theme_source.current_theme(),
         quadrants: initial_quadrants,
         today: initial_today,
+        desktop_settings,
     };
 
     let (intent_sender, mut intent_receiver) = tokio::sync::mpsc::unbounded_channel::<UiIntent>();
@@ -68,6 +71,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     let desktop_integration =
         start_desktop_integration(Arc::clone(&desktop_event_sink), &event_sink);
+    shell.set_platform_capabilities(ui_capabilities(desktop_integration.as_ref(), &*autostart));
+    report_autostart_reconcile_failure(autostart_reconcile_failed, &event_sink);
     let reminder_delivery = native_reminder_delivery(Arc::clone(&event_sink));
     let (reminder_scheduler, reminder_handle) =
         ReminderScheduler::new(reminders, clock, reminder_delivery);
@@ -97,7 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let ui_result = shell.run();
+    let ui_result = shell.run(background_requested());
     if let Some(integration) = desktop_integration {
         integration.shutdown();
     }
@@ -108,6 +113,55 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     runtime.block_on(activation_worker)?;
     ui_result?;
     Ok(())
+}
+
+fn application_runtime() -> std::io::Result<tokio::runtime::Runtime> {
+    tokio::runtime::Builder::new_multi_thread()
+        .thread_name("quadrant-application")
+        .enable_all()
+        .build()
+}
+
+fn reconcile_autostart(
+    autostart: &dyn AutostartService,
+    settings: quadrant_application::DesktopSettings,
+) -> bool {
+    autostart
+        .set_enabled(settings.launch_at_startup, settings.start_hidden)
+        .is_err()
+}
+
+fn ui_capabilities(
+    desktop: Option<&quadrant_platform::DesktopIntegration>,
+    autostart: &dyn AutostartService,
+) -> quadrant_ui::UiPlatformCapabilities {
+    let capabilities = desktop
+        .map(quadrant_platform::DesktopIntegration::capabilities)
+        .unwrap_or_default();
+    quadrant_ui::UiPlatformCapabilities {
+        autostart: autostart.is_supported(),
+        tray: capabilities.tray,
+        global_hotkey: capabilities.global_hotkey,
+        native_notifications: capabilities.native_notifications,
+        single_instance: capabilities.single_instance,
+    }
+}
+
+fn report_autostart_reconcile_failure(
+    failed: bool,
+    event_sink: &quadrant_ui::ApplicationEventSink,
+) {
+    if failed {
+        event_sink(ApplicationEvent::OperationFailed(UserFacingError {
+            message: "The saved startup registration could not be refreshed.".to_owned(),
+        }));
+    }
+}
+
+fn background_requested() -> bool {
+    std::env::args_os()
+        .skip(1)
+        .any(|argument| argument == "--background")
 }
 
 fn start_desktop_integration(

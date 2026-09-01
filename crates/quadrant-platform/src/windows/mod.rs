@@ -1,5 +1,19 @@
 //! Windows-only desktop integration.
 
+mod autostart;
+mod theme;
+
+pub(crate) fn set_autostart(
+    enabled: bool,
+    start_hidden: bool,
+) -> Result<(), quadrant_application::AutostartError> {
+    autostart::set_enabled(enabled, start_hidden)
+}
+
+pub(crate) fn current_system_theme() -> quadrant_application::SystemTheme {
+    theme::current_system_theme()
+}
+
 use std::{
     sync::{Arc, mpsc},
     thread,
@@ -98,7 +112,7 @@ fn run_platform_thread(sink: &DesktopEventSink, ready_sender: &mpsc::SyncSender<
     let capabilities = PlatformCapabilities {
         global_hotkey: hotkey_registered,
         tray: tray_icon.is_some(),
-        autostart: false,
+        autostart: true,
         native_notifications: true,
         native_backdrop: false,
         single_instance: true,

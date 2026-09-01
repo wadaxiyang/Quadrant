@@ -8,9 +8,9 @@ mod tasks;
 mod today;
 
 pub use ports::{
-    CalendarError, Clock, ReminderRepository, RepositoryError, RepositoryOperation,
-    SettingsRepository, SystemClock, TaskIdGenerator, TaskRepository, TodayContextSource,
-    TodayRepository, UuidTaskIdGenerator,
+    AutostartError, AutostartService, CalendarError, Clock, ReminderRepository, RepositoryError,
+    RepositoryOperation, SettingsRepository, SystemClock, TaskIdGenerator, TaskRepository,
+    TodayContextSource, TodayRepository, UuidTaskIdGenerator,
 };
 pub use quadrant_domain::{
     LocalDate, NewTask, Quadrant, RecurrencePattern, RecurrenceRule, ScheduledInstant, SortKey,
@@ -39,6 +39,8 @@ pub enum UiIntent {
     SubmitQuickAdd(QuickAddSubmission),
     /// Change the user's preferred color theme.
     SetTheme(ThemeMode),
+    /// Persist and apply desktop startup/window behavior.
+    SetDesktopSettings(DesktopSettings),
     /// Move an active task into Inbox or a quadrant.
     MoveTask {
         /// Task to move.
@@ -401,6 +403,50 @@ pub enum ThemeMode {
     Dark,
 }
 
+/// Validated desktop lifecycle preferences.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DesktopSettings {
+    /// Register Quadrant to launch after user login where supported.
+    pub launch_at_startup: bool,
+    /// Keep the main window hidden when the process starts and tray is available.
+    pub start_hidden: bool,
+    /// Behavior when the main-window Close action is requested.
+    pub close_behavior: WindowCloseBehavior,
+    /// Behavior when the main-window Minimize action is requested.
+    pub minimize_behavior: WindowMinimizeBehavior,
+}
+
+impl Default for DesktopSettings {
+    fn default() -> Self {
+        Self {
+            launch_at_startup: false,
+            start_hidden: false,
+            close_behavior: WindowCloseBehavior::HideToTray,
+            minimize_behavior: WindowMinimizeBehavior::Taskbar,
+        }
+    }
+}
+
+/// Main-window Close behavior.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum WindowCloseBehavior {
+    /// End the application through its normal shutdown path.
+    Quit,
+    /// Hide the window and keep the tray application running.
+    #[default]
+    HideToTray,
+}
+
+/// Main-window Minimize behavior.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum WindowMinimizeBehavior {
+    /// Minimize to the normal platform taskbar/dock representation.
+    #[default]
+    Taskbar,
+    /// Hide the window and keep it recoverable from the tray.
+    HideToTray,
+}
+
 /// Normalized platform theme reported to application/UI code.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum SystemTheme {
@@ -497,6 +543,8 @@ pub enum ApplicationEvent {
     TaskEditorSaved,
     /// Keep the editor open and show a field-validation message.
     TaskEditorValidationFailed(String),
+    /// Apply the persisted desktop lifecycle policy to the UI adapter.
+    DesktopSettingsChanged(DesktopSettings),
     /// Show stable positive feedback.
     OperationSucceeded(String),
     /// Show a stable user-facing failure without exposing raw diagnostics.

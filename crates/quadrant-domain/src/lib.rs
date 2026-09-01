@@ -6,7 +6,9 @@ mod recurrence;
 mod task;
 mod time;
 
-pub use recurrence::{RecurrencePattern, RecurrenceRule, RecurrenceRuleError};
+pub use recurrence::{
+    RecurrenceAdvanceError, RecurrencePattern, RecurrenceRule, RecurrenceRuleError,
+};
 pub use task::{
     CompletionSnapshot, NewTask, Quadrant, SortKey, Task, TaskDetailsUpdate, TaskDomainError,
     TaskId, TaskPlacement, TaskRecord, TaskStatus, TaskTitle,

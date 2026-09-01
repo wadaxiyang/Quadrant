@@ -1,5 +1,6 @@
 //! Platform capability boundary and target-specific integrations.
 
+mod autostart;
 mod desktop;
 mod instance;
 mod notifications;
@@ -16,6 +17,7 @@ use quadrant_application::{
 
 const DATABASE_FILE_NAME: &str = "quadrant-rust.db";
 
+pub use autostart::PlatformAutostartService;
 pub use desktop::DesktopIntegration;
 pub use instance::{ActivationListener, SingleInstanceCoordinator};
 pub use notifications::PlatformNotificationDelivery;
@@ -74,8 +76,18 @@ pub struct PlatformThemeSource;
 
 impl SystemThemeSource for PlatformThemeSource {
     fn current_theme(&self) -> SystemTheme {
-        SystemTheme::Light
+        current_system_theme()
     }
+}
+
+#[cfg(target_os = "windows")]
+fn current_system_theme() -> SystemTheme {
+    windows::current_system_theme()
+}
+
+#[cfg(not(target_os = "windows"))]
+const fn current_system_theme() -> SystemTheme {
+    SystemTheme::Light
 }
 
 /// DST-aware local calendar boundaries backed by the host system timezone.

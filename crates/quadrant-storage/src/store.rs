@@ -6,8 +6,9 @@ use std::{
 };
 
 use quadrant_application::{
-    ReminderRepository, ReorderDirection, RepositoryError, RepositoryOperation, SettingsRepository,
-    TaskRepository, ThemeMode, TodayRepository,
+    DesktopSettings, ReminderRepository, ReorderDirection, RepositoryError, RepositoryOperation,
+    SettingsRepository, TaskRepository, ThemeMode, TodayRepository, WindowCloseBehavior,
+    WindowMinimizeBehavior,
 };
 use quadrant_domain::{
     LocalDate, NewTask, SortKey, Task, TaskDetailsUpdate, TaskId, TaskPlacement, TaskStatus,
@@ -217,6 +218,7 @@ impl TaskRepository for SqliteStore {
         let mut connection = self.lock(operation)?;
         let transaction = immediate_transaction(&mut connection, operation)?;
         let mut task = require_task(&transaction, id, operation)?;
+        let previous_reminder = task.record().reminder.clone();
         if task.record().placement != update.placement {
             let sort_key = next_sort_key(&transaction, update.placement)
                 .map_err(|error| RepositoryError::new(operation, error))?;
@@ -227,17 +229,33 @@ impl TaskRepository for SqliteStore {
             .map_err(|error| RepositoryError::new(operation, error))?;
         update_task_row(&transaction, &task)
             .map_err(|error| RepositoryError::new(operation, error))?;
+        if previous_reminder != task.record().reminder {
+            transaction
+                .execute(
+                    "UPDATE tasks SET reminder_delivered_for_utc = NULL WHERE id = ?1",
+                    [id.to_string()],
+                )
+                .map_err(|error| RepositoryError::new(operation, error))?;
+        }
         transaction
             .commit()
             .map_err(|error| RepositoryError::new(operation, error))?;
         Ok(task)
     }
 
-    fn complete_task(&self, id: TaskId, now: UtcTimestamp) -> Result<Task, RepositoryError> {
+    fn complete_task(
+        &self,
+        id: TaskId,
+        next_occurrence_id: TaskId,
+        now: UtcTimestamp,
+    ) -> Result<Task, RepositoryError> {
         let operation = RepositoryOperation::TransitionTask;
         let mut connection = self.lock(operation)?;
         let transaction = immediate_transaction(&mut connection, operation)?;
         let mut task = require_task(&transaction, id, operation)?;
+        let next_draft = task
+            .next_recurrence_draft()
+            .map_err(|error| RepositoryError::new(operation, error))?;
         let snapshot = task
             .complete(now)
             .map_err(|error| RepositoryError::new(operation, error))?;
@@ -248,16 +266,27 @@ impl TaskRepository for SqliteStore {
                 "INSERT INTO task_completion_events(
                      id, task_id, task_title_snapshot, quadrant_snapshot, completed_at_utc,
                      recurrence_occurrence_key
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, NULL)",
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 params![
                     Uuid::now_v7().to_string(),
                     snapshot.task_id.to_string(),
                     snapshot.title.as_str(),
                     mapping::placement_to_db(snapshot.placement),
                     snapshot.completed_at.unix_seconds(),
+                    task.record()
+                        .recurrence
+                        .map(|_| snapshot.task_id.to_string()),
                 ],
             )
             .map_err(|error| RepositoryError::new(operation, error))?;
+        if let Some(draft) = next_draft {
+            let sort_key = next_sort_key(&transaction, draft.placement)
+                .map_err(|error| RepositoryError::new(operation, error))?;
+            let next_task = Task::create(next_occurrence_id, draft, sort_key, now)
+                .map_err(|error| RepositoryError::new(operation, error))?;
+            insert_task(&transaction, &next_task)
+                .map_err(|error| RepositoryError::new(operation, error))?;
+        }
         transaction
             .commit()
             .map_err(|error| RepositoryError::new(operation, error))?;
@@ -334,6 +363,7 @@ impl ReminderRepository for SqliteStore {
         let sql = format!(
             "SELECT {TASK_COLUMNS} FROM tasks
              WHERE status = 0 AND reminder_at_utc IS NOT NULL
+               AND reminder_delivered_for_utc IS NOT reminder_at_utc
              ORDER BY reminder_at_utc, id"
         );
         let mut statement = connection
@@ -370,9 +400,19 @@ impl ReminderRepository for SqliteStore {
                 .as_ref()
                 .is_some_and(|reminder| reminder.at_utc == scheduled_for);
         if matches {
-            task.clear_reminder(now);
-            update_task_row(&transaction, &task)
-                .map_err(|error| RepositoryError::new(operation, error))?;
+            if task.record().recurrence.is_some() {
+                transaction
+                    .execute(
+                        "UPDATE tasks SET reminder_delivered_for_utc = ?2
+                         WHERE id = ?1 AND status = 0 AND reminder_at_utc = ?2",
+                        params![id.to_string(), scheduled_for.unix_seconds()],
+                    )
+                    .map_err(|error| RepositoryError::new(operation, error))?;
+            } else {
+                task.clear_reminder(now);
+                update_task_row(&transaction, &task)
+                    .map_err(|error| RepositoryError::new(operation, error))?;
+            }
         }
         transaction
             .commit()
@@ -432,6 +472,99 @@ impl SettingsRepository for SqliteStore {
             .map_err(|error| RepositoryError::new(operation, error))?;
         Ok(())
     }
+
+    fn load_desktop_settings(&self) -> Result<DesktopSettings, RepositoryError> {
+        let operation = RepositoryOperation::ReadSettings;
+        let connection = self.lock(operation)?;
+        let defaults = DesktopSettings::default();
+        Ok(DesktopSettings {
+            launch_at_startup: load_bool_setting(
+                &connection,
+                "desktop.launch_at_startup",
+                operation,
+            )?
+            .unwrap_or(defaults.launch_at_startup),
+            start_hidden: load_bool_setting(&connection, "desktop.start_hidden", operation)?
+                .unwrap_or(defaults.start_hidden),
+            close_behavior: if load_bool_setting(&connection, "desktop.close_to_tray", operation)?
+                .unwrap_or(defaults.close_behavior == WindowCloseBehavior::HideToTray)
+            {
+                WindowCloseBehavior::HideToTray
+            } else {
+                WindowCloseBehavior::Quit
+            },
+            minimize_behavior: if load_bool_setting(
+                &connection,
+                "desktop.minimize_to_tray",
+                operation,
+            )?
+            .unwrap_or(defaults.minimize_behavior == WindowMinimizeBehavior::HideToTray)
+            {
+                WindowMinimizeBehavior::HideToTray
+            } else {
+                WindowMinimizeBehavior::Taskbar
+            },
+        })
+    }
+
+    fn save_desktop_settings(
+        &self,
+        settings: DesktopSettings,
+        now: UtcTimestamp,
+    ) -> Result<(), RepositoryError> {
+        let operation = RepositoryOperation::WriteSettings;
+        let mut connection = self.lock(operation)?;
+        let transaction = immediate_transaction(&mut connection, operation)?;
+        let values = [
+            ("desktop.launch_at_startup", settings.launch_at_startup),
+            ("desktop.start_hidden", settings.start_hidden),
+            (
+                "desktop.close_to_tray",
+                settings.close_behavior == WindowCloseBehavior::HideToTray,
+            ),
+            (
+                "desktop.minimize_to_tray",
+                settings.minimize_behavior == WindowMinimizeBehavior::HideToTray,
+            ),
+        ];
+        for (key, value) in values {
+            let json = serde_json::to_string(&value)
+                .map_err(|error| RepositoryError::new(operation, error))?;
+            transaction
+                .execute(
+                    "INSERT INTO settings(key, value_json, updated_at_utc)
+                     VALUES (?1, ?2, ?3)
+                     ON CONFLICT(key) DO UPDATE SET
+                         value_json = excluded.value_json,
+                         updated_at_utc = excluded.updated_at_utc",
+                    params![key, json, now.unix_seconds()],
+                )
+                .map_err(|error| RepositoryError::new(operation, error))?;
+        }
+        transaction
+            .commit()
+            .map_err(|error| RepositoryError::new(operation, error))
+    }
+}
+
+fn load_bool_setting(
+    connection: &Connection,
+    key: &str,
+    operation: RepositoryOperation,
+) -> Result<Option<bool>, RepositoryError> {
+    connection
+        .query_row(
+            "SELECT value_json FROM settings WHERE key = ?1",
+            [key],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|error| RepositoryError::new(operation, error))?
+        .map(|json| {
+            serde_json::from_str::<bool>(&json)
+                .map_err(|error| RepositoryError::new(operation, error))
+        })
+        .transpose()
 }
 
 fn immediate_transaction(
@@ -617,8 +750,8 @@ fn update_task_row(connection: &Connection, task: &Task) -> rusqlite::Result<()>
 #[cfg(test)]
 mod tests {
     use quadrant_application::{
-        ReminderRepository, ReorderDirection, SettingsRepository, TaskRepository, ThemeMode,
-        TodayRepository,
+        DesktopSettings, ReminderRepository, ReorderDirection, SettingsRepository, TaskRepository,
+        ThemeMode, TodayRepository, WindowCloseBehavior, WindowMinimizeBehavior,
     };
     use quadrant_domain::{
         LocalDate, NewTask, Quadrant, RecurrencePattern, RecurrenceRule, ScheduledInstant,
@@ -632,10 +765,79 @@ mod tests {
         TaskId::from_uuid(Uuid::from_u128(value))
     }
 
+    fn rename_without_rescheduling(
+        store: &SqliteStore,
+        id: TaskId,
+        now: UtcTimestamp,
+    ) -> Result<(), quadrant_application::RepositoryError> {
+        let task = store.get_task(id)?.expect("source exists");
+        store.update_task(
+            id,
+            TaskDetailsUpdate {
+                title: TaskTitle::new("Recurring renamed").expect("valid title"),
+                notes: "notes changed after delivery".to_owned(),
+                placement: task.record().placement,
+                planned_on: task.record().planned_on,
+                due: task.record().due.clone(),
+                reminder: task.record().reminder.clone(),
+                recurrence: task.record().recurrence,
+            },
+            now,
+        )?;
+        Ok(())
+    }
+
+    fn assert_recurring_completion(
+        store: &SqliteStore,
+        source_id: TaskId,
+        next_id: TaskId,
+        previous_reminder: UtcTimestamp,
+    ) {
+        let source = store
+            .get_task(source_id)
+            .expect("source query")
+            .expect("source exists");
+        assert_eq!(source.record().status, TaskStatus::Completed);
+        let next = store
+            .get_task(next_id)
+            .expect("next query")
+            .expect("next occurrence exists");
+        assert_eq!(next.record().status, TaskStatus::Active);
+        assert_eq!(
+            next.record().planned_on.expect("next plan").to_string(),
+            "2026-02-28"
+        );
+        assert!(
+            next.record()
+                .reminder
+                .as_ref()
+                .is_some_and(|reminder| reminder.at_utc > previous_reminder)
+        );
+        assert_eq!(
+            store
+                .list_pending_reminders()
+                .expect("next reminder pending")
+                .len(),
+            1
+        );
+        let recurrence_key = store
+            .connection
+            .lock()
+            .expect("connection lock")
+            .query_row(
+                "SELECT recurrence_occurrence_key FROM task_completion_events
+                 WHERE task_id = ?1",
+                [source_id.to_string()],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .expect("completion event");
+        assert_eq!(recurrence_key, Some(source_id.to_string()));
+    }
+
     #[test]
     fn empty_database_migrates_and_enables_foreign_keys() {
         let store = SqliteStore::open_in_memory().expect("storage opens");
-        assert_eq!(store.schema_version().expect("schema version"), 1);
+        assert_eq!(store.schema_version().expect("schema version"), 2);
         let enabled = store
             .connection
             .lock()
@@ -667,7 +869,7 @@ mod tests {
         );
 
         let completed = store
-            .complete_task(id, UtcTimestamp::from_unix_seconds(12))
+            .complete_task(id, task_id(101), UtcTimestamp::from_unix_seconds(12))
             .expect("task completed");
         assert_eq!(completed.record().status, TaskStatus::Completed);
         let reopened = store
@@ -703,7 +905,7 @@ mod tests {
 
         assert!(
             store
-                .complete_task(id, UtcTimestamp::from_unix_seconds(21))
+                .complete_task(id, task_id(102), UtcTimestamp::from_unix_seconds(21),)
                 .is_err()
         );
         let task = store
@@ -790,7 +992,11 @@ mod tests {
                 .expect("task created");
         }
         store
-            .complete_task(task_id(30), UtcTimestamp::from_unix_seconds(10))
+            .complete_task(
+                task_id(30),
+                task_id(103),
+                UtcTimestamp::from_unix_seconds(10),
+            )
             .expect("due task completed");
 
         let candidates = store
@@ -844,6 +1050,78 @@ mod tests {
     }
 
     #[test]
+    fn recurring_completion_preserves_history_and_creates_the_next_occurrence_atomically() {
+        let store = SqliteStore::open_in_memory().expect("storage opens");
+        let source_id = task_id(40);
+        let next_id = task_id(41);
+        let reminder_at = UtcTimestamp::from_unix_seconds(1_769_856_000);
+        let mut draft =
+            NewTask::quick_capture("Recurring", TaskPlacement::Inbox).expect("valid draft");
+        draft.planned_on = Some(LocalDate::parse_iso("2026-01-31").expect("valid date"));
+        draft.reminder = Some(ScheduledInstant {
+            at_utc: reminder_at,
+            time_zone: TimeZoneId::new("UTC").expect("valid timezone"),
+        });
+        draft.recurrence =
+            Some(RecurrenceRule::new(RecurrencePattern::Monthly).expect("valid recurrence"));
+        store
+            .create_task(
+                source_id,
+                draft,
+                UtcTimestamp::from_unix_seconds(1_769_000_000),
+            )
+            .expect("task created");
+
+        assert!(
+            store
+                .clear_reminder_if_matches(
+                    source_id,
+                    reminder_at,
+                    UtcTimestamp::from_unix_seconds(1_769_856_001),
+                )
+                .expect("delivery recorded")
+        );
+        assert!(
+            store
+                .list_pending_reminders()
+                .expect("delivered reminder hidden")
+                .is_empty()
+        );
+        assert!(
+            store
+                .get_task(source_id)
+                .expect("source query")
+                .expect("source exists")
+                .record()
+                .reminder
+                .is_some(),
+            "the recurrence template survives reminder delivery"
+        );
+
+        rename_without_rescheduling(
+            &store,
+            source_id,
+            UtcTimestamp::from_unix_seconds(1_769_856_002),
+        )
+        .expect("non-schedule edit succeeds");
+        assert!(
+            store
+                .list_pending_reminders()
+                .expect("delivered reminder stays hidden after a non-schedule edit")
+                .is_empty()
+        );
+
+        store
+            .complete_task(
+                source_id,
+                next_id,
+                UtcTimestamp::from_unix_seconds(1_770_000_000),
+            )
+            .expect("recurring task completes");
+        assert_recurring_completion(&store, source_id, next_id, reminder_at);
+    }
+
+    #[test]
     fn theme_setting_round_trips_as_validated_json() {
         let store = SqliteStore::open_in_memory().expect("storage opens");
         assert_eq!(store.load_theme_mode().expect("theme query"), None);
@@ -854,6 +1132,70 @@ mod tests {
             store.load_theme_mode().expect("theme query"),
             Some(ThemeMode::Dark)
         );
+    }
+
+    #[test]
+    fn desktop_settings_default_and_round_trip_as_one_group() {
+        let store = SqliteStore::open_in_memory().expect("storage opens");
+        assert_eq!(
+            store
+                .load_desktop_settings()
+                .expect("desktop settings query"),
+            DesktopSettings::default()
+        );
+        let settings = DesktopSettings {
+            launch_at_startup: true,
+            start_hidden: true,
+            close_behavior: WindowCloseBehavior::Quit,
+            minimize_behavior: WindowMinimizeBehavior::HideToTray,
+        };
+        store
+            .save_desktop_settings(settings, UtcTimestamp::from_unix_seconds(31))
+            .expect("desktop settings saved");
+        assert_eq!(
+            store
+                .load_desktop_settings()
+                .expect("desktop settings query"),
+            settings
+        );
+    }
+
+    #[test]
+    fn desktop_settings_group_rolls_back_on_partial_failure() {
+        let store = SqliteStore::open_in_memory().expect("storage opens");
+        store
+            .connection
+            .lock()
+            .expect("connection lock")
+            .execute_batch(
+                "CREATE TRIGGER reject_start_hidden
+                 BEFORE INSERT ON settings
+                 WHEN NEW.key = 'desktop.start_hidden'
+                 BEGIN SELECT RAISE(ABORT, 'test rollback'); END;",
+            )
+            .expect("failure trigger installed");
+        assert!(
+            store
+                .save_desktop_settings(
+                    DesktopSettings {
+                        launch_at_startup: true,
+                        ..DesktopSettings::default()
+                    },
+                    UtcTimestamp::from_unix_seconds(32),
+                )
+                .is_err()
+        );
+        let stored_count = store
+            .connection
+            .lock()
+            .expect("connection lock")
+            .query_row(
+                "SELECT COUNT(*) FROM settings WHERE key LIKE 'desktop.%'",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .expect("settings count");
+        assert_eq!(stored_count, 0);
     }
 
     #[test]

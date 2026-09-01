@@ -4062,6 +4062,7 @@ dependencies = [
 name = "quadrant-domain"
 version = "0.1.0"
 dependencies = [
+ "jiff",
  "serde",
  "thiserror 2.0.20",
  "time",

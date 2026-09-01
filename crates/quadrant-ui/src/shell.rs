@@ -3,10 +3,10 @@
 use std::{rc::Rc, str::FromStr, sync::Arc};
 
 use quadrant_application::{
-    ApplicationEvent, DesktopEvent, NavigationRoute, Quadrant, QuadrantsViewState,
+    ApplicationEvent, DesktopEvent, DesktopSettings, NavigationRoute, Quadrant, QuadrantsViewState,
     QuickAddSubmission, RecurrenceChoice, ReorderDirection, SystemTheme, TaskEditorState,
     TaskEditorSubmission, TaskId, TaskPlacement, ThemeMode as ApplicationThemeMode, TodayViewState,
-    UiIntent,
+    UiIntent, WindowCloseBehavior, WindowMinimizeBehavior,
 };
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, VecModel};
 
@@ -26,6 +26,24 @@ pub struct UiShellConfig {
     pub quadrants: QuadrantsViewState,
     /// Initial repository-backed Today projection.
     pub today: TodayViewState,
+    /// Persisted desktop lifecycle policy.
+    pub desktop_settings: DesktopSettings,
+}
+
+/// Platform capability snapshot normalized by the composition root.
+#[allow(clippy::struct_excessive_bools)] // Independent capabilities, not one lifecycle state.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct UiPlatformCapabilities {
+    /// Whether login startup can be configured.
+    pub autostart: bool,
+    /// Whether hiding windows remains recoverable through a tray/status item.
+    pub tray: bool,
+    /// Whether the global Quick Add shortcut registered successfully.
+    pub global_hotkey: bool,
+    /// Whether native notifications are supported.
+    pub native_notifications: bool,
+    /// Whether activation forwarding is available.
+    pub single_instance: bool,
 }
 
 /// Thread-safe sink used by application-runtime work to enqueue typed UI events.
@@ -39,6 +57,7 @@ pub struct UiShell {
     main_window: MainWindow,
     quick_add: QuickAddWindow,
     task_editor: TaskEditorWindow,
+    initial_desktop_settings: DesktopSettings,
 }
 
 impl UiShell {
@@ -57,6 +76,7 @@ impl UiShell {
         let intent_handler: Rc<dyn Fn(UiIntent)> = Rc::new(on_intent);
 
         initialize_theme(&main_window, &quick_add, &task_editor, config);
+        apply_desktop_settings(&main_window, config.desktop_settings);
         apply_quadrants_state(&main_window, &config.quadrants);
         apply_today_state(&main_window, &config.today);
         bind_main_window(&main_window, &quick_add, &task_editor, &intent_handler);
@@ -67,6 +87,7 @@ impl UiShell {
             main_window,
             quick_add,
             task_editor,
+            initial_desktop_settings: config.desktop_settings,
         })
     }
 
@@ -105,13 +126,37 @@ impl UiShell {
         })
     }
 
+    /// Applies the capabilities that initialized successfully before the event loop starts.
+    pub fn set_platform_capabilities(&self, capabilities: UiPlatformCapabilities) {
+        self.main_window
+            .set_autostart_supported(capabilities.autostart);
+        self.main_window.set_tray_supported(capabilities.tray);
+        self.main_window
+            .set_global_hotkey_available(capabilities.global_hotkey);
+        self.main_window
+            .set_native_notifications_available(capabilities.native_notifications);
+        self.main_window
+            .set_single_instance_available(capabilities.single_instance);
+    }
+
     /// Runs the Slint event loop until normal application shutdown.
     ///
     /// # Errors
     ///
     /// Returns an event-loop platform error.
-    pub fn run(self) -> Result<(), slint::PlatformError> {
-        let result = self.main_window.run();
+    pub fn run(self, background_requested: bool) -> Result<(), slint::PlatformError> {
+        let start_hidden = should_hide_at_startup(
+            self.main_window.get_tray_supported(),
+            self.initial_desktop_settings.start_hidden,
+            background_requested,
+        );
+        if !start_hidden {
+            self.main_window.show()?;
+        }
+        // Tray/background operation must not use Slint's default
+        // QuitOnLastWindowClosed behavior: hiding the final visible window is
+        // an expected steady state, not application shutdown.
+        let result = slint::run_event_loop_until_quit();
         drop(self.quick_add.hide());
         drop(self.task_editor.hide());
         result
@@ -169,6 +214,26 @@ fn bind_main_window(
             window.invoke_set_theme_mode(mode);
         }
     });
+
+    let desktop_settings_handler = Rc::clone(intent_handler);
+    main_window.on_desktop_settings_changed(
+        move |launch_at_startup, start_hidden, close_to_tray, minimize_to_tray| {
+            desktop_settings_handler(UiIntent::SetDesktopSettings(DesktopSettings {
+                launch_at_startup,
+                start_hidden,
+                close_behavior: if close_to_tray {
+                    WindowCloseBehavior::HideToTray
+                } else {
+                    WindowCloseBehavior::Quit
+                },
+                minimize_behavior: if minimize_to_tray {
+                    WindowMinimizeBehavior::HideToTray
+                } else {
+                    WindowMinimizeBehavior::Taskbar
+                },
+            }));
+        },
+    );
 
     bind_task_actions(main_window, intent_handler);
     bind_main_window_controls(main_window);
@@ -242,7 +307,11 @@ fn bind_main_window_controls(main_window: &MainWindow) {
     let minimize_weak = main_window.as_weak();
     main_window.on_window_minimize(move || {
         if let Some(window) = minimize_weak.upgrade() {
-            window.window().set_minimized(true);
+            if should_hide_to_tray(window.get_tray_supported(), window.get_minimize_to_tray()) {
+                drop(window.hide());
+            } else {
+                window.window().set_minimized(true);
+            }
         }
     });
 
@@ -261,12 +330,24 @@ fn bind_main_window_controls(main_window: &MainWindow) {
         }
     });
 
-    main_window.on_window_close(|| {
-        drop(slint::quit_event_loop());
+    let close_weak = main_window.as_weak();
+    main_window.on_window_close(move || {
+        if let Some(window) = close_weak.upgrade() {
+            if should_hide_to_tray(window.get_tray_supported(), window.get_close_to_tray()) {
+                drop(window.hide());
+            } else {
+                drop(slint::quit_event_loop());
+            }
+        }
     });
 
-    main_window.window().on_close_requested(|| {
-        drop(slint::quit_event_loop());
+    let native_close_weak = main_window.as_weak();
+    main_window.window().on_close_requested(move || {
+        if let Some(window) = native_close_weak.upgrade()
+            && !should_hide_to_tray(window.get_tray_supported(), window.get_close_to_tray())
+        {
+            drop(slint::quit_event_loop());
+        }
         slint::CloseRequestResponse::HideWindow
     });
 }
@@ -413,6 +494,9 @@ fn apply_application_event(
                 editor.set_error_message(SharedString::from(message));
             }
         }
+        ApplicationEvent::DesktopSettingsChanged(settings) => {
+            apply_desktop_settings(main, settings);
+        }
         ApplicationEvent::OperationSucceeded(message) => {
             main.invoke_show_toast(SharedString::from(message), ToastKind::Success);
         }
@@ -420,6 +504,25 @@ fn apply_application_event(
             main.invoke_show_toast(SharedString::from(error.message), ToastKind::Error);
         }
     }
+}
+
+fn apply_desktop_settings(main: &MainWindow, settings: DesktopSettings) {
+    main.set_launch_at_startup(settings.launch_at_startup);
+    main.set_start_hidden(settings.start_hidden);
+    main.set_close_to_tray(settings.close_behavior == WindowCloseBehavior::HideToTray);
+    main.set_minimize_to_tray(settings.minimize_behavior == WindowMinimizeBehavior::HideToTray);
+}
+
+const fn should_hide_to_tray(tray_available: bool, setting_enabled: bool) -> bool {
+    tray_available && setting_enabled
+}
+
+const fn should_hide_at_startup(
+    tray_available: bool,
+    setting_enabled: bool,
+    background_requested: bool,
+) -> bool {
+    tray_available && (setting_enabled || background_requested)
 }
 
 fn apply_task_editor_state(editor: &TaskEditorWindow, state: &TaskEditorState) {
@@ -545,7 +648,7 @@ fn move_window_by(window: &slint::Window, dx: f32, dy: f32) {
 
 #[cfg(test)]
 mod tests {
-    use super::placement_from_destination;
+    use super::{placement_from_destination, should_hide_at_startup, should_hide_to_tray};
     use quadrant_application::{Quadrant, TaskPlacement};
 
     #[test]
@@ -556,5 +659,13 @@ mod tests {
             Some(TaskPlacement::Quadrant(Quadrant::Q4))
         );
         assert_eq!(placement_from_destination(5), None);
+    }
+
+    #[test]
+    fn tray_window_policies_never_hide_without_a_recovery_surface() {
+        assert!(should_hide_to_tray(true, true));
+        assert!(!should_hide_to_tray(false, true));
+        assert!(should_hide_at_startup(true, false, true));
+        assert!(!should_hide_at_startup(false, true, true));
     }
 }
