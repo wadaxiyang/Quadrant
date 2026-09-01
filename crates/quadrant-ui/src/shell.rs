@@ -5,12 +5,13 @@ use std::{rc::Rc, str::FromStr, sync::Arc};
 use quadrant_application::{
     ApplicationEvent, NavigationRoute, Quadrant, QuadrantsViewState, QuickAddSubmission,
     RecurrenceChoice, ReorderDirection, SystemTheme, TaskEditorState, TaskEditorSubmission, TaskId,
-    TaskPlacement, ThemeMode as ApplicationThemeMode, UiIntent,
+    TaskPlacement, ThemeMode as ApplicationThemeMode, TodayViewState, UiIntent,
 };
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, VecModel};
 
 use crate::{
     MainWindow, QuickAddWindow, TaskEditorWindow, TaskRow, ThemeMode as SlintThemeMode, ToastKind,
+    TodayTaskRow,
 };
 
 /// Initial state supplied by the composition root.
@@ -22,6 +23,8 @@ pub struct UiShellConfig {
     pub system_theme: SystemTheme,
     /// Initial repository-backed active task projection.
     pub quadrants: QuadrantsViewState,
+    /// Initial repository-backed Today projection.
+    pub today: TodayViewState,
 }
 
 /// Thread-safe sink used by application-runtime work to enqueue typed UI events.
@@ -51,6 +54,7 @@ impl UiShell {
 
         initialize_theme(&main_window, &quick_add, &task_editor, config);
         apply_quadrants_state(&main_window, &config.quadrants);
+        apply_today_state(&main_window, &config.today);
         bind_main_window(&main_window, &quick_add, &task_editor, &intent_handler);
         bind_quick_add(&quick_add, Rc::clone(&intent_handler));
         bind_task_editor(&task_editor, intent_handler);
@@ -351,6 +355,13 @@ fn apply_application_event(
 ) {
     match event {
         ApplicationEvent::QuadrantsChanged(state) => apply_quadrants_state(main, &state),
+        ApplicationEvent::TodayChanged(state) => apply_today_state(main, &state),
+        ApplicationEvent::ReminderDue(alert) => {
+            main.invoke_show_toast(
+                SharedString::from(format!("Reminder: {}", alert.title)),
+                ToastKind::Info,
+            );
+        }
         ApplicationEvent::TaskEditorLoaded(state) => {
             if let Some(editor) = task_editor.upgrade() {
                 apply_task_editor_state(&editor, &state);
@@ -402,6 +413,26 @@ fn apply_quadrants_state(main: &MainWindow, state: &QuadrantsViewState) {
     main.set_q2_tasks(task_model(&state.q2));
     main.set_q3_tasks(task_model(&state.q3));
     main.set_q4_tasks(task_model(&state.q4));
+}
+
+fn apply_today_state(main: &MainWindow, state: &TodayViewState) {
+    main.set_overdue_tasks(today_model(&state.overdue));
+    main.set_planned_today_tasks(today_model(&state.planned_today));
+    main.set_due_today_tasks(today_model(&state.due_today));
+    main.set_needs_reschedule_tasks(today_model(&state.needs_reschedule));
+    main.set_today_task_count(i32::try_from(state.unique_task_count).unwrap_or(i32::MAX));
+}
+
+fn today_model(tasks: &[quadrant_application::TodayTaskSummary]) -> ModelRc<TodayTaskRow> {
+    let rows = tasks
+        .iter()
+        .map(|task| TodayTaskRow {
+            id: SharedString::from(task.id.to_string()),
+            title: SharedString::from(task.title.as_str()),
+            metadata: SharedString::from(task.metadata.as_str()),
+        })
+        .collect::<Vec<_>>();
+    ModelRc::from(Rc::new(VecModel::from(rows)))
 }
 
 fn task_model(tasks: &[quadrant_application::TaskSummary]) -> ModelRc<TaskRow> {

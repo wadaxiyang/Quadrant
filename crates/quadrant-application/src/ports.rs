@@ -2,10 +2,12 @@
 
 use std::{error::Error, fmt, time::SystemTime};
 
-use quadrant_domain::{NewTask, Task, TaskDetailsUpdate, TaskId, TaskPlacement, UtcTimestamp};
+use quadrant_domain::{
+    LocalDate, NewTask, Task, TaskDetailsUpdate, TaskId, TaskPlacement, UtcTimestamp,
+};
 use uuid::Uuid;
 
-use crate::{ReorderDirection, ThemeMode};
+use crate::{ReorderDirection, ThemeMode, TodayContext};
 
 /// Semantic repository operation used for error classification.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -16,10 +18,14 @@ pub enum RepositoryOperation {
     Migrate,
     /// Reading task state.
     ReadTasks,
+    /// Reading active reminder state.
+    ReadReminders,
     /// Creating a task.
     CreateTask,
     /// Updating or moving a task.
     UpdateTask,
+    /// Consuming a delivered reminder.
+    UpdateReminder,
     /// Completing/reopening a task and its history.
     TransitionTask,
     /// Permanently deleting a task.
@@ -154,6 +160,38 @@ pub trait TaskRepository: Send + Sync {
     fn delete_task(&self, id: TaskId) -> Result<(), RepositoryError>;
 }
 
+/// Read model source for the derived Today projection.
+pub trait TodayRepository: Send + Sync {
+    /// Lists active Today candidates: any due task or a task planned no later than today.
+    ///
+    /// # Errors
+    ///
+    /// Returns a task-read repository failure.
+    fn list_today_candidates(&self, local_today: LocalDate) -> Result<Vec<Task>, RepositoryError>;
+}
+
+/// Persistence capability used by the nearest-deadline reminder scheduler.
+pub trait ReminderRepository: Send + Sync {
+    /// Lists active tasks with reminders in ascending deadline order.
+    ///
+    /// # Errors
+    ///
+    /// Returns a reminder-read repository failure.
+    fn list_pending_reminders(&self) -> Result<Vec<Task>, RepositoryError>;
+
+    /// Clears a reminder only when its persisted deadline still matches the delivered value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an update failure. A stale or missing reminder returns `Ok(false)`.
+    fn clear_reminder_if_matches(
+        &self,
+        id: TaskId,
+        scheduled_for: UtcTimestamp,
+        now: UtcTimestamp,
+    ) -> Result<bool, RepositoryError>;
+}
+
 /// Typed settings port; heterogeneous JSON remains behind the adapter.
 pub trait SettingsRepository: Send + Sync {
     /// Loads the persisted theme preference.
@@ -179,6 +217,40 @@ pub trait SettingsRepository: Send + Sync {
 pub trait Clock: Send + Sync {
     /// Returns the current UTC instant.
     fn now(&self) -> UtcTimestamp;
+}
+
+/// Failure to derive local calendar boundaries from the host platform.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CalendarError {
+    detail: String,
+}
+
+impl CalendarError {
+    /// Creates a calendar-boundary error without exposing platform types.
+    #[must_use]
+    pub fn new(detail: impl fmt::Display) -> Self {
+        Self {
+            detail: detail.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for CalendarError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.detail)
+    }
+}
+
+impl Error for CalendarError {}
+
+/// Platform calendar boundary used by Today selection logic.
+pub trait TodayContextSource: Send + Sync {
+    /// Derives the local date and DST-safe UTC boundaries containing `now`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a normalized platform calendar error.
+    fn today_context(&self, now: UtcTimestamp) -> Result<TodayContext, CalendarError>;
 }
 
 /// Production clock based on the standard system clock.

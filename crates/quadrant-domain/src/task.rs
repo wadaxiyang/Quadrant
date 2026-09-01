@@ -340,6 +340,12 @@ impl Task {
         Ok(())
     }
 
+    /// Clears a delivered reminder while preserving its due date and other details.
+    pub fn clear_reminder(&mut self, now: UtcTimestamp) {
+        self.0.reminder = None;
+        self.0.updated_at = now;
+    }
+
     /// Completes an active task and returns the immutable history snapshot.
     ///
     /// # Errors

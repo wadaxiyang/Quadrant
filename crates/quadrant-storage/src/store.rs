@@ -6,11 +6,12 @@ use std::{
 };
 
 use quadrant_application::{
-    ReorderDirection, RepositoryError, RepositoryOperation, SettingsRepository, TaskRepository,
-    ThemeMode,
+    ReminderRepository, ReorderDirection, RepositoryError, RepositoryOperation, SettingsRepository,
+    TaskRepository, ThemeMode, TodayRepository,
 };
 use quadrant_domain::{
-    NewTask, SortKey, Task, TaskDetailsUpdate, TaskId, TaskPlacement, TaskStatus, UtcTimestamp,
+    LocalDate, NewTask, SortKey, Task, TaskDetailsUpdate, TaskId, TaskPlacement, TaskStatus,
+    UtcTimestamp,
 };
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use uuid::Uuid;
@@ -306,6 +307,80 @@ impl TaskRepository for SqliteStore {
     }
 }
 
+impl TodayRepository for SqliteStore {
+    fn list_today_candidates(&self, local_today: LocalDate) -> Result<Vec<Task>, RepositoryError> {
+        let operation = RepositoryOperation::ReadTasks;
+        let connection = self.lock(operation)?;
+        let sql = format!(
+            "SELECT {TASK_COLUMNS} FROM tasks
+             WHERE status = 0 AND (due_at_utc IS NOT NULL OR planned_on <= ?1)
+             ORDER BY due_at_utc, planned_on, created_at_utc, id"
+        );
+        let mut statement = connection
+            .prepare(&sql)
+            .map_err(|error| RepositoryError::new(operation, error))?;
+        let rows = statement
+            .query_map([local_today.to_string()], mapping::task_from_row)
+            .map_err(|error| RepositoryError::new(operation, error))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(|error| RepositoryError::new(operation, error))
+    }
+}
+
+impl ReminderRepository for SqliteStore {
+    fn list_pending_reminders(&self) -> Result<Vec<Task>, RepositoryError> {
+        let operation = RepositoryOperation::ReadReminders;
+        let connection = self.lock(operation)?;
+        let sql = format!(
+            "SELECT {TASK_COLUMNS} FROM tasks
+             WHERE status = 0 AND reminder_at_utc IS NOT NULL
+             ORDER BY reminder_at_utc, id"
+        );
+        let mut statement = connection
+            .prepare(&sql)
+            .map_err(|error| RepositoryError::new(operation, error))?;
+        let rows = statement
+            .query_map([], mapping::task_from_row)
+            .map_err(|error| RepositoryError::new(operation, error))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(|error| RepositoryError::new(operation, error))
+    }
+
+    fn clear_reminder_if_matches(
+        &self,
+        id: TaskId,
+        scheduled_for: UtcTimestamp,
+        now: UtcTimestamp,
+    ) -> Result<bool, RepositoryError> {
+        let operation = RepositoryOperation::UpdateReminder;
+        let mut connection = self.lock(operation)?;
+        let transaction = immediate_transaction(&mut connection, operation)?;
+        let Some(mut task) =
+            get_task(&transaction, id).map_err(|error| RepositoryError::new(operation, error))?
+        else {
+            transaction
+                .commit()
+                .map_err(|error| RepositoryError::new(operation, error))?;
+            return Ok(false);
+        };
+        let matches = task.record().status == TaskStatus::Active
+            && task
+                .record()
+                .reminder
+                .as_ref()
+                .is_some_and(|reminder| reminder.at_utc == scheduled_for);
+        if matches {
+            task.clear_reminder(now);
+            update_task_row(&transaction, &task)
+                .map_err(|error| RepositoryError::new(operation, error))?;
+        }
+        transaction
+            .commit()
+            .map_err(|error| RepositoryError::new(operation, error))?;
+        Ok(matches)
+    }
+}
+
 impl SettingsRepository for SqliteStore {
     fn load_theme_mode(&self) -> Result<Option<ThemeMode>, RepositoryError> {
         let operation = RepositoryOperation::ReadSettings;
@@ -541,7 +616,10 @@ fn update_task_row(connection: &Connection, task: &Task) -> rusqlite::Result<()>
 
 #[cfg(test)]
 mod tests {
-    use quadrant_application::{ReorderDirection, SettingsRepository, TaskRepository, ThemeMode};
+    use quadrant_application::{
+        ReminderRepository, ReorderDirection, SettingsRepository, TaskRepository, ThemeMode,
+        TodayRepository,
+    };
     use quadrant_domain::{
         LocalDate, NewTask, Quadrant, RecurrencePattern, RecurrenceRule, ScheduledInstant,
         TaskDetailsUpdate, TaskId, TaskPlacement, TaskStatus, TaskTitle, TimeZoneId, UtcTimestamp,
@@ -682,6 +760,87 @@ mod tests {
             .expect("task query")
             .expect("task exists");
         assert_eq!(restored, updated);
+    }
+
+    #[test]
+    fn today_candidates_include_active_due_or_current_plan_only() {
+        let store = SqliteStore::open_in_memory().expect("storage opens");
+        let today = LocalDate::parse_iso("2026-09-02").expect("valid date");
+        let cases = [
+            (task_id(30), "Due", None, Some(300)),
+            (task_id(31), "Old plan", Some("2026-09-01"), None),
+            (task_id(32), "Today plan", Some("2026-09-02"), None),
+            (task_id(33), "Future plan", Some("2026-09-03"), None),
+        ];
+        for (index, (id, title, planned_on, due_at)) in cases.into_iter().enumerate() {
+            let mut draft =
+                NewTask::quick_capture(title, TaskPlacement::Inbox).expect("valid draft");
+            draft.planned_on =
+                planned_on.map(|date| LocalDate::parse_iso(date).expect("valid planned date"));
+            draft.due = due_at.map(|seconds| ScheduledInstant {
+                at_utc: UtcTimestamp::from_unix_seconds(seconds),
+                time_zone: TimeZoneId::new("Asia/Shanghai").expect("valid timezone"),
+            });
+            store
+                .create_task(
+                    id,
+                    draft,
+                    UtcTimestamp::from_unix_seconds(i64::try_from(index).expect("index")),
+                )
+                .expect("task created");
+        }
+        store
+            .complete_task(task_id(30), UtcTimestamp::from_unix_seconds(10))
+            .expect("due task completed");
+
+        let candidates = store
+            .list_today_candidates(today)
+            .expect("today candidates");
+        let titles = candidates
+            .iter()
+            .map(|task| task.record().title.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(titles, vec!["Old plan", "Today plan"]);
+    }
+
+    #[test]
+    fn reminder_consumption_requires_the_expected_deadline() {
+        let store = SqliteStore::open_in_memory().expect("storage opens");
+        let id = task_id(34);
+        let mut draft =
+            NewTask::quick_capture("Remind me", TaskPlacement::Inbox).expect("valid draft");
+        draft.reminder = Some(ScheduledInstant {
+            at_utc: UtcTimestamp::from_unix_seconds(500),
+            time_zone: TimeZoneId::new("Asia/Shanghai").expect("valid timezone"),
+        });
+        store
+            .create_task(id, draft, UtcTimestamp::from_unix_seconds(1))
+            .expect("task created");
+        assert_eq!(store.list_pending_reminders().expect("reminders").len(), 1);
+        assert!(
+            !store
+                .clear_reminder_if_matches(
+                    id,
+                    UtcTimestamp::from_unix_seconds(499),
+                    UtcTimestamp::from_unix_seconds(2),
+                )
+                .expect("stale reminder ignored")
+        );
+        assert!(
+            store
+                .clear_reminder_if_matches(
+                    id,
+                    UtcTimestamp::from_unix_seconds(500),
+                    UtcTimestamp::from_unix_seconds(3),
+                )
+                .expect("reminder consumed")
+        );
+        assert!(
+            store
+                .list_pending_reminders()
+                .expect("reminders")
+                .is_empty()
+        );
     }
 
     #[test]

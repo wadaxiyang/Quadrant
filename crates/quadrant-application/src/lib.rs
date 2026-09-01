@@ -3,18 +3,26 @@
 #![forbid(unsafe_code)]
 
 mod ports;
+mod reminders;
 mod tasks;
+mod today;
 
 pub use ports::{
-    Clock, RepositoryError, RepositoryOperation, SettingsRepository, SystemClock, TaskIdGenerator,
-    TaskRepository, UuidTaskIdGenerator,
+    CalendarError, Clock, ReminderRepository, RepositoryError, RepositoryOperation,
+    SettingsRepository, SystemClock, TaskIdGenerator, TaskRepository, TodayContextSource,
+    TodayRepository, UuidTaskIdGenerator,
 };
 pub use quadrant_domain::{
     LocalDate, NewTask, Quadrant, RecurrencePattern, RecurrenceRule, ScheduledInstant, SortKey,
     Task, TaskDetailsUpdate, TaskDomainError, TaskId, TaskPlacement, TaskStatus, TaskTitle,
     TimeZoneId, UtcTimestamp,
 };
-pub use tasks::TaskApplication;
+pub use reminders::{
+    ReminderAlert, ReminderDelivery, ReminderDeliveryError, ReminderPlan, ReminderScheduler,
+    ReminderSchedulerHandle,
+};
+pub use tasks::{ApplicationLoadError, TaskApplication};
+pub use today::{TodayContext, TodayTaskSummary, TodayViewState};
 
 use std::fmt;
 
@@ -60,6 +68,21 @@ pub enum UiIntent {
         /// Validated replacement details.
         update: TaskDetailsUpdate,
     },
+}
+
+impl UiIntent {
+    /// Returns whether this intent can change the active reminder schedule.
+    #[must_use]
+    pub const fn affects_reminder_schedule(&self) -> bool {
+        matches!(
+            self,
+            Self::SubmitQuickAdd(_)
+                | Self::SubmitTaskEditor(_)
+                | Self::CompleteTask(_)
+                | Self::DeleteTask(_)
+                | Self::UpdateTask { .. }
+        )
+    }
 }
 
 /// Relative manual-order operation within one task placement.
@@ -464,6 +487,10 @@ impl QuadrantsViewState {
 pub enum ApplicationEvent {
     /// Replace the active Quadrants projection.
     QuadrantsChanged(QuadrantsViewState),
+    /// Replace the derived Today projection.
+    TodayChanged(TodayViewState),
+    /// Surface an application reminder through the active presentation adapter.
+    ReminderDue(ReminderAlert),
     /// Populate and open the dedicated task editor.
     TaskEditorLoaded(TaskEditorState),
     /// Close the task editor after a successful save.

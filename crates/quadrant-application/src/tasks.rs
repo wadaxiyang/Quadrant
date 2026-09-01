@@ -3,18 +3,32 @@
 use std::sync::Arc;
 
 use crate::{
-    ApplicationEvent, Clock, NewTask, QuadrantsViewState, RepositoryError, SettingsRepository,
-    TaskIdGenerator, TaskRepository, UiIntent, UserFacingError,
+    ApplicationEvent, CalendarError, Clock, NewTask, QuadrantsViewState, RepositoryError,
+    SettingsRepository, TaskIdGenerator, TaskRepository, TodayContextSource, TodayRepository,
+    TodayViewState, UiIntent, UserFacingError,
 };
+
+/// Initial/refresh projection load failure.
+#[derive(Debug, thiserror::Error)]
+pub enum ApplicationLoadError {
+    /// Repository query failed.
+    #[error(transparent)]
+    Repository(#[from] RepositoryError),
+    /// Platform local-calendar derivation failed.
+    #[error(transparent)]
+    Calendar(#[from] CalendarError),
+}
 
 /// Synchronous application use cases designed to run on the app-owned runtime's
 /// blocking pool rather than the Slint event loop.
 #[derive(Clone)]
 pub struct TaskApplication {
     tasks: Arc<dyn TaskRepository>,
+    today_tasks: Arc<dyn TodayRepository>,
     settings: Arc<dyn SettingsRepository>,
     clock: Arc<dyn Clock>,
     ids: Arc<dyn TaskIdGenerator>,
+    today_context: Arc<dyn TodayContextSource>,
 }
 
 impl TaskApplication {
@@ -22,15 +36,19 @@ impl TaskApplication {
     #[must_use]
     pub fn new(
         tasks: Arc<dyn TaskRepository>,
+        today_tasks: Arc<dyn TodayRepository>,
         settings: Arc<dyn SettingsRepository>,
         clock: Arc<dyn Clock>,
         ids: Arc<dyn TaskIdGenerator>,
+        today_context: Arc<dyn TodayContextSource>,
     ) -> Self {
         Self {
             tasks,
+            today_tasks,
             settings,
             clock,
             ids,
+            today_context,
         }
     }
 
@@ -45,10 +63,26 @@ impl TaskApplication {
             .map(|tasks| QuadrantsViewState::from_tasks(&tasks))
     }
 
+    /// Loads the deterministic Today projection using current platform calendar boundaries.
+    ///
+    /// # Errors
+    ///
+    /// Returns a repository or platform calendar failure.
+    pub fn load_today(&self) -> Result<TodayViewState, ApplicationLoadError> {
+        let now = self.clock.now();
+        let context = self.today_context.today_context(now)?;
+        let tasks = self.today_tasks.list_today_candidates(context.local_date)?;
+        Ok(TodayViewState::from_tasks(&tasks, now, context))
+    }
+
     /// Handles a typed UI intent and produces zero or more UI-safe events.
     #[must_use]
     pub fn handle(&self, intent: UiIntent) -> Vec<ApplicationEvent> {
         match intent {
+            UiIntent::Navigate(crate::NavigationRoute::Today) => match self.load_today() {
+                Ok(state) => vec![ApplicationEvent::TodayChanged(state)],
+                Err(error) => vec![load_failure_event(&error)],
+            },
             UiIntent::Navigate(_) | UiIntent::OpenQuickAdd => Vec::new(),
             UiIntent::SetTheme(mode) => match self.settings.save_theme_mode(mode, self.clock.now())
             {
@@ -105,13 +139,14 @@ impl TaskApplication {
                     }
                 };
                 match self.tasks.update_task(task_id, update, self.clock.now()) {
-                    Ok(_) => match self.load_quadrants() {
-                        Ok(state) => vec![
-                            ApplicationEvent::QuadrantsChanged(state),
+                    Ok(_) => match self.load_states() {
+                        Ok((quadrants, today)) => vec![
+                            ApplicationEvent::QuadrantsChanged(quadrants),
+                            ApplicationEvent::TodayChanged(today),
                             ApplicationEvent::TaskEditorSaved,
                             ApplicationEvent::OperationSucceeded("Task updated.".to_owned()),
                         ],
-                        Err(error) => vec![failure_event(&error)],
+                        Err(error) => vec![load_failure_event(&error)],
                     },
                     Err(error) => vec![failure_event(&error)],
                 }
@@ -136,21 +171,28 @@ impl TaskApplication {
     }
 
     fn refresh_after_success(&self, message: &str) -> Vec<ApplicationEvent> {
-        match self.load_quadrants() {
-            Ok(state) => vec![
-                ApplicationEvent::QuadrantsChanged(state),
+        match self.load_states() {
+            Ok((quadrants, today)) => vec![
+                ApplicationEvent::QuadrantsChanged(quadrants),
+                ApplicationEvent::TodayChanged(today),
                 ApplicationEvent::OperationSucceeded(message.to_owned()),
             ],
-            Err(error) => vec![failure_event(&error)],
+            Err(error) => vec![load_failure_event(&error)],
         }
+    }
+
+    fn load_states(&self) -> Result<(QuadrantsViewState, TodayViewState), ApplicationLoadError> {
+        Ok((self.load_quadrants()?, self.load_today()?))
     }
 }
 
 fn failure_event(error: &RepositoryError) -> ApplicationEvent {
     let message = match error.operation() {
         crate::RepositoryOperation::ReadTasks => "Tasks could not be loaded.",
+        crate::RepositoryOperation::ReadReminders => "Reminders could not be loaded.",
         crate::RepositoryOperation::CreateTask => "The task could not be added.",
         crate::RepositoryOperation::UpdateTask => "The task could not be updated.",
+        crate::RepositoryOperation::UpdateReminder => "The reminder could not be updated.",
         crate::RepositoryOperation::TransitionTask => "The task state could not be changed.",
         crate::RepositoryOperation::DeleteTask => "The task could not be deleted.",
         crate::RepositoryOperation::ReadSettings => "Settings could not be loaded.",
@@ -162,4 +204,13 @@ fn failure_event(error: &RepositoryError) -> ApplicationEvent {
     ApplicationEvent::OperationFailed(UserFacingError {
         message: message.to_owned(),
     })
+}
+
+fn load_failure_event(error: &ApplicationLoadError) -> ApplicationEvent {
+    match error {
+        ApplicationLoadError::Repository(error) => failure_event(error),
+        ApplicationLoadError::Calendar(_) => ApplicationEvent::OperationFailed(UserFacingError {
+            message: "The local Today calendar could not be determined.".to_owned(),
+        }),
+    }
 }

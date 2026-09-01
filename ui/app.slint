@@ -8,7 +8,7 @@ import { TitleBar } from "components/title_bar.slint";
 import { ModalManager } from "components/modal_manager.slint";
 import { ToastHost, ToastKind } from "components/toast.slint";
 import { QuadrantsView, TaskRow } from "views/quadrants.slint";
-import { TodayView } from "views/today.slint";
+import { TodayTaskRow, TodayView } from "views/today.slint";
 import { FocusView } from "views/focus.slint";
 import { ReviewView } from "views/review.slint";
 import { CompletedView } from "views/completed.slint";
@@ -42,6 +42,11 @@ export component MainWindow inherits Window {
     in-out property <[TaskRow]> q2_tasks;
     in-out property <[TaskRow]> q3_tasks;
     in-out property <[TaskRow]> q4_tasks;
+    in-out property <[TodayTaskRow]> overdue_tasks;
+    in-out property <[TodayTaskRow]> planned_today_tasks;
+    in-out property <[TodayTaskRow]> due_today_tasks;
+    in-out property <[TodayTaskRow]> needs_reschedule_tasks;
+    in-out property <int> today_task_count;
 
     callback navigation_requested(int);
     callback quick_add_requested;
@@ -131,7 +136,15 @@ export component MainWindow inherits Window {
                             root.dialog_visible = true;
                         }
                     }
-                    if root.current_route == 1: TodayView { }
+                    if root.current_route == 1: TodayView {
+                        overdue_tasks: root.overdue_tasks;
+                        planned_today_tasks: root.planned_today_tasks;
+                        due_today_tasks: root.due_today_tasks;
+                        needs_reschedule_tasks: root.needs_reschedule_tasks;
+                        unique_task_count: root.today_task_count;
+                        edit_requested(id) => { root.task_edit_requested(id); }
+                        complete_requested(id) => { root.task_complete_requested(id); }
+                    }
                     if root.current_route == 2: FocusView { }
                     if root.current_route == 3: ReviewView { }
                     if root.current_route == 4: CompletedView { }

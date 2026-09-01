@@ -1,19 +1,153 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
-import { PageHeader, EmptyState } from "../components/page_shell.slint";
+import { FluentButton, SurfaceCard } from "../components/common.slint";
+import { EmptyState, PageHeader } from "../components/page_shell.slint";
+
+export struct TodayTaskRow {
+    id: string,
+    title: string,
+    metadata: string,
+}
+
+component TodayTaskCard inherits Rectangle {
+    in property <TodayTaskRow> task;
+    callback edit_requested(string);
+    callback complete_requested(string);
+
+    height: 60px;
+    background: Theme.input_bg;
+    border-width: 1px;
+    border-color: Theme.input_border;
+    border-radius: 5px;
+
+    HorizontalLayout {
+        padding: 9px;
+        spacing: 8px;
+        VerticalLayout {
+            spacing: 3px;
+            horizontal-stretch: 1;
+            Text {
+                text: root.task.title;
+                color: Theme.text_primary;
+                font-size: 13px;
+                font-weight: 500;
+                overflow: elide;
+            }
+            Text {
+                text: root.task.metadata;
+                color: Theme.text_secondary;
+                font-size: 10px;
+                overflow: elide;
+            }
+        }
+        FluentButton { min-width: 48px; text: "Edit"; clicked => { root.edit_requested(root.task.id); } }
+        FluentButton { min-width: 54px; text: "Done"; primary: true; clicked => { root.complete_requested(root.task.id); } }
+    }
+}
+
+component TodaySection inherits SurfaceCard {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <color> accent;
+    in property <[TodayTaskRow]> tasks;
+    callback edit_requested(string);
+    callback complete_requested(string);
+
+    min-height: 92px;
+
+    Rectangle { x: 0px; width: 4px; height: 100%; background: root.accent; border-radius: 2px; }
+    VerticalLayout {
+        padding: 12px;
+        spacing: 7px;
+        HorizontalLayout {
+            Text { text: root.title; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
+            Rectangle { horizontal-stretch: 1; }
+            Text { text: root.tasks.length + " tasks"; color: Theme.text_secondary; font-size: 11px; }
+        }
+        Text { text: root.subtitle; color: Theme.text_secondary; font-size: 10px; }
+        for task in root.tasks: TodayTaskCard {
+            task: task;
+            edit_requested(id) => { root.edit_requested(id); }
+            complete_requested(id) => { root.complete_requested(id); }
+        }
+    }
+}
 
 export component TodayView inherits Rectangle {
-    VerticalLayout {
-        padding: UiConstants.page_padding;
-        spacing: 16px;
-        PageHeader { title: "Today"; subtitle: "A focused execution list derived from planning rules."; }
-        EmptyState {
-            vertical-stretch: 1;
-            title: "Build a deliberate day";
-            message: "Planned, overdue, and due-today tasks will be projected here without duplicating storage.";
-            milestone: "Today selection logic arrives in M3";
+    in property <[TodayTaskRow]> overdue_tasks;
+    in property <[TodayTaskRow]> planned_today_tasks;
+    in property <[TodayTaskRow]> due_today_tasks;
+    in property <[TodayTaskRow]> needs_reschedule_tasks;
+    in property <int> unique_task_count;
+    callback edit_requested(string);
+    callback complete_requested(string);
+
+    background: transparent;
+
+    ScrollView {
+        width: 100%;
+        height: 100%;
+        VerticalLayout {
+            padding: UiConstants.page_padding;
+            spacing: 14px;
+
+            PageHeader { title: "Today"; subtitle: "Plans, deadlines, and work that needs attention now."; }
+
+            SurfaceCard {
+                height: 66px;
+                HorizontalLayout {
+                    padding: 14px;
+                    spacing: 18px;
+                    VerticalLayout {
+                        Text { text: "TASKS"; color: Theme.text_secondary; font-size: 10px; font-weight: 600; }
+                        Text { text: root.unique_task_count; color: Theme.text_primary; font-size: 20px; font-weight: 600; }
+                    }
+                    Rectangle { width: 1px; background: Theme.border_color; }
+                    Text {
+                        text: "Each task appears once: overdue, planned today, due today, then needs rescheduling.";
+                        color: Theme.text_secondary;
+                        font-size: 11px;
+                        vertical-alignment: center;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            if root.overdue_tasks.length > 0: TodaySection {
+                title: "Overdue"; subtitle: "Deadlines before the current instant"; accent: Theme.danger;
+                tasks: root.overdue_tasks;
+                edit_requested(id) => { root.edit_requested(id); }
+                complete_requested(id) => { root.complete_requested(id); }
+            }
+            if root.planned_today_tasks.length > 0: TodaySection {
+                title: "Planned today"; subtitle: "Work intentionally scheduled for the local date"; accent: Theme.accent;
+                tasks: root.planned_today_tasks;
+                edit_requested(id) => { root.edit_requested(id); }
+                complete_requested(id) => { root.complete_requested(id); }
+            }
+            if root.due_today_tasks.length > 0: TodaySection {
+                title: "Due today"; subtitle: "Deadlines inside today's local calendar boundaries"; accent: Theme.success;
+                tasks: root.due_today_tasks;
+                edit_requested(id) => { root.edit_requested(id); }
+                complete_requested(id) => { root.complete_requested(id); }
+            }
+            if root.needs_reschedule_tasks.length > 0: TodaySection {
+                title: "Needs rescheduling"; subtitle: "Unfinished work planned before today"; accent: #ca5010;
+                tasks: root.needs_reschedule_tasks;
+                edit_requested(id) => { root.edit_requested(id); }
+                complete_requested(id) => { root.complete_requested(id); }
+            }
+
+            if root.unique_task_count == 0: EmptyState {
+                height: 250px;
+                title: "Nothing needs attention today";
+                message: "Plan a task for today or add a due date from the task editor.";
+                milestone: "Today is derived from live task data";
+            }
         }
     }
 }

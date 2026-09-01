@@ -2,7 +2,11 @@
 
 use std::{env, io, path::PathBuf};
 
-use quadrant_application::{SystemTheme, SystemThemeSource};
+use jiff::{Timestamp, tz::TimeZone};
+use quadrant_application::{
+    CalendarError, LocalDate, SystemTheme, SystemThemeSource, TodayContext, TodayContextSource,
+    UtcTimestamp,
+};
 
 /// Capabilities exposed to application/UI code without leaking OS checks.
 #[allow(clippy::struct_excessive_bools)] // Independent feature flags, not one state machine.
@@ -30,6 +34,33 @@ pub struct PlatformThemeSource;
 impl SystemThemeSource for PlatformThemeSource {
     fn current_theme(&self) -> SystemTheme {
         SystemTheme::Light
+    }
+}
+
+/// DST-aware local calendar boundaries backed by the host system timezone.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PlatformTodayContextSource;
+
+impl TodayContextSource for PlatformTodayContextSource {
+    fn today_context(&self, now: UtcTimestamp) -> Result<TodayContext, CalendarError> {
+        let timestamp = Timestamp::from_second(now.unix_seconds()).map_err(CalendarError::new)?;
+        let zoned = timestamp.to_zoned(TimeZone::system());
+        let day_start = zoned.start_of_day().map_err(CalendarError::new)?;
+        let next_day_start = zoned
+            .tomorrow()
+            .and_then(|tomorrow| tomorrow.start_of_day())
+            .map_err(CalendarError::new)?;
+        let date = zoned.date();
+        let month = u8::try_from(date.month()).map_err(CalendarError::new)?;
+        let day = u8::try_from(date.day()).map_err(CalendarError::new)?;
+        Ok(TodayContext {
+            local_date: LocalDate::from_calendar_date(i32::from(date.year()), month, day)
+                .map_err(CalendarError::new)?,
+            day_start_utc: UtcTimestamp::from_unix_seconds(day_start.timestamp().as_second()),
+            next_day_start_utc: UtcTimestamp::from_unix_seconds(
+                next_day_start.timestamp().as_second(),
+            ),
+        })
     }
 }
 
@@ -91,4 +122,23 @@ fn default_data_directory() -> Option<PathBuf> {
 #[cfg(not(any(target_os = "windows", target_os = "macos", unix)))]
 fn default_data_directory() -> Option<PathBuf> {
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use quadrant_application::{TodayContextSource, UtcTimestamp};
+
+    use super::PlatformTodayContextSource;
+
+    #[test]
+    fn system_today_context_contains_the_requested_instant() {
+        let now = UtcTimestamp::from_unix_seconds(1_788_192_000);
+        let context = PlatformTodayContextSource
+            .today_context(now)
+            .expect("system calendar context");
+
+        assert!(context.day_start_utc <= now);
+        assert!(now < context.next_day_start_utc);
+        assert!(context.day_start_utc < context.next_day_start_utc);
+    }
 }
