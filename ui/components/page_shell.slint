@@ -1,0 +1,110 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme } from "../theme.slint";
+import { FluentButton, SurfaceCard } from "common.slint";
+
+export component PageHeader inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <bool> show_action: false;
+    in property <string> action_text;
+    callback action_clicked;
+
+    height: 64px;
+
+    VerticalLayout {
+        spacing: 4px;
+        alignment: center;
+
+        Text {
+            text: root.title;
+            color: Theme.text_primary;
+            font-size: 26px;
+            font-weight: 600;
+        }
+
+        Text {
+            text: root.subtitle;
+            color: Theme.text_secondary;
+            font-size: 13px;
+        }
+    }
+
+    if root.show_action: FluentButton {
+        x: parent.width - self.width;
+        y: (parent.height - self.height) / 2;
+        width: 112px;
+        text: root.action_text;
+        primary: true;
+        clicked => { root.action_clicked(); }
+    }
+}
+
+export component EmptyState inherits SurfaceCard {
+    in property <string> title;
+    in property <string> message;
+    in property <string> milestone;
+
+    VerticalLayout {
+        padding: 28px;
+        spacing: 8px;
+        alignment: center;
+
+        Text {
+            text: root.title;
+            color: Theme.text_primary;
+            font-size: 18px;
+            font-weight: 600;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: root.message;
+            color: Theme.text_secondary;
+            font-size: 13px;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+
+        Text {
+            text: root.milestone;
+            color: Theme.accent;
+            font-size: 11px;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+export component MetricCard inherits SurfaceCard {
+    in property <string> label;
+    in property <string> value: "—";
+    in property <string> hint;
+
+    min-width: 150px;
+    height: 112px;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 4px;
+
+        Text {
+            text: root.label;
+            color: Theme.text_secondary;
+            font-size: 12px;
+        }
+
+        Text {
+            text: root.value;
+            color: Theme.text_primary;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        Text {
+            text: root.hint;
+            color: Theme.text_secondary;
+            font-size: 11px;
+        }
+    }
+}

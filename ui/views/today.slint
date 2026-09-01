@@ -1,0 +1,19 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { UiConstants } from "../constants.slint";
+import { PageHeader, EmptyState } from "../components/page_shell.slint";
+
+export component TodayView inherits Rectangle {
+    VerticalLayout {
+        padding: UiConstants.page_padding;
+        spacing: 16px;
+        PageHeader { title: "Today"; subtitle: "A focused execution list derived from planning rules."; }
+        EmptyState {
+            vertical-stretch: 1;
+            title: "Build a deliberate day";
+            message: "Planned, overdue, and due-today tasks will be projected here without duplicating storage.";
+            milestone: "Today selection logic arrives in M3";
+        }
+    }
+}

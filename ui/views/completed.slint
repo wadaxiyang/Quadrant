@@ -1,0 +1,19 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { UiConstants } from "../constants.slint";
+import { PageHeader, EmptyState } from "../components/page_shell.slint";
+
+export component CompletedView inherits Rectangle {
+    VerticalLayout {
+        padding: UiConstants.page_padding;
+        spacing: 16px;
+        PageHeader { title: "Completed"; subtitle: "Bounded history with explicit reopen behavior."; }
+        EmptyState {
+            vertical-stretch: 1;
+            title: "Completed history will stay bounded";
+            message: "This view will page through persistent completion history instead of loading everything into Slint.";
+            milestone: "Completed queries and reopen behavior arrive in M5";
+        }
+    }
+}

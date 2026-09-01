@@ -1,0 +1,46 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme, ThemeMode } from "../theme.slint";
+import { UiConstants } from "../constants.slint";
+import { PageHeader } from "../components/page_shell.slint";
+import { SegmentButton, SurfaceCard } from "../components/common.slint";
+
+export component SettingsView inherits Rectangle {
+    in property <ThemeMode> theme_mode: ThemeMode.system;
+    callback theme_selected(ThemeMode);
+
+    VerticalLayout {
+        padding: UiConstants.page_padding;
+        spacing: 16px;
+        PageHeader { title: "Settings"; subtitle: "Validated preferences with explicit platform capabilities."; }
+
+        SurfaceCard {
+            height: 132px;
+            VerticalLayout {
+                padding: 16px;
+                spacing: 10px;
+                Text { text: "Appearance"; color: Theme.text_primary; font-size: 15px; font-weight: 600; }
+                Text { text: "System follows the normalized platform theme source."; color: Theme.text_secondary; font-size: 11px; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    SegmentButton { width: 104px; text: "System"; selected: root.theme_mode == ThemeMode.system; clicked => { root.theme_selected(ThemeMode.system); } }
+                    SegmentButton { width: 104px; text: "Light"; selected: root.theme_mode == ThemeMode.light; clicked => { root.theme_selected(ThemeMode.light); } }
+                    SegmentButton { width: 104px; text: "Dark"; selected: root.theme_mode == ThemeMode.dark; clicked => { root.theme_selected(ThemeMode.dark); } }
+                }
+            }
+        }
+
+        SurfaceCard {
+            height: 112px;
+            VerticalLayout {
+                padding: 16px;
+                spacing: 6px;
+                Text { text: "Desktop integration"; color: Theme.text_primary; font-size: 15px; font-weight: 600; }
+                Text { text: "Hotkey, tray, startup, and notifications will be enabled from platform capabilities in M3."; color: Theme.text_secondary; font-size: 12px; wrap: word-wrap; }
+            }
+        }
+
+        Rectangle { vertical-stretch: 1; }
+    }
+}

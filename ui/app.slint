@@ -1,55 +1,147 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { Theme } from "theme.slint";
+import { Theme, ThemeMode } from "theme.slint";
+import { UiConstants } from "constants.slint";
 import { Sidebar } from "components/sidebar.slint";
+import { TitleBar } from "components/title_bar.slint";
+import { ModalManager } from "components/modal_manager.slint";
+import { ToastHost, ToastKind } from "components/toast.slint";
+import { QuadrantsView } from "views/quadrants.slint";
+import { TodayView } from "views/today.slint";
+import { FocusView } from "views/focus.slint";
+import { ReviewView } from "views/review.slint";
+import { CompletedView } from "views/completed.slint";
+import { SettingsView } from "views/settings.slint";
+import { AboutView } from "views/about.slint";
+
+export { QuickAddWindow } from "components/quick_add.slint";
 
 export component MainWindow inherits Window {
     title: "Quadrant";
-    width: 1100px;
-    height: 720px;
+    preferred-width: 1100px;
+    preferred-height: 720px;
+    min-width: 760px;
+    min-height: 520px;
+    no-frame: true;
+    resize-border-width: 6px;
     background: Theme.background;
 
     in-out property <int> current_route: 0;
+    in-out property <bool> toast_visible: false;
+    in-out property <string> toast_message;
+    in-out property <ToastKind> toast_kind: ToastKind.info;
+    in-out property <bool> dialog_visible: false;
+    in-out property <string> dialog_title;
+    in-out property <string> dialog_message;
 
-    HorizontalLayout {
-        spacing: 0px;
+    callback navigation_requested(int);
+    callback quick_add_requested;
+    callback theme_selected(ThemeMode);
+    callback window_close;
+    callback window_minimize;
+    callback window_maximize;
+    callback window_drag_delta(float, float);
 
-        Sidebar {
-            selected_route: root.current_route;
-            route_selected(route) => { root.current_route = route; }
-        }
+    public function show_toast(message: string, kind: ToastKind) {
+        root.toast_message = message;
+        root.toast_kind = kind;
+        root.toast_visible = true;
+    }
 
-        Rectangle {
-            background: Theme.content_bg;
-            border-color: Theme.border_color;
-            border-width: 1px;
-            border-radius: 8px;
+    public function apply_theme(mode: ThemeMode, system_dark: bool) {
+        Theme.mode = mode;
+        Theme.system_dark = system_dark;
+    }
 
-            VerticalLayout {
-                padding: 32px;
-                spacing: 8px;
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: Theme.background;
+        border-radius: root.maximized ? 0px : UiConstants.content_radius;
+        border-width: root.maximized ? 0px : 1px;
+        border-color: Theme.main_color;
+        clip: true;
 
-                Text {
-                    text: root.current_route == 0 ? "Quadrants" :
-                          root.current_route == 1 ? "Today" :
-                          root.current_route == 2 ? "Focus" :
-                          root.current_route == 3 ? "Review" :
-                          root.current_route == 4 ? "Completed" :
-                          root.current_route == 5 ? "Settings" : "About";
-                    font-size: 28px;
-                    font-weight: 600;
-                    color: Theme.text_primary;
+        VerticalLayout {
+            spacing: 0px;
+
+            TitleBar {
+                title: "Quadrant";
+                version: "0.1.0";
+                is_maximized: root.maximized;
+                theme_mode: Theme.mode;
+                close => { root.window_close(); }
+                minimize => { root.window_minimize(); }
+                maximize => { root.window_maximize(); }
+                theme_selected(mode) => {
+                    Theme.mode = mode;
+                    root.theme_selected(mode);
+                }
+                drag_delta(dx, dy) => { root.window_drag_delta(dx, dy); }
+            }
+
+            HorizontalLayout {
+                spacing: 0px;
+
+                Sidebar {
+                    selected_route: root.current_route;
+                    route_selected(route) => {
+                        root.current_route = route;
+                        root.navigation_requested(route);
+                    }
+                    quick_add_clicked => { root.quick_add_requested(); }
                 }
 
-                Text {
-                    text: "M0 foundation is ready. Feature views arrive in the next milestones.";
-                    font-size: 14px;
-                    color: Theme.text_secondary;
-                }
+                Rectangle {
+                    background: Theme.content_bg;
+                    border-color: Theme.border_color;
+                    border-width: 1px;
+                    border-radius: root.maximized ? 0px : UiConstants.content_radius;
+                    clip: true;
 
-                Rectangle { vertical-stretch: 1; }
+                    if root.current_route == 0: QuadrantsView { }
+                    if root.current_route == 1: TodayView { }
+                    if root.current_route == 2: FocusView { }
+                    if root.current_route == 3: ReviewView { }
+                    if root.current_route == 4: CompletedView { }
+                    if root.current_route == 5: SettingsView {
+                        theme_mode: Theme.mode;
+                        theme_selected(mode) => {
+                            Theme.mode = mode;
+                            root.theme_selected(mode);
+                        }
+                    }
+                    if root.current_route == 6: AboutView {
+                        show_notices => {
+                            root.dialog_title = "Source and license notices";
+                            root.dialog_message = "Quadrant is GPL-3.0-only. Fluent UI components are derived from owu/wsl-dashboard at commit 948589a. Icons are Microsoft Fluent UI System Icons under the MIT License.";
+                            root.dialog_visible = true;
+                        }
+                    }
+                }
             }
         }
+    }
+
+    ToastHost {
+        x: (parent.width - self.width) / 2;
+        y: parent.height - self.height - 20px;
+        shown: root.toast_visible;
+        message: root.toast_message;
+        kind: root.toast_kind;
+        z: 400;
+        dismissed => { root.toast_visible = false; }
+    }
+
+    ModalManager {
+        width: 100%;
+        height: 100%;
+        shown: root.dialog_visible;
+        title: root.dialog_title;
+        message: root.dialog_message;
+        primary_text: "Close";
+        accepted => { root.dialog_visible = false; }
+        dismissed => { root.dialog_visible = false; }
     }
 }

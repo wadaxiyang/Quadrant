@@ -1,0 +1,32 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme } from "../theme.slint";
+import { UiConstants } from "../constants.slint";
+import { PageHeader } from "../components/page_shell.slint";
+import { FluentButton, SurfaceCard } from "../components/common.slint";
+
+export component FocusView inherits Rectangle {
+    VerticalLayout {
+        padding: UiConstants.page_padding;
+        spacing: 16px;
+        PageHeader { title: "Focus"; subtitle: "Stopwatch and Pomodoro, grounded in real time anchors."; }
+        SurfaceCard {
+            vertical-stretch: 1;
+            VerticalLayout {
+                padding: 32px;
+                spacing: 12px;
+                alignment: center;
+                Text { text: "25:00"; color: Theme.text_primary; font-size: 58px; font-weight: 300; horizontal-alignment: center; }
+                Text { text: "Timer controls are intentionally inactive in the M1 shell."; color: Theme.text_secondary; font-size: 12px; horizontal-alignment: center; }
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 8px;
+                    FluentButton { width: 96px; text: "Stopwatch"; enabled: false; }
+                    FluentButton { width: 96px; text: "Pomodoro"; primary: true; enabled: false; }
+                }
+                Text { text: "Focus state machine and persistence arrive in M4"; color: Theme.accent; font-size: 11px; horizontal-alignment: center; }
+            }
+        }
+    }
+}

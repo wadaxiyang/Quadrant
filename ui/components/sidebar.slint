@@ -14,6 +14,7 @@ export component Sidebar inherits Rectangle {
     in-out property <bool> collapsed: false;
     in property <int> selected_route: 0;
     callback route_selected(int);
+    callback quick_add_clicked;
 
     width: collapsed ? UiConstants.sidebar_collapsed_width : UiConstants.sidebar_expanded_width;
     background: Theme.sidebar_bg;
@@ -47,6 +48,53 @@ export component Sidebar inherits Rectangle {
 
             menu_touch := TouchArea {
                 clicked => { root.collapsed = !root.collapsed; }
+            }
+        }
+
+        Rectangle {
+            height: 36px;
+            border-radius: 4px;
+            background: quick_add_touch.has-hover ? Theme.accent_hover : Theme.accent;
+
+            HorizontalLayout {
+                padding-left: 13px;
+                spacing: root.collapsed ? 0px : 12px;
+                alignment: start;
+
+                Text {
+                    width: 20px;
+                    text: "+";
+                    color: white;
+                    font-size: 22px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    width: root.collapsed ? 0px : quick_add_label.preferred-width;
+                    clip: true;
+
+                    animate width {
+                        duration: 200ms;
+                        easing: ease-out-quad;
+                    }
+
+                    quick_add_label := Text {
+                        width: 100%;
+                        text: "Quick Add";
+                        color: white;
+                        font-size: 13px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                        opacity: root.collapsed && parent.width < 10px ? 0 : 1;
+                        animate opacity { duration: 150ms; }
+                    }
+                }
+            }
+
+            quick_add_touch := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.quick_add_clicked(); }
             }
         }
 

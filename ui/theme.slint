@@ -5,18 +5,33 @@
 // Derived from wsl-dashboard src/ui/theme.slint at
 // 948589a255a4bd8a3ff9c3de49e2e13109378fcd; WSL data and Windows-only fonts removed.
 
+export enum ThemeMode { system, light, dark }
+
 export global Theme {
-    in property <bool> dark_mode: false;
+    in-out property <ThemeMode> mode: ThemeMode.system;
+    in-out property <bool> system_dark: false;
+    out property <bool> dark_mode: mode == ThemeMode.dark || (mode == ThemeMode.system && system_dark);
     out property <color> background: dark_mode ? #202020 : #f3f3f3;
     out property <color> content_bg: dark_mode ? #1e1e1e : #ffffff;
     out property <color> sidebar_bg: transparent;
     out property <color> card_bg: dark_mode ? #2d2d30 : #ffffff;
+    out property <color> card_bg_muted: dark_mode ? #27272a : #fafafa;
     out property <color> text_primary: dark_mode ? #eeeeee : #1a1a1a;
     out property <color> text_secondary: dark_mode ? #bbbbbb : #666666;
     out property <color> border_color: dark_mode ? #3e3e42 : #e6e8eb;
+    out property <color> main_color: dark_mode ? #55555a : #c6c6c6;
     out property <color> hover_bg: dark_mode ? #2a2d2e : #eaeaea;
     out property <color> selected_bg: dark_mode ? #37373d : #e6e6e6;
     out property <color> accent: #0067c0;
+    out property <color> accent_hover: dark_mode ? #1683d8 : #005a9e;
+    out property <color> input_bg: dark_mode ? #252526 : #ffffff;
+    out property <color> input_border: dark_mode ? #4b4b50 : #d3d3d3;
+    out property <color> overlay: #00000080;
+    out property <color> danger: dark_mode ? #ff6b6b : #c42b1c;
+    out property <color> success: dark_mode ? #4ade80 : #107c10;
+    out property <color> scrollbar_bg: dark_mode ? #2a2d2e : #f0f0f0;
+    out property <color> scrollbar_thumb: dark_mode ? #5d5d5d : #c1c1c1;
+    out property <color> scrollbar_thumb_hover: dark_mode ? #6d6d6d : #a8a8a8;
     out property <color> icon_color_navigation: dark_mode ? #38bdf8 : #0284c7;
     out property <color> icon_color_success: dark_mode ? #4ade80 : #16a34a;
     out property <color> icon_color_info: dark_mode ? #60a5fa : #2563eb;

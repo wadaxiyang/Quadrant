@@ -1,0 +1,31 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme } from "../theme.slint";
+import { UiConstants } from "../constants.slint";
+import { PageHeader } from "../components/page_shell.slint";
+import { FluentButton, SurfaceCard } from "../components/common.slint";
+
+export component AboutView inherits Rectangle {
+    callback show_notices;
+
+    VerticalLayout {
+        padding: UiConstants.page_padding;
+        spacing: 16px;
+        PageHeader { title: "About"; subtitle: "Quadrant Tasks · version 0.1.0"; }
+        SurfaceCard {
+            vertical-stretch: 1;
+            VerticalLayout {
+                padding: 24px;
+                spacing: 10px;
+                Text { text: "Quadrant"; color: Theme.text_primary; font-size: 24px; font-weight: 600; }
+                Text { text: "A local-first four-quadrant task manager built with Rust and Slint."; color: Theme.text_secondary; font-size: 13px; wrap: word-wrap; }
+                Text { text: "License: GPL-3.0-only"; color: Theme.text_primary; font-size: 12px; }
+                Text { text: "Fluent UI components are derived from owu/wsl-dashboard (GPL-3.0-only)."; color: Theme.text_secondary; font-size: 12px; wrap: word-wrap; }
+                Text { text: "Icons: Microsoft Fluent UI System Icons (MIT)."; color: Theme.text_secondary; font-size: 12px; }
+                Rectangle { vertical-stretch: 1; }
+                FluentButton { width: 132px; text: "Source notices"; clicked => { root.show_notices(); } }
+            }
+        }
+    }
+}

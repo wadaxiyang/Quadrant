@@ -7,11 +7,6 @@
 
 slint::include_modules!();
 
-/// Constructs the main window and runs the Slint event loop.
-///
-/// # Errors
-///
-/// Returns a platform error when the window or event loop cannot be created.
-pub fn run() -> Result<(), slint::PlatformError> {
-    MainWindow::new()?.run()
-}
+mod shell;
+
+pub use shell::{UiShellConfig, run};

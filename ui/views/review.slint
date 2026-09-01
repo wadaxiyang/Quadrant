@@ -1,0 +1,25 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { UiConstants } from "../constants.slint";
+import { PageHeader, MetricCard, EmptyState } from "../components/page_shell.slint";
+
+export component ReviewView inherits Rectangle {
+    VerticalLayout {
+        padding: UiConstants.page_padding;
+        spacing: 16px;
+        PageHeader { title: "Review"; subtitle: "Completion and focus history, summarized from persistent events."; }
+        HorizontalLayout {
+            spacing: 12px;
+            MetricCard { label: "Completed tasks"; hint: "No history query yet"; }
+            MetricCard { label: "Focused time"; hint: "No focus sessions yet"; }
+            MetricCard { label: "Focus sessions"; hint: "No history query yet"; }
+        }
+        EmptyState {
+            vertical-stretch: 1;
+            title: "Review grows from real history";
+            message: "Charts and trends will use completion events and focus sessions—not mutable UI counters.";
+            milestone: "Review aggregation arrives in M5";
+        }
+    }
+}

@@ -1,0 +1,77 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from the overlay/manager pattern in wsl-dashboard
+// src/ui/components/modal_manager.slint at 948589a255a4bd8a3ff9c3de49e2e13109378fcd.
+// WSL-specific dialogs and data were removed in favor of one reusable shell.
+
+import { Theme } from "../theme.slint";
+import { FluentButton, SurfaceCard } from "common.slint";
+
+export component ModalManager inherits Rectangle {
+    in property <bool> shown: false;
+    in property <string> title;
+    in property <string> message;
+    in property <string> primary_text: "OK";
+    in property <string> secondary_text: "Cancel";
+    in property <bool> show_secondary: false;
+    callback accepted;
+    callback dismissed;
+
+    if root.shown: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: Theme.overlay;
+        z: 500;
+
+        TouchArea { }
+
+        SurfaceCard {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: Math.min(parent.width - 48px, 420px);
+            height: 220px;
+            drop-shadow-blur: 20px;
+            drop-shadow-color: #00000055;
+
+            VerticalLayout {
+                padding: 24px;
+                spacing: 12px;
+
+                Text {
+                    text: root.title;
+                    color: Theme.text_primary;
+                    font-size: 20px;
+                    font-weight: 600;
+                }
+
+                Text {
+                    text: root.message;
+                    color: Theme.text_secondary;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                    vertical-stretch: 1;
+                }
+
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 8px;
+
+                    if root.show_secondary: FluentButton {
+                        width: 92px;
+                        text: root.secondary_text;
+                        clicked => { root.dismissed(); }
+                    }
+
+                    FluentButton {
+                        width: 92px;
+                        text: root.primary_text;
+                        primary: true;
+                        clicked => { root.accepted(); }
+                    }
+                }
+            }
+        }
+    }
+}

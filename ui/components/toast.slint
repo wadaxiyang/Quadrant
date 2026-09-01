@@ -1,0 +1,71 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme } from "../theme.slint";
+
+export enum ToastKind { info, success, error }
+
+export component ToastHost inherits Rectangle {
+    in property <bool> shown: false;
+    in property <string> message;
+    in property <ToastKind> kind: ToastKind.info;
+    callback dismissed;
+
+    width: 420px;
+    height: root.shown ? 48px : 0px;
+    opacity: root.shown ? 1 : 0;
+    background: Theme.card_bg;
+    border-width: 1px;
+    border-color: root.kind == ToastKind.error ? Theme.danger :
+                  root.kind == ToastKind.success ? Theme.success : Theme.accent;
+    border-radius: 6px;
+    clip: true;
+    drop-shadow-blur: 12px;
+    drop-shadow-color: #00000044;
+
+    animate height { duration: 160ms; easing: ease-out-quad; }
+    animate opacity { duration: 120ms; }
+
+    Rectangle {
+        width: 4px;
+        height: 100%;
+        background: root.kind == ToastKind.error ? Theme.danger :
+                    root.kind == ToastKind.success ? Theme.success : Theme.accent;
+    }
+
+    Text {
+        x: 16px;
+        width: parent.width - 52px;
+        text: root.message;
+        color: Theme.text_primary;
+        font-size: 12px;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+
+    Rectangle {
+        x: parent.width - 36px;
+        width: 36px;
+        height: 100%;
+        background: close_touch.has-hover ? Theme.hover_bg : transparent;
+
+        Text {
+            text: "×";
+            color: Theme.text_secondary;
+            font-size: 16px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        close_touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { root.dismissed(); }
+        }
+    }
+
+    Timer {
+        running: root.shown;
+        interval: 4000ms;
+        triggered => { root.dismissed(); }
+    }
+}

@@ -1,0 +1,142 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme, ThemeMode } from "../theme.slint";
+import { FluentButton, FluentTextField, SegmentButton, SurfaceCard } from "common.slint";
+
+export component QuickAddWindow inherits Window {
+    title: "Quick Add — Quadrant";
+    width: 560px;
+    height: 280px;
+    background: Theme.background;
+    forward-focus: title_field;
+
+    in-out property <string> title_text;
+    in-out property <int> destination: 0;
+    in-out property <string> error_message;
+
+    callback submitted(string, int);
+    callback cancelled;
+
+    public function apply_theme(mode: ThemeMode, system_dark: bool) {
+        Theme.mode = mode;
+        Theme.system_dark = system_dark;
+    }
+
+    public function set_theme_mode(mode: ThemeMode) {
+        Theme.mode = mode;
+    }
+
+    capture_keys := FocusScope {
+        width: 100%;
+        height: 100%;
+        capture-key-pressed(event) => {
+            if (event.text == Key.Escape) {
+                root.cancelled();
+                return accept;
+            }
+            if (event.modifiers.control && event.text == "1") {
+                root.destination = 1;
+                return accept;
+            }
+            if (event.modifiers.control && event.text == "2") {
+                root.destination = 2;
+                return accept;
+            }
+            if (event.modifiers.control && event.text == "3") {
+                root.destination = 3;
+                return accept;
+            }
+            if (event.modifiers.control && event.text == "4") {
+                root.destination = 4;
+                return accept;
+            }
+            return reject;
+        }
+
+        SurfaceCard {
+            x: 12px;
+            y: 12px;
+            width: parent.width - 24px;
+            height: parent.height - 24px;
+
+            VerticalLayout {
+                padding: 20px;
+                spacing: 12px;
+
+                Text {
+                    text: "Quick Add";
+                    color: Theme.text_primary;
+                    font-size: 20px;
+                    font-weight: 600;
+                }
+
+                title_field := FluentTextField {
+                    text <=> root.title_text;
+                    placeholder_text: "What needs your attention?";
+                    accepted(value) => { root.submitted(value, root.destination); }
+                    edited(value) => {
+                        if (value != "") {
+                            root.error_message = "";
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 6px;
+
+                    SegmentButton {
+                        text: "Inbox";
+                        selected: root.destination == 0;
+                        clicked => { root.destination = 0; }
+                    }
+                    SegmentButton {
+                        text: "Q1";
+                        selected: root.destination == 1;
+                        clicked => { root.destination = 1; }
+                    }
+                    SegmentButton {
+                        text: "Q2";
+                        selected: root.destination == 2;
+                        clicked => { root.destination = 2; }
+                    }
+                    SegmentButton {
+                        text: "Q3";
+                        selected: root.destination == 3;
+                        clicked => { root.destination = 3; }
+                    }
+                    SegmentButton {
+                        text: "Q4";
+                        selected: root.destination == 4;
+                        clicked => { root.destination = 4; }
+                    }
+                }
+
+                Text {
+                    text: root.error_message != "" ? root.error_message :
+                          "Enter to capture · Esc to cancel · Ctrl+1…4 to classify";
+                    color: root.error_message != "" ? Theme.danger : Theme.text_secondary;
+                    font-size: 11px;
+                }
+
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 8px;
+
+                    FluentButton {
+                        width: 88px;
+                        text: "Cancel";
+                        clicked => { root.cancelled(); }
+                    }
+
+                    FluentButton {
+                        width: 104px;
+                        text: "Add task";
+                        primary: true;
+                        clicked => { root.submitted(root.title_text, root.destination); }
+                    }
+                }
+            }
+        }
+    }
+}
