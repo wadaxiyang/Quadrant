@@ -14,6 +14,8 @@ use quadrant_application::{
     TodayContextSource, UtcTimestamp,
 };
 
+const DATABASE_FILE_NAME: &str = "quadrant-rust.db";
+
 pub use desktop::DesktopIntegration;
 pub use instance::{ActivationListener, SingleInstanceCoordinator};
 pub use notifications::PlatformNotificationDelivery;
@@ -126,7 +128,10 @@ impl PlatformPaths {
                 )
             })?;
         std::fs::create_dir_all(&directory)?;
-        Ok(directory.join("quadrant.db"))
+        // The read-only .NET reference used `quadrant.db` in the same directory.
+        // Keep the rewrite's clean schema physically separate so opening Quadrant
+        // can never attempt Rust migrations against a legacy database.
+        Ok(directory.join(DATABASE_FILE_NAME))
     }
 }
 
@@ -165,9 +170,21 @@ fn default_data_directory() -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use quadrant_application::{TodayContextSource, UtcTimestamp};
 
-    use super::PlatformTodayContextSource;
+    use super::{DATABASE_FILE_NAME, PlatformTodayContextSource};
+
+    #[test]
+    fn rewrite_database_does_not_reuse_the_legacy_file_name() {
+        assert_eq!(DATABASE_FILE_NAME, "quadrant-rust.db");
+        assert_ne!(DATABASE_FILE_NAME, "quadrant.db");
+        assert_eq!(
+            Path::new("profile").join(DATABASE_FILE_NAME),
+            Path::new("profile").join("quadrant-rust.db")
+        );
+    }
 
     #[test]
     fn system_today_context_contains_the_requested_instant() {

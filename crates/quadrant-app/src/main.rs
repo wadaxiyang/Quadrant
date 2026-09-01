@@ -1,15 +1,15 @@
 //! Quadrant composition root.
 
+use std::sync::Arc;
+
+use quadrant_application::{
+    ApplicationEvent, Clock, ReminderAlert, ReminderDelivery, ReminderDeliveryError,
+    ReminderRepository, ReminderScheduler, SettingsRepository, SystemClock, SystemThemeSource,
+    TaskApplication, TaskIdGenerator, TaskRepository, TodayContextSource, TodayRepository,
+    UiIntent, UserFacingError, UuidTaskIdGenerator,
+};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use std::sync::Arc;
-
-    use quadrant_application::{
-        ApplicationEvent, Clock, ReminderAlert, ReminderDelivery, ReminderDeliveryError,
-        ReminderRepository, ReminderScheduler, SettingsRepository, SystemClock, SystemThemeSource,
-        TaskApplication, TaskIdGenerator, TaskRepository, TodayContextSource, TodayRepository,
-        UiIntent, UserFacingError, UuidTaskIdGenerator,
-    };
-
     let database_path = quadrant_platform::PlatformPaths.database_path()?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .thread_name("quadrant-application")
@@ -67,23 +67,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         activation_shutdown_receiver,
     ));
     let desktop_integration =
-        match quadrant_platform::DesktopIntegration::start(Arc::clone(&desktop_event_sink)) {
-            Ok(integration) => Some(integration),
-            Err(_) => {
-                event_sink(ApplicationEvent::OperationFailed(UserFacingError {
-                    message: "Desktop shortcut and tray integration are unavailable.".to_owned(),
-                }));
-                None
-            }
-        };
-    let reminder_event_sink = Arc::clone(&event_sink);
-    let native_notifications = quadrant_platform::PlatformNotificationDelivery;
-    let reminder_delivery: Arc<dyn ReminderDelivery> = Arc::new(move |alert: ReminderAlert| {
-        if native_notifications.deliver(alert.clone()).is_err() {
-            reminder_event_sink(ApplicationEvent::ReminderDue(alert));
-        }
-        Ok::<(), ReminderDeliveryError>(())
-    });
+        start_desktop_integration(Arc::clone(&desktop_event_sink), &event_sink);
+    let reminder_delivery = native_reminder_delivery(Arc::clone(&event_sink));
     let (reminder_scheduler, reminder_handle) =
         ReminderScheduler::new(reminders, clock, reminder_delivery);
     let scheduler_worker = runtime.spawn(reminder_scheduler.run());
@@ -123,4 +108,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     runtime.block_on(activation_worker)?;
     ui_result?;
     Ok(())
+}
+
+fn start_desktop_integration(
+    desktop_event_sink: quadrant_platform::DesktopEventSink,
+    event_sink: &quadrant_ui::ApplicationEventSink,
+) -> Option<quadrant_platform::DesktopIntegration> {
+    let Ok(integration) = quadrant_platform::DesktopIntegration::start(desktop_event_sink) else {
+        event_sink(quadrant_application::ApplicationEvent::OperationFailed(
+            quadrant_application::UserFacingError {
+                message: "Desktop shortcut and tray integration are unavailable.".to_owned(),
+            },
+        ));
+        return None;
+    };
+    Some(integration)
+}
+
+fn native_reminder_delivery(
+    event_sink: quadrant_ui::ApplicationEventSink,
+) -> Arc<dyn ReminderDelivery> {
+    let native_notifications = quadrant_platform::PlatformNotificationDelivery;
+    Arc::new(move |alert: ReminderAlert| {
+        if native_notifications.deliver(alert.clone()).is_err() {
+            event_sink(ApplicationEvent::ReminderDue(alert));
+        }
+        Ok::<(), ReminderDeliveryError>(())
+    })
 }
