@@ -3,12 +3,14 @@
 use std::sync::Arc;
 
 use quadrant_application::{
-    ApplicationEvent, AutostartService, Clock, ReminderAlert, ReminderDelivery,
-    ReminderDeliveryError, ReminderRepository, ReminderScheduler, SettingsRepository, SystemClock,
-    SystemThemeSource, TaskApplication, TaskIdGenerator, TaskRepository, TodayContextSource,
-    TodayRepository, UiIntent, UserFacingError, UuidTaskIdGenerator,
+    ApplicationEvent, AutostartService, Clock, FocusApplication, FocusRepository, FocusScheduler,
+    FocusSessionIdGenerator, ReminderAlert, ReminderDelivery, ReminderDeliveryError,
+    ReminderRepository, ReminderScheduler, SettingsRepository, SystemClock, SystemThemeSource,
+    TaskApplication, TaskIdGenerator, TaskRepository, TodayContextSource, TodayRepository,
+    UiIntent, UserFacingError, UuidFocusSessionIdGenerator, UuidTaskIdGenerator,
 };
 
+#[allow(clippy::too_many_lines)] // Composition root keeps all concrete wiring visible in one place.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_path = quadrant_platform::PlatformPaths.database_path()?;
     let runtime = application_runtime()?;
@@ -27,11 +29,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tasks: Arc<dyn TaskRepository> = store.clone();
     let today_tasks: Arc<dyn TodayRepository> = store.clone();
     let reminders: Arc<dyn ReminderRepository> = store.clone();
+    let focus_repository: Arc<dyn FocusRepository> = store.clone();
     let settings: Arc<dyn SettingsRepository> = store.clone();
     let autostart: Arc<dyn AutostartService> =
         Arc::new(quadrant_platform::PlatformAutostartService);
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
     let ids: Arc<dyn TaskIdGenerator> = Arc::new(UuidTaskIdGenerator);
+    let focus_ids: Arc<dyn FocusSessionIdGenerator> = Arc::new(UuidFocusSessionIdGenerator);
     let today_context: Arc<dyn TodayContextSource> =
         Arc::new(quadrant_platform::PlatformTodayContextSource);
     let application = TaskApplication::new(
@@ -41,10 +45,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&autostart),
         Arc::clone(&clock),
         ids,
+        Arc::clone(&today_context),
+    );
+    let focus_application = FocusApplication::new(
+        focus_repository,
+        Arc::clone(&tasks),
+        Arc::clone(&settings),
+        Arc::clone(&clock),
+        focus_ids,
         today_context,
     );
     let initial_quadrants = application.load_quadrants()?;
     let initial_today = application.load_today()?;
+    let initial_focus = focus_application.load_state()?;
     let theme_mode = store.load_theme_mode()?.unwrap_or_default();
     let desktop_settings = settings.load_desktop_settings()?;
     let autostart_reconcile_failed = reconcile_autostart(&*autostart, desktop_settings);
@@ -55,6 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         system_theme: theme_source.current_theme(),
         quadrants: initial_quadrants,
         today: initial_today,
+        focus: initial_focus,
         desktop_settings,
     };
 
@@ -77,13 +91,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (reminder_scheduler, reminder_handle) =
         ReminderScheduler::new(reminders, clock, reminder_delivery);
     let scheduler_worker = runtime.spawn(reminder_scheduler.run());
+    let (focus_scheduler, focus_handle) =
+        FocusScheduler::new(focus_application.clone(), Arc::clone(&event_sink));
+    let focus_scheduler_worker = runtime.spawn(focus_scheduler.run());
     let application_event_sink = Arc::clone(&event_sink);
     let worker_reminder_handle = reminder_handle.clone();
+    let worker_focus_handle = focus_handle.clone();
     let worker = runtime.spawn(async move {
         while let Some(intent) = intent_receiver.recv().await {
             let affects_reminders = intent.affects_reminder_schedule();
+            let affects_focus = intent.affects_focus_schedule();
+            let refreshes_focus = intent.affects_focus_projection();
+            let is_focus = intent.is_focus_intent();
             let application = application.clone();
-            let events = tokio::task::spawn_blocking(move || application.handle(intent)).await;
+            let focus_application = focus_application.clone();
+            let events = tokio::task::spawn_blocking(move || {
+                if is_focus {
+                    focus_application.handle(&intent)
+                } else {
+                    let mut events = application.handle(intent);
+                    if refreshes_focus && let Ok(state) = focus_application.load_state() {
+                        events.push(ApplicationEvent::FocusChanged(state));
+                    }
+                    events
+                }
+            })
+            .await;
             match events {
                 Ok(events) => {
                     for event in events {
@@ -91,6 +124,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     if affects_reminders {
                         worker_reminder_handle.schedule_changed();
+                    }
+                    if affects_focus {
+                        worker_focus_handle.schedule_changed();
                     }
                 }
                 Err(_) => {
@@ -108,8 +144,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let _ = activation_shutdown.send(());
     reminder_handle.shutdown();
+    focus_handle.shutdown();
     runtime.block_on(worker)?;
     runtime.block_on(scheduler_worker)?;
+    runtime.block_on(focus_scheduler_worker)?;
     runtime.block_on(activation_worker)?;
     ui_result?;
     Ok(())

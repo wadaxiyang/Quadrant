@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod connection;
+mod focus;
 mod mapping;
 mod migrations;
 mod store;

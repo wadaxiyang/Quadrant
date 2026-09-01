@@ -9,7 +9,7 @@ import { ModalManager } from "components/modal_manager.slint";
 import { ToastHost, ToastKind } from "components/toast.slint";
 import { QuadrantsView, TaskRow } from "views/quadrants.slint";
 import { TodayTaskRow, TodayView } from "views/today.slint";
-import { FocusView } from "views/focus.slint";
+import { FocusTaskRow, FocusView } from "views/focus.slint";
 import { ReviewView } from "views/review.slint";
 import { CompletedView } from "views/completed.slint";
 import { SettingsView } from "views/settings.slint";
@@ -47,6 +47,21 @@ export component MainWindow inherits Window {
     in-out property <[TodayTaskRow]> due_today_tasks;
     in-out property <[TodayTaskRow]> needs_reschedule_tasks;
     in-out property <int> today_task_count;
+    in-out property <[FocusTaskRow]> focus_tasks;
+    in-out property <string> focus_selected_task_id;
+    in-out property <int> focus_selected_mode: 1;
+    in-out property <int> focus_selected_kind: 0;
+    in-out property <int> focus_session_status: -1;
+    in-out property <string> focus_timer_text: "25:00";
+    in-out property <float> focus_timer_progress: 0;
+    in-out property <string> focus_session_label: "Ready to focus";
+    in-out property <string> focus_today_summary: "No productive focus completed today";
+    in-out property <string> focus_minutes: "25";
+    in-out property <string> short_break_minutes: "5";
+    in-out property <string> long_break_minutes: "15";
+    in-out property <string> long_break_interval: "4";
+    in-out property <bool> auto_start_break: false;
+    in-out property <bool> auto_start_focus: false;
     in-out property <bool> launch_at_startup: false;
     in-out property <bool> start_hidden: false;
     in-out property <bool> close_to_tray: true;
@@ -66,6 +81,12 @@ export component MainWindow inherits Window {
     callback task_reorder_requested(string, int);
     callback task_complete_requested(string);
     callback task_delete_confirmed(string);
+    callback focus_start_requested(int, int, string);
+    callback focus_pause_requested;
+    callback focus_resume_requested;
+    callback focus_finish_requested;
+    callback focus_cancel_requested;
+    callback focus_settings_changed(string, string, string, string, bool, bool);
     callback window_close;
     callback window_minimize;
     callback window_maximize;
@@ -155,7 +176,31 @@ export component MainWindow inherits Window {
                         edit_requested(id) => { root.task_edit_requested(id); }
                         complete_requested(id) => { root.task_complete_requested(id); }
                     }
-                    if root.current_route == 2: FocusView { }
+                    if root.current_route == 2: FocusView {
+                        tasks: root.focus_tasks;
+                        selected_task_id <=> root.focus_selected_task_id;
+                        selected_mode <=> root.focus_selected_mode;
+                        selected_kind <=> root.focus_selected_kind;
+                        session_status: root.focus_session_status;
+                        timer_text: root.focus_timer_text;
+                        timer_progress: root.focus_timer_progress;
+                        session_label: root.focus_session_label;
+                        today_summary: root.focus_today_summary;
+                        focus_minutes <=> root.focus_minutes;
+                        short_break_minutes <=> root.short_break_minutes;
+                        long_break_minutes <=> root.long_break_minutes;
+                        long_break_interval <=> root.long_break_interval;
+                        auto_start_break <=> root.auto_start_break;
+                        auto_start_focus <=> root.auto_start_focus;
+                        start_requested(mode, kind, task_id) => { root.focus_start_requested(mode, kind, task_id); }
+                        pause_requested => { root.focus_pause_requested(); }
+                        resume_requested => { root.focus_resume_requested(); }
+                        finish_requested => { root.focus_finish_requested(); }
+                        cancel_requested => { root.focus_cancel_requested(); }
+                        settings_changed(focus, short_break, long_break, interval, auto_break, auto_focus) => {
+                            root.focus_settings_changed(focus, short_break, long_break, interval, auto_break, auto_focus);
+                        }
+                    }
                     if root.current_route == 3: ReviewView { }
                     if root.current_route == 4: CompletedView { }
                     if root.current_route == 5: SettingsView {

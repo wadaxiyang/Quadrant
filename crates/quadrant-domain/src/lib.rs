@@ -2,10 +2,15 @@
 
 #![forbid(unsafe_code)]
 
+mod focus;
 mod recurrence;
 mod task;
 mod time;
 
+pub use focus::{
+    FocusDomainError, FocusMode, FocusSession, FocusSessionId, FocusSessionRecord, FocusStatus,
+    FocusTaskSnapshot, PomodoroKind, PomodoroSettings,
+};
 pub use recurrence::{
     RecurrenceAdvanceError, RecurrencePattern, RecurrenceRule, RecurrenceRuleError,
 };

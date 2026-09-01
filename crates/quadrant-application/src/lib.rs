@@ -2,20 +2,24 @@
 
 #![forbid(unsafe_code)]
 
+mod focus;
 mod ports;
 mod reminders;
 mod tasks;
 mod today;
 
+pub use focus::{FocusApplication, FocusScheduler, FocusSchedulerHandle};
 pub use ports::{
-    AutostartError, AutostartService, CalendarError, Clock, ReminderRepository, RepositoryError,
-    RepositoryOperation, SettingsRepository, SystemClock, TaskIdGenerator, TaskRepository,
-    TodayContextSource, TodayRepository, UuidTaskIdGenerator,
+    AutostartError, AutostartService, CalendarError, Clock, FocusRepository,
+    FocusSessionIdGenerator, ReminderRepository, RepositoryError, RepositoryOperation,
+    SettingsRepository, SystemClock, TaskIdGenerator, TaskRepository, TodayContextSource,
+    TodayRepository, UuidFocusSessionIdGenerator, UuidTaskIdGenerator,
 };
 pub use quadrant_domain::{
-    LocalDate, NewTask, Quadrant, RecurrencePattern, RecurrenceRule, ScheduledInstant, SortKey,
-    Task, TaskDetailsUpdate, TaskDomainError, TaskId, TaskPlacement, TaskStatus, TaskTitle,
-    TimeZoneId, UtcTimestamp,
+    FocusDomainError, FocusMode, FocusSession, FocusSessionId, FocusSessionRecord, FocusStatus,
+    FocusTaskSnapshot, LocalDate, NewTask, PomodoroKind, PomodoroSettings, Quadrant,
+    RecurrencePattern, RecurrenceRule, ScheduledInstant, SortKey, Task, TaskDetailsUpdate,
+    TaskDomainError, TaskId, TaskPlacement, TaskStatus, TaskTitle, TimeZoneId, UtcTimestamp,
 };
 pub use reminders::{
     ReminderAlert, ReminderDelivery, ReminderDeliveryError, ReminderPlan, ReminderScheduler,
@@ -41,6 +45,18 @@ pub enum UiIntent {
     SetTheme(ThemeMode),
     /// Persist and apply desktop startup/window behavior.
     SetDesktopSettings(DesktopSettings),
+    /// Start a stopwatch or Pomodoro phase, optionally associated with an active task.
+    StartFocus(FocusStartRequest),
+    /// Freeze the current running focus session.
+    PauseFocus,
+    /// Resume the current paused focus session.
+    ResumeFocus,
+    /// Complete the current focus session at its present elapsed duration.
+    FinishFocus,
+    /// Discard the current session while retaining an audit row.
+    CancelFocus,
+    /// Persist validated Pomodoro defaults and automatic continuation choices.
+    SetPomodoroSettings(PomodoroSettings),
     /// Move an active task into Inbox or a quadrant.
     MoveTask {
         /// Task to move.
@@ -85,6 +101,93 @@ impl UiIntent {
                 | Self::UpdateTask { .. }
         )
     }
+
+    /// Returns whether the Focus application service owns this intent.
+    #[must_use]
+    pub const fn is_focus_intent(&self) -> bool {
+        matches!(
+            self,
+            Self::Navigate(NavigationRoute::Focus)
+                | Self::StartFocus(_)
+                | Self::PauseFocus
+                | Self::ResumeFocus
+                | Self::FinishFocus
+                | Self::CancelFocus
+                | Self::SetPomodoroSettings(_)
+        )
+    }
+
+    /// Returns whether the nearest-deadline Focus scheduler must recompute.
+    #[must_use]
+    pub const fn affects_focus_schedule(&self) -> bool {
+        matches!(
+            self,
+            Self::StartFocus(_)
+                | Self::PauseFocus
+                | Self::ResumeFocus
+                | Self::FinishFocus
+                | Self::CancelFocus
+                | Self::SetPomodoroSettings(_)
+        )
+    }
+
+    /// Returns whether active-task choices or a current task association may have changed.
+    #[must_use]
+    pub const fn affects_focus_projection(&self) -> bool {
+        matches!(
+            self,
+            Self::SubmitQuickAdd(_)
+                | Self::SubmitTaskEditor(_)
+                | Self::MoveTask { .. }
+                | Self::CompleteTask(_)
+                | Self::DeleteTask(_)
+                | Self::UpdateTask { .. }
+        )
+    }
+}
+
+/// User selection for beginning a Focus session.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FocusStartRequest {
+    /// Count upward or down from a Pomodoro duration.
+    pub mode: FocusMode,
+    /// Required for Pomodoro and absent for stopwatch.
+    pub pomodoro_kind: Option<PomodoroKind>,
+    /// Optional task for productive sessions; breaks ignore task selection.
+    pub task_id: Option<TaskId>,
+}
+
+/// Active task available for Focus association.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FocusTaskSummary {
+    /// Stable task identity.
+    pub id: TaskId,
+    /// Current title.
+    pub title: String,
+    /// Compact placement label.
+    pub placement: TaskPlacement,
+}
+
+/// Productive Focus completed on one host-local date.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct FocusDaySummary {
+    /// Sum of productive completed running time.
+    pub total_seconds: u64,
+    /// Number of productive completed sessions.
+    pub session_count: u32,
+}
+
+/// Repository-backed state consumed by the Focus view.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FocusViewState {
+    /// Active tasks available to associate with a new productive session.
+    pub tasks: Vec<FocusTaskSummary>,
+    /// The only running or paused session.
+    pub session: Option<FocusSession>,
+    /// Validated Pomodoro defaults.
+    pub settings: PomodoroSettings,
+    /// Productive Focus completed today.
+    pub today: FocusDaySummary,
 }
 
 /// Relative manual-order operation within one task placement.
@@ -535,6 +638,8 @@ pub enum ApplicationEvent {
     QuadrantsChanged(QuadrantsViewState),
     /// Replace the derived Today projection.
     TodayChanged(TodayViewState),
+    /// Replace the repository-backed Focus projection.
+    FocusChanged(FocusViewState),
     /// Surface an application reminder through the active presentation adapter.
     ReminderDue(ReminderAlert),
     /// Populate and open the dedicated task editor.

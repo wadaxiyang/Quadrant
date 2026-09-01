@@ -3,11 +3,12 @@
 use std::{error::Error, fmt, time::SystemTime};
 
 use quadrant_domain::{
-    LocalDate, NewTask, Task, TaskDetailsUpdate, TaskId, TaskPlacement, UtcTimestamp,
+    FocusSession, FocusSessionId, FocusStatus, LocalDate, NewTask, PomodoroSettings, Task,
+    TaskDetailsUpdate, TaskId, TaskPlacement, UtcTimestamp,
 };
 use uuid::Uuid;
 
-use crate::{DesktopSettings, ReorderDirection, ThemeMode, TodayContext};
+use crate::{DesktopSettings, FocusDaySummary, ReorderDirection, ThemeMode, TodayContext};
 
 /// Semantic repository operation used for error classification.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -34,6 +35,10 @@ pub enum RepositoryOperation {
     ReadSettings,
     /// Writing settings.
     WriteSettings,
+    /// Reading current or historical focus state.
+    ReadFocus,
+    /// Creating or transitioning a focus session.
+    WriteFocus,
 }
 
 /// Storage adapter failure with typed operation context and diagnostic detail.
@@ -234,6 +239,76 @@ pub trait SettingsRepository: Send + Sync {
         settings: DesktopSettings,
         now: UtcTimestamp,
     ) -> Result<(), RepositoryError>;
+
+    /// Loads validated Pomodoro defaults, using product defaults for missing keys.
+    ///
+    /// # Errors
+    ///
+    /// Returns a settings read or validation failure.
+    fn load_pomodoro_settings(&self) -> Result<PomodoroSettings, RepositoryError>;
+
+    /// Stores the coherent Pomodoro settings group.
+    ///
+    /// # Errors
+    ///
+    /// Returns a settings write failure; partial settings must be rolled back.
+    fn save_pomodoro_settings(
+        &self,
+        settings: PomodoroSettings,
+        now: UtcTimestamp,
+    ) -> Result<(), RepositoryError>;
+}
+
+/// Focus-session persistence capability.
+pub trait FocusRepository: Send + Sync {
+    /// Loads the only running/paused session, if any.
+    ///
+    /// # Errors
+    ///
+    /// Returns a focus read or mapping failure.
+    fn get_current_focus_session(&self) -> Result<Option<FocusSession>, RepositoryError>;
+
+    /// Inserts a new running session while enforcing one-current-session globally.
+    ///
+    /// # Errors
+    ///
+    /// Returns a focus write failure when another current session exists or storage rejects it.
+    fn create_focus_session(&self, session: FocusSession) -> Result<FocusSession, RepositoryError>;
+
+    /// Persists one optimistic lifecycle transition.
+    ///
+    /// # Errors
+    ///
+    /// Returns a focus write failure if the stored status no longer matches `expected`.
+    fn transition_focus_session(
+        &self,
+        session: FocusSession,
+        expected: FocusStatus,
+    ) -> Result<FocusSession, RepositoryError>;
+
+    /// Aggregates productive completed focus for one host-local creation date.
+    ///
+    /// # Errors
+    ///
+    /// Returns a focus query failure.
+    fn productive_focus_summary(
+        &self,
+        local_date: LocalDate,
+    ) -> Result<FocusDaySummary, RepositoryError>;
+
+    /// Counts completed productive Pomodoro focus intervals for break cadence.
+    ///
+    /// # Errors
+    ///
+    /// Returns a focus query failure.
+    fn completed_pomodoro_focus_count(&self) -> Result<u64, RepositoryError>;
+
+    /// Returns the most recent Pomodoro focus task association, if it still exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns a focus query failure.
+    fn latest_pomodoro_focus_task_id(&self) -> Result<Option<TaskId>, RepositoryError>;
 }
 
 /// Platform capability for registering login/startup launch behavior.
@@ -331,6 +406,22 @@ impl Clock for SystemClock {
 pub trait TaskIdGenerator: Send + Sync {
     /// Generates a fresh task identity.
     fn generate(&self) -> TaskId;
+}
+
+/// Focus-session identity generation boundary.
+pub trait FocusSessionIdGenerator: Send + Sync {
+    /// Generates a fresh session identity.
+    fn generate(&self) -> FocusSessionId;
+}
+
+/// Production `UUIDv7` focus-session identity generator.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct UuidFocusSessionIdGenerator;
+
+impl FocusSessionIdGenerator for UuidFocusSessionIdGenerator {
+    fn generate(&self) -> FocusSessionId {
+        FocusSessionId::from_uuid(Uuid::now_v7())
+    }
 }
 
 /// Production `UUIDv7` task identity generator.

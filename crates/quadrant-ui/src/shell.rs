@@ -1,18 +1,25 @@
 //! Main/Quick Add window construction and typed callback binding.
 
-use std::{rc::Rc, str::FromStr, sync::Arc};
+use std::{
+    rc::Rc,
+    str::FromStr,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use quadrant_application::{
-    ApplicationEvent, DesktopEvent, DesktopSettings, NavigationRoute, Quadrant, QuadrantsViewState,
-    QuickAddSubmission, RecurrenceChoice, ReorderDirection, SystemTheme, TaskEditorState,
-    TaskEditorSubmission, TaskId, TaskPlacement, ThemeMode as ApplicationThemeMode, TodayViewState,
-    UiIntent, WindowCloseBehavior, WindowMinimizeBehavior,
+    ApplicationEvent, DesktopEvent, DesktopSettings, FocusMode, FocusSession, FocusStartRequest,
+    FocusStatus, FocusViewState, NavigationRoute, PomodoroKind, PomodoroSettings, Quadrant,
+    QuadrantsViewState, QuickAddSubmission, RecurrenceChoice, ReorderDirection, SystemTheme,
+    TaskEditorState, TaskEditorSubmission, TaskId, TaskPlacement,
+    ThemeMode as ApplicationThemeMode, TodayViewState, UiIntent, UtcTimestamp, WindowCloseBehavior,
+    WindowMinimizeBehavior,
 };
-use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, VecModel};
+use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, TimerMode, VecModel};
 
 use crate::{
-    MainWindow, QuickAddWindow, TaskEditorWindow, TaskRow, ThemeMode as SlintThemeMode, ToastKind,
-    TodayTaskRow,
+    FocusTaskRow, MainWindow, QuickAddWindow, TaskEditorWindow, TaskRow,
+    ThemeMode as SlintThemeMode, ToastKind, TodayTaskRow,
 };
 
 /// Initial state supplied by the composition root.
@@ -26,6 +33,8 @@ pub struct UiShellConfig {
     pub quadrants: QuadrantsViewState,
     /// Initial repository-backed Today projection.
     pub today: TodayViewState,
+    /// Initial repository-backed Focus projection.
+    pub focus: FocusViewState,
     /// Persisted desktop lifecycle policy.
     pub desktop_settings: DesktopSettings,
 }
@@ -57,6 +66,8 @@ pub struct UiShell {
     main_window: MainWindow,
     quick_add: QuickAddWindow,
     task_editor: TaskEditorWindow,
+    focus_session: Arc<Mutex<Option<FocusSession>>>,
+    _focus_timer: slint::Timer,
     initial_desktop_settings: DesktopSettings,
 }
 
@@ -73,20 +84,25 @@ impl UiShell {
         let main_window = MainWindow::new()?;
         let quick_add = QuickAddWindow::new()?;
         let task_editor = TaskEditorWindow::new()?;
+        let focus_session = Arc::new(Mutex::new(config.focus.session.clone()));
         let intent_handler: Rc<dyn Fn(UiIntent)> = Rc::new(on_intent);
 
         initialize_theme(&main_window, &quick_add, &task_editor, config);
         apply_desktop_settings(&main_window, config.desktop_settings);
         apply_quadrants_state(&main_window, &config.quadrants);
         apply_today_state(&main_window, &config.today);
+        apply_focus_state(&main_window, &config.focus, &focus_session);
         bind_main_window(&main_window, &quick_add, &task_editor, &intent_handler);
         bind_quick_add(&quick_add, Rc::clone(&intent_handler));
         bind_task_editor(&task_editor, intent_handler);
 
+        let focus_timer = start_focus_projection_timer(&main_window, Arc::clone(&focus_session));
         Ok(Self {
             main_window,
             quick_add,
             task_editor,
+            focus_session,
+            _focus_timer: focus_timer,
             initial_desktop_settings: config.desktop_settings,
         })
     }
@@ -96,10 +112,12 @@ impl UiShell {
     pub fn event_sink(&self) -> ApplicationEventSink {
         let main_weak = self.main_window.as_weak();
         let editor_weak = self.task_editor.as_weak();
+        let focus_session = Arc::clone(&self.focus_session);
         Arc::new(move |event| {
             let editor_weak = editor_weak.clone();
+            let focus_session = Arc::clone(&focus_session);
             drop(main_weak.upgrade_in_event_loop(move |main| {
-                apply_application_event(&main, &editor_weak, event);
+                apply_application_event(&main, &editor_weak, &focus_session, event);
             }));
         })
     }
@@ -236,7 +254,91 @@ fn bind_main_window(
     );
 
     bind_task_actions(main_window, intent_handler);
+    bind_focus_actions(main_window, intent_handler);
     bind_main_window_controls(main_window);
+}
+
+fn bind_focus_actions(main_window: &MainWindow, intent_handler: &Rc<dyn Fn(UiIntent)>) {
+    let start_handler = Rc::clone(intent_handler);
+    let start_main = main_window.as_weak();
+    main_window.on_focus_start_requested(move |mode, kind, task_id| {
+        let mode = match mode {
+            0 => Some(FocusMode::Stopwatch),
+            1 => Some(FocusMode::Pomodoro),
+            _ => None,
+        };
+        let pomodoro_kind = match (mode, kind) {
+            (Some(FocusMode::Stopwatch), _) => Some(None),
+            (Some(FocusMode::Pomodoro), 0) => Some(Some(PomodoroKind::Focus)),
+            (Some(FocusMode::Pomodoro), 1) => Some(Some(PomodoroKind::ShortBreak)),
+            (Some(FocusMode::Pomodoro), 2) => Some(Some(PomodoroKind::LongBreak)),
+            _ => None,
+        };
+        let task_id = if task_id.is_empty() {
+            Ok(None)
+        } else {
+            TaskId::from_str(task_id.as_str()).map(Some)
+        };
+        match (mode, pomodoro_kind, task_id) {
+            (Some(mode), Some(pomodoro_kind), Ok(task_id)) => {
+                start_handler(UiIntent::StartFocus(FocusStartRequest {
+                    mode,
+                    pomodoro_kind,
+                    task_id,
+                }));
+            }
+            _ => show_invalid_focus_action(&start_main),
+        }
+    });
+
+    let pause_handler = Rc::clone(intent_handler);
+    main_window.on_focus_pause_requested(move || pause_handler(UiIntent::PauseFocus));
+    let resume_handler = Rc::clone(intent_handler);
+    main_window.on_focus_resume_requested(move || resume_handler(UiIntent::ResumeFocus));
+    let finish_handler = Rc::clone(intent_handler);
+    main_window.on_focus_finish_requested(move || finish_handler(UiIntent::FinishFocus));
+    let cancel_handler = Rc::clone(intent_handler);
+    main_window.on_focus_cancel_requested(move || cancel_handler(UiIntent::CancelFocus));
+
+    let settings_handler = Rc::clone(intent_handler);
+    let settings_main = main_window.as_weak();
+    main_window.on_focus_settings_changed(
+        move |focus, short_break, long_break, interval, auto_break, auto_focus| {
+            let parsed = (
+                focus.trim().parse::<u16>(),
+                short_break.trim().parse::<u16>(),
+                long_break.trim().parse::<u16>(),
+                interval.trim().parse::<u8>(),
+            );
+            match parsed {
+                (
+                    Ok(focus_minutes),
+                    Ok(short_break_minutes),
+                    Ok(long_break_minutes),
+                    Ok(long_break_interval),
+                ) => {
+                    settings_handler(UiIntent::SetPomodoroSettings(PomodoroSettings {
+                        focus_minutes,
+                        short_break_minutes,
+                        long_break_minutes,
+                        long_break_interval,
+                        auto_start_break: auto_break,
+                        auto_start_focus: auto_focus,
+                    }));
+                }
+                _ => show_invalid_focus_action(&settings_main),
+            }
+        },
+    );
+}
+
+fn show_invalid_focus_action(main: &slint::Weak<MainWindow>) {
+    if let Some(main) = main.upgrade() {
+        main.invoke_show_toast(
+            SharedString::from("Focus settings or selection are invalid."),
+            ToastKind::Error,
+        );
+    }
 }
 
 fn show_quick_add(quick_add: &QuickAddWindow, main: &MainWindow) {
@@ -462,11 +564,13 @@ fn show_invalid_task_action(main: &slint::Weak<MainWindow>) {
 fn apply_application_event(
     main: &MainWindow,
     task_editor: &slint::Weak<TaskEditorWindow>,
+    focus_session: &Arc<Mutex<Option<FocusSession>>>,
     event: ApplicationEvent,
 ) {
     match event {
         ApplicationEvent::QuadrantsChanged(state) => apply_quadrants_state(main, &state),
         ApplicationEvent::TodayChanged(state) => apply_today_state(main, &state),
+        ApplicationEvent::FocusChanged(state) => apply_focus_state(main, &state, focus_session),
         ApplicationEvent::ReminderDue(alert) => {
             main.invoke_show_toast(
                 SharedString::from(format!("Reminder: {}", alert.title)),
@@ -503,6 +607,177 @@ fn apply_application_event(
         ApplicationEvent::OperationFailed(error) => {
             main.invoke_show_toast(SharedString::from(error.message), ToastKind::Error);
         }
+    }
+}
+
+fn apply_focus_state(
+    main: &MainWindow,
+    state: &FocusViewState,
+    focus_session: &Arc<Mutex<Option<FocusSession>>>,
+) {
+    main.set_focus_tasks(focus_task_model(&state.tasks));
+    main.set_focus_minutes(SharedString::from(state.settings.focus_minutes.to_string()));
+    main.set_short_break_minutes(SharedString::from(
+        state.settings.short_break_minutes.to_string(),
+    ));
+    main.set_long_break_minutes(SharedString::from(
+        state.settings.long_break_minutes.to_string(),
+    ));
+    main.set_long_break_interval(SharedString::from(
+        state.settings.long_break_interval.to_string(),
+    ));
+    main.set_auto_start_break(state.settings.auto_start_break);
+    main.set_auto_start_focus(state.settings.auto_start_focus);
+    main.set_focus_today_summary(SharedString::from(if state.today.session_count == 0 {
+        "No productive focus completed today".to_owned()
+    } else {
+        format!(
+            "Today: {} across {} session{}",
+            format_duration(state.today.total_seconds),
+            state.today.session_count,
+            if state.today.session_count == 1 {
+                ""
+            } else {
+                "s"
+            }
+        )
+    }));
+    if let Ok(mut session) = focus_session.lock() {
+        session.clone_from(&state.session);
+    }
+    if let Some(session) = state.session.as_ref() {
+        let record = session.record();
+        main.set_focus_selected_mode(match record.mode {
+            FocusMode::Stopwatch => 0,
+            FocusMode::Pomodoro => 1,
+        });
+        main.set_focus_selected_kind(match record.pomodoro_kind {
+            None | Some(PomodoroKind::Focus) => 0,
+            Some(PomodoroKind::ShortBreak) => 1,
+            Some(PomodoroKind::LongBreak) => 2,
+        });
+        main.set_focus_selected_task_id(SharedString::from(
+            record
+                .task
+                .as_ref()
+                .and_then(|task| task.id)
+                .map(|id| id.to_string())
+                .unwrap_or_default(),
+        ));
+        update_focus_projection(main, session, current_utc());
+    } else {
+        main.set_focus_session_status(-1);
+        main.set_focus_timer_progress(0.0);
+        main.set_focus_session_label(SharedString::from("Ready to focus"));
+        main.set_focus_timer_text(SharedString::from(format_clock(
+            u64::from(state.settings.focus_minutes) * 60,
+        )));
+    }
+}
+
+fn start_focus_projection_timer(
+    main: &MainWindow,
+    focus_session: Arc<Mutex<Option<FocusSession>>>,
+) -> slint::Timer {
+    let timer = slint::Timer::default();
+    let main = main.as_weak();
+    timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
+        let Some(main) = main.upgrade() else {
+            return;
+        };
+        let Ok(session) = focus_session.lock() else {
+            return;
+        };
+        if let Some(session) = session.as_ref() {
+            update_focus_projection(&main, session, current_utc());
+        }
+    });
+    timer
+}
+
+fn update_focus_projection(main: &MainWindow, session: &FocusSession, now: UtcTimestamp) {
+    let record = session.record();
+    main.set_focus_session_status(match record.status {
+        FocusStatus::Running => 0,
+        FocusStatus::Paused => 1,
+        FocusStatus::Completed | FocusStatus::Cancelled => -1,
+    });
+    let elapsed = session.elapsed_seconds_at(now);
+    let display = session.remaining_seconds_at(now).unwrap_or(elapsed);
+    main.set_focus_timer_text(SharedString::from(format_clock(u64::from(display))));
+    let progress = record.target_duration_seconds.map_or(0.0, |target| {
+        let elapsed = u16::try_from(elapsed).unwrap_or(u16::MAX);
+        let target = u16::try_from(target).unwrap_or(u16::MAX);
+        (f32::from(elapsed) / f32::from(target)).clamp(0.0, 1.0)
+    });
+    main.set_focus_timer_progress(progress);
+    let phase = match (record.mode, record.pomodoro_kind) {
+        (FocusMode::Stopwatch, _) => "Stopwatch",
+        (_, Some(PomodoroKind::Focus)) => "Pomodoro focus",
+        (_, Some(PomodoroKind::ShortBreak)) => "Short break",
+        (_, Some(PomodoroKind::LongBreak)) => "Long break",
+        _ => "Focus",
+    };
+    let status = if record.status == FocusStatus::Paused {
+        "Paused"
+    } else {
+        "Running"
+    };
+    let task = record
+        .task
+        .as_ref()
+        .map_or(String::new(), |task| format!(" · {}", task.title));
+    main.set_focus_session_label(SharedString::from(format!("{phase} · {status}{task}")));
+}
+
+fn current_utc() -> UtcTimestamp {
+    let seconds = std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    UtcTimestamp::from_unix_seconds(i64::try_from(seconds).unwrap_or(i64::MAX))
+}
+
+fn format_clock(seconds: u64) -> String {
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    let seconds = seconds % 60;
+    if hours > 0 {
+        format!("{hours:02}:{minutes:02}:{seconds:02}")
+    } else {
+        format!("{minutes:02}:{seconds:02}")
+    }
+}
+
+fn format_duration(seconds: u64) -> String {
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    if hours > 0 {
+        format!("{hours}h {minutes}m")
+    } else {
+        format!("{minutes}m")
+    }
+}
+
+fn focus_task_model(tasks: &[quadrant_application::FocusTaskSummary]) -> ModelRc<FocusTaskRow> {
+    let rows = tasks
+        .iter()
+        .map(|task| FocusTaskRow {
+            id: SharedString::from(task.id.to_string()),
+            title: SharedString::from(task.title.as_str()),
+            metadata: SharedString::from(placement_label(task.placement)),
+        })
+        .collect::<Vec<_>>();
+    ModelRc::from(Rc::new(VecModel::from(rows)))
+}
+
+const fn placement_label(placement: TaskPlacement) -> &'static str {
+    match placement {
+        TaskPlacement::Inbox => "Inbox",
+        TaskPlacement::Quadrant(Quadrant::Q1) => "Q1",
+        TaskPlacement::Quadrant(Quadrant::Q2) => "Q2",
+        TaskPlacement::Quadrant(Quadrant::Q3) => "Q3",
+        TaskPlacement::Quadrant(Quadrant::Q4) => "Q4",
     }
 }
 

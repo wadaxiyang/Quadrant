@@ -4091,6 +4091,7 @@ dependencies = [
  "quadrant-application",
  "quadrant-domain",
  "rusqlite",
+ "serde",
  "serde_json",
  "tempfile",
  "uuid",

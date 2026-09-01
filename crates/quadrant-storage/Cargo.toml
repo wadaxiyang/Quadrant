@@ -11,6 +11,7 @@ repository.workspace = true
 quadrant-application.workspace = true
 quadrant-domain.workspace = true
 rusqlite.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
 

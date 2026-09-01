@@ -80,13 +80,21 @@ impl TaskApplication {
 
     /// Handles a typed UI intent and produces zero or more UI-safe events.
     #[must_use]
+    #[allow(clippy::too_many_lines)] // The exhaustive dispatcher keeps intent ownership explicit.
     pub fn handle(&self, intent: UiIntent) -> Vec<ApplicationEvent> {
         match intent {
             UiIntent::Navigate(crate::NavigationRoute::Today) => match self.load_today() {
                 Ok(state) => vec![ApplicationEvent::TodayChanged(state)],
                 Err(error) => vec![load_failure_event(&error)],
             },
-            UiIntent::Navigate(_) | UiIntent::OpenQuickAdd => Vec::new(),
+            UiIntent::Navigate(_)
+            | UiIntent::OpenQuickAdd
+            | UiIntent::StartFocus(_)
+            | UiIntent::PauseFocus
+            | UiIntent::ResumeFocus
+            | UiIntent::FinishFocus
+            | UiIntent::CancelFocus
+            | UiIntent::SetPomodoroSettings(_) => Vec::new(),
             UiIntent::SetTheme(mode) => match self.settings.save_theme_mode(mode, self.clock.now())
             {
                 Ok(()) => Vec::new(),
@@ -247,6 +255,8 @@ fn failure_event(error: &RepositoryError) -> ApplicationEvent {
         crate::RepositoryOperation::DeleteTask => "The task could not be deleted.",
         crate::RepositoryOperation::ReadSettings => "Settings could not be loaded.",
         crate::RepositoryOperation::WriteSettings => "Settings could not be saved.",
+        crate::RepositoryOperation::ReadFocus => "Focus state could not be loaded.",
+        crate::RepositoryOperation::WriteFocus => "The Focus session could not be changed.",
         crate::RepositoryOperation::Open | crate::RepositoryOperation::Migrate => {
             "Quadrant storage is unavailable."
         }

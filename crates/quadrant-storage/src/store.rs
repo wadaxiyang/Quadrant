@@ -11,8 +11,8 @@ use quadrant_application::{
     WindowMinimizeBehavior,
 };
 use quadrant_domain::{
-    LocalDate, NewTask, SortKey, Task, TaskDetailsUpdate, TaskId, TaskPlacement, TaskStatus,
-    UtcTimestamp,
+    LocalDate, NewTask, PomodoroSettings, SortKey, Task, TaskDetailsUpdate, TaskId, TaskPlacement,
+    TaskStatus, UtcTimestamp,
 };
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use uuid::Uuid;
@@ -68,7 +68,7 @@ impl SqliteStore {
             .map_err(|error| RepositoryError::new(RepositoryOperation::ReadTasks, error))
     }
 
-    fn lock(
+    pub(crate) fn lock(
         &self,
         operation: RepositoryOperation,
     ) -> Result<MutexGuard<'_, Connection>, RepositoryError> {
@@ -545,6 +545,96 @@ impl SettingsRepository for SqliteStore {
             .commit()
             .map_err(|error| RepositoryError::new(operation, error))
     }
+
+    fn load_pomodoro_settings(&self) -> Result<PomodoroSettings, RepositoryError> {
+        let operation = RepositoryOperation::ReadSettings;
+        let connection = self.lock(operation)?;
+        let defaults = PomodoroSettings::default();
+        let settings = PomodoroSettings {
+            focus_minutes: load_json_setting(&connection, "focus.focus_minutes", operation)?
+                .unwrap_or(defaults.focus_minutes),
+            short_break_minutes: load_json_setting(
+                &connection,
+                "focus.short_break_minutes",
+                operation,
+            )?
+            .unwrap_or(defaults.short_break_minutes),
+            long_break_minutes: load_json_setting(
+                &connection,
+                "focus.long_break_minutes",
+                operation,
+            )?
+            .unwrap_or(defaults.long_break_minutes),
+            long_break_interval: load_json_setting(
+                &connection,
+                "focus.long_break_interval",
+                operation,
+            )?
+            .unwrap_or(defaults.long_break_interval),
+            auto_start_break: load_json_setting(&connection, "focus.auto_start_break", operation)?
+                .unwrap_or(defaults.auto_start_break),
+            auto_start_focus: load_json_setting(&connection, "focus.auto_start_focus", operation)?
+                .unwrap_or(defaults.auto_start_focus),
+        };
+        settings
+            .validate()
+            .map_err(|error| RepositoryError::new(operation, error))
+    }
+
+    fn save_pomodoro_settings(
+        &self,
+        settings: PomodoroSettings,
+        now: UtcTimestamp,
+    ) -> Result<(), RepositoryError> {
+        let operation = RepositoryOperation::WriteSettings;
+        let settings = settings
+            .validate()
+            .map_err(|error| RepositoryError::new(operation, error))?;
+        let mut connection = self.lock(operation)?;
+        let transaction = immediate_transaction(&mut connection, operation)?;
+        let values = [
+            (
+                "focus.focus_minutes",
+                serde_json::to_string(&settings.focus_minutes),
+            ),
+            (
+                "focus.short_break_minutes",
+                serde_json::to_string(&settings.short_break_minutes),
+            ),
+            (
+                "focus.long_break_minutes",
+                serde_json::to_string(&settings.long_break_minutes),
+            ),
+            (
+                "focus.long_break_interval",
+                serde_json::to_string(&settings.long_break_interval),
+            ),
+            (
+                "focus.auto_start_break",
+                serde_json::to_string(&settings.auto_start_break),
+            ),
+            (
+                "focus.auto_start_focus",
+                serde_json::to_string(&settings.auto_start_focus),
+            ),
+        ];
+        for (key, json) in values {
+            let json = json.map_err(|error| RepositoryError::new(operation, error))?;
+            transaction
+                .execute(
+                    "INSERT INTO settings(key, value_json, updated_at_utc)
+                     VALUES (?1, ?2, ?3)
+                     ON CONFLICT(key) DO UPDATE SET
+                         value_json = excluded.value_json,
+                         updated_at_utc = excluded.updated_at_utc",
+                    params![key, json, now.unix_seconds()],
+                )
+                .map_err(|error| RepositoryError::new(operation, error))?;
+        }
+        transaction
+            .commit()
+            .map_err(|error| RepositoryError::new(operation, error))
+    }
 }
 
 fn load_bool_setting(
@@ -563,6 +653,25 @@ fn load_bool_setting(
         .map(|json| {
             serde_json::from_str::<bool>(&json)
                 .map_err(|error| RepositoryError::new(operation, error))
+        })
+        .transpose()
+}
+
+fn load_json_setting<T: serde::de::DeserializeOwned>(
+    connection: &Connection,
+    key: &str,
+    operation: RepositoryOperation,
+) -> Result<Option<T>, RepositoryError> {
+    connection
+        .query_row(
+            "SELECT value_json FROM settings WHERE key = ?1",
+            [key],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|error| RepositoryError::new(operation, error))?
+        .map(|json| {
+            serde_json::from_str::<T>(&json).map_err(|error| RepositoryError::new(operation, error))
         })
         .transpose()
 }
@@ -754,8 +863,9 @@ mod tests {
         ThemeMode, TodayRepository, WindowCloseBehavior, WindowMinimizeBehavior,
     };
     use quadrant_domain::{
-        LocalDate, NewTask, Quadrant, RecurrencePattern, RecurrenceRule, ScheduledInstant,
-        TaskDetailsUpdate, TaskId, TaskPlacement, TaskStatus, TaskTitle, TimeZoneId, UtcTimestamp,
+        LocalDate, NewTask, PomodoroSettings, Quadrant, RecurrencePattern, RecurrenceRule,
+        ScheduledInstant, TaskDetailsUpdate, TaskId, TaskPlacement, TaskStatus, TaskTitle,
+        TimeZoneId, UtcTimestamp,
     };
     use uuid::Uuid;
 
@@ -837,7 +947,7 @@ mod tests {
     #[test]
     fn empty_database_migrates_and_enables_foreign_keys() {
         let store = SqliteStore::open_in_memory().expect("storage opens");
-        assert_eq!(store.schema_version().expect("schema version"), 2);
+        assert_eq!(store.schema_version().expect("schema version"), 3);
         let enabled = store
             .connection
             .lock()
@@ -1196,6 +1306,45 @@ mod tests {
             )
             .expect("settings count");
         assert_eq!(stored_count, 0);
+    }
+
+    #[test]
+    fn pomodoro_settings_default_validate_and_round_trip_as_one_group() {
+        let store = SqliteStore::open_in_memory().expect("storage opens");
+        assert_eq!(
+            store
+                .load_pomodoro_settings()
+                .expect("Pomodoro settings query"),
+            PomodoroSettings::default()
+        );
+        let settings = PomodoroSettings {
+            focus_minutes: 50,
+            short_break_minutes: 10,
+            long_break_minutes: 25,
+            long_break_interval: 3,
+            auto_start_break: true,
+            auto_start_focus: true,
+        };
+        store
+            .save_pomodoro_settings(settings, UtcTimestamp::from_unix_seconds(33))
+            .expect("Pomodoro settings save");
+        assert_eq!(
+            store
+                .load_pomodoro_settings()
+                .expect("Pomodoro settings query"),
+            settings
+        );
+        assert!(
+            store
+                .save_pomodoro_settings(
+                    PomodoroSettings {
+                        focus_minutes: 0,
+                        ..settings
+                    },
+                    UtcTimestamp::from_unix_seconds(34),
+                )
+                .is_err()
+        );
     }
 
     #[test]
