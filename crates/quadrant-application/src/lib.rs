@@ -1,8 +1,20 @@
-//! Application use cases, ports, and typed events.
+//! Application use cases, ports, projections, and typed events.
 
 #![forbid(unsafe_code)]
 
-pub use quadrant_domain::{Quadrant, TaskPlacement};
+mod ports;
+mod tasks;
+
+pub use ports::{
+    Clock, RepositoryError, RepositoryOperation, SettingsRepository, SystemClock, TaskIdGenerator,
+    TaskRepository, UuidTaskIdGenerator,
+};
+pub use quadrant_domain::{
+    LocalDate, NewTask, Quadrant, RecurrencePattern, RecurrenceRule, ScheduledInstant, SortKey,
+    Task, TaskDetailsUpdate, TaskDomainError, TaskId, TaskPlacement, TaskStatus, TaskTitle,
+    TimeZoneId, UtcTimestamp,
+};
+pub use tasks::TaskApplication;
 
 /// A typed intent emitted by the presentation layer.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -15,6 +27,24 @@ pub enum UiIntent {
     SubmitQuickAdd(QuickAddSubmission),
     /// Change the user's preferred color theme.
     SetTheme(ThemeMode),
+    /// Move an active task into Inbox or a quadrant.
+    MoveTask {
+        /// Task to move.
+        task_id: TaskId,
+        /// Destination placement.
+        placement: TaskPlacement,
+    },
+    /// Complete an active task.
+    CompleteTask(TaskId),
+    /// Permanently delete a task while retaining immutable completion snapshots.
+    DeleteTask(TaskId),
+    /// Persist edited task details.
+    UpdateTask {
+        /// Task to update.
+        task_id: TaskId,
+        /// Validated replacement details.
+        update: TaskDetailsUpdate,
+    },
 }
 
 /// Top-level routes shared by the application and UI adapter.
@@ -105,9 +135,83 @@ pub struct QuickAddSubmission {
     pub placement: TaskPlacement,
 }
 
+/// Lightweight task projection consumed by the Quadrants UI.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TaskSummary {
+    /// Stable task identity.
+    pub id: TaskId,
+    /// User-visible title.
+    pub title: String,
+    /// Inbox/quadrant location.
+    pub placement: TaskPlacement,
+}
+
+impl From<&Task> for TaskSummary {
+    fn from(task: &Task) -> Self {
+        let record = task.record();
+        Self {
+            id: record.id,
+            title: record.title.as_str().to_owned(),
+            placement: record.placement,
+        }
+    }
+}
+
+/// Active-task projection grouped for the four-quadrant screen.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct QuadrantsViewState {
+    /// Unclassified captures.
+    pub inbox: Vec<TaskSummary>,
+    /// Important and urgent tasks.
+    pub q1: Vec<TaskSummary>,
+    /// Important and not urgent tasks.
+    pub q2: Vec<TaskSummary>,
+    /// Not important and urgent tasks.
+    pub q3: Vec<TaskSummary>,
+    /// Not important and not urgent tasks.
+    pub q4: Vec<TaskSummary>,
+}
+
+impl QuadrantsViewState {
+    /// Groups a repository-ordered active task list by placement.
+    #[must_use]
+    pub fn from_tasks(tasks: &[Task]) -> Self {
+        let mut state = Self::default();
+        for task in tasks {
+            let summary = TaskSummary::from(task);
+            match summary.placement {
+                TaskPlacement::Inbox => state.inbox.push(summary),
+                TaskPlacement::Quadrant(Quadrant::Q1) => state.q1.push(summary),
+                TaskPlacement::Quadrant(Quadrant::Q2) => state.q2.push(summary),
+                TaskPlacement::Quadrant(Quadrant::Q3) => state.q3.push(summary),
+                TaskPlacement::Quadrant(Quadrant::Q4) => state.q4.push(summary),
+            }
+        }
+        state
+    }
+}
+
+/// Typed events sent from application work back to the UI adapter.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ApplicationEvent {
+    /// Replace the active Quadrants projection.
+    QuadrantsChanged(QuadrantsViewState),
+    /// Show stable positive feedback.
+    OperationSucceeded(String),
+    /// Show a stable user-facing failure without exposing raw diagnostics.
+    OperationFailed(UserFacingError),
+}
+
+/// Stable UI-safe error information.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UserFacingError {
+    /// Short message safe to render directly.
+    pub message: String,
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{NavigationRoute, ThemeMode};
+    use super::{NavigationRoute, QuadrantsViewState, ThemeMode};
 
     #[test]
     fn route_indices_round_trip() {
@@ -121,5 +225,10 @@ mod tests {
     #[test]
     fn system_is_the_default_theme_mode() {
         assert_eq!(ThemeMode::default(), ThemeMode::System);
+    }
+
+    #[test]
+    fn empty_quadrants_projection_is_well_formed() {
+        assert_eq!(QuadrantsViewState::default().inbox.len(), 0);
     }
 }

@@ -7,7 +7,7 @@ import { Sidebar } from "components/sidebar.slint";
 import { TitleBar } from "components/title_bar.slint";
 import { ModalManager } from "components/modal_manager.slint";
 import { ToastHost, ToastKind } from "components/toast.slint";
-import { QuadrantsView } from "views/quadrants.slint";
+import { QuadrantsView, TaskRow } from "views/quadrants.slint";
 import { TodayView } from "views/today.slint";
 import { FocusView } from "views/focus.slint";
 import { ReviewView } from "views/review.slint";
@@ -34,10 +34,20 @@ export component MainWindow inherits Window {
     in-out property <bool> dialog_visible: false;
     in-out property <string> dialog_title;
     in-out property <string> dialog_message;
+    property <int> dialog_mode: 0;
+    property <string> pending_delete_id;
+    in-out property <[TaskRow]> inbox_tasks;
+    in-out property <[TaskRow]> q1_tasks;
+    in-out property <[TaskRow]> q2_tasks;
+    in-out property <[TaskRow]> q3_tasks;
+    in-out property <[TaskRow]> q4_tasks;
 
     callback navigation_requested(int);
     callback quick_add_requested;
     callback theme_selected(ThemeMode);
+    callback task_move_requested(string, int);
+    callback task_complete_requested(string);
+    callback task_delete_confirmed(string);
     callback window_close;
     callback window_minimize;
     callback window_maximize;
@@ -100,7 +110,22 @@ export component MainWindow inherits Window {
                     border-radius: root.maximized ? 0px : UiConstants.content_radius;
                     clip: true;
 
-                    if root.current_route == 0: QuadrantsView { }
+                    if root.current_route == 0: QuadrantsView {
+                        inbox_tasks: root.inbox_tasks;
+                        q1_tasks: root.q1_tasks;
+                        q2_tasks: root.q2_tasks;
+                        q3_tasks: root.q3_tasks;
+                        q4_tasks: root.q4_tasks;
+                        move_requested(id, destination) => { root.task_move_requested(id, destination); }
+                        complete_requested(id) => { root.task_complete_requested(id); }
+                        delete_requested(id) => {
+                            root.pending_delete_id = id;
+                            root.dialog_mode = 1;
+                            root.dialog_title = "Delete task?";
+                            root.dialog_message = "This permanently deletes the task. Completed history snapshots remain available for Review.";
+                            root.dialog_visible = true;
+                        }
+                    }
                     if root.current_route == 1: TodayView { }
                     if root.current_route == 2: FocusView { }
                     if root.current_route == 3: ReviewView { }
@@ -114,6 +139,7 @@ export component MainWindow inherits Window {
                     }
                     if root.current_route == 6: AboutView {
                         show_notices => {
+                            root.dialog_mode = 0;
                             root.dialog_title = "Source and license notices";
                             root.dialog_message = "Quadrant is GPL-3.0-only. Fluent UI components are derived from owu/wsl-dashboard at commit 948589a. Icons are Microsoft Fluent UI System Icons under the MIT License.";
                             root.dialog_visible = true;
@@ -140,8 +166,19 @@ export component MainWindow inherits Window {
         shown: root.dialog_visible;
         title: root.dialog_title;
         message: root.dialog_message;
-        primary_text: "Close";
-        accepted => { root.dialog_visible = false; }
-        dismissed => { root.dialog_visible = false; }
+        primary_text: root.dialog_mode == 1 ? "Delete" : "Close";
+        show_secondary: root.dialog_mode == 1;
+        secondary_text: "Cancel";
+        accepted => {
+            if (root.dialog_mode == 1) {
+                root.task_delete_confirmed(root.pending_delete_id);
+                root.pending_delete_id = "";
+            }
+            root.dialog_visible = false;
+        }
+        dismissed => {
+            root.pending_delete_id = "";
+            root.dialog_visible = false;
+        }
     }
 }

@@ -1,7 +1,10 @@
-//! Storage adapter boundary for the future `rusqlite` implementation.
+//! `SQLite` persistence adapter for Quadrant.
 
 #![forbid(unsafe_code)]
 
-/// Marker for the concrete storage adapter assembled by the app crate.
-#[derive(Debug, Default)]
-pub struct StorageAdapter;
+mod connection;
+mod mapping;
+mod migrations;
+mod store;
+
+pub use store::SqliteStore;

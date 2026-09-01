@@ -1,45 +1,84 @@
 //! Main/Quick Add window construction and typed callback binding.
 
-use std::rc::Rc;
+use std::{rc::Rc, str::FromStr, sync::Arc};
 
 use quadrant_application::{
-    NavigationRoute, Quadrant, QuickAddSubmission, SystemTheme, TaskPlacement,
-    ThemeMode as ApplicationThemeMode, UiIntent,
+    ApplicationEvent, NavigationRoute, Quadrant, QuadrantsViewState, QuickAddSubmission,
+    SystemTheme, TaskId, TaskPlacement, ThemeMode as ApplicationThemeMode, UiIntent,
 };
-use slint::{ComponentHandle, PhysicalPosition, SharedString};
+use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, VecModel};
 
-use crate::{MainWindow, QuickAddWindow, ThemeMode as SlintThemeMode, ToastKind};
+use crate::{MainWindow, QuickAddWindow, TaskRow, ThemeMode as SlintThemeMode, ToastKind};
 
 /// Initial state supplied by the composition root.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UiShellConfig {
     /// User-selected theme behavior.
     pub theme_mode: ApplicationThemeMode,
     /// Current normalized platform appearance.
     pub system_theme: SystemTheme,
+    /// Initial repository-backed active task projection.
+    pub quadrants: QuadrantsViewState,
 }
 
-/// Constructs both M1 windows, binds typed UI intents, and runs the Slint event loop.
-///
-/// # Errors
-///
-/// Returns a platform error when a window or the event loop cannot be created.
-pub fn run(
-    config: UiShellConfig,
-    on_intent: impl Fn(UiIntent) + 'static,
-) -> Result<(), slint::PlatformError> {
-    let main_window = MainWindow::new()?;
-    let quick_add = QuickAddWindow::new()?;
-    let intent_handler: Rc<dyn Fn(UiIntent)> = Rc::new(on_intent);
+/// Thread-safe sink used by application-runtime work to enqueue typed UI events.
+pub type ApplicationEventSink = Arc<dyn Fn(ApplicationEvent) + Send + Sync>;
 
-    initialize_theme(&main_window, &quick_add, config);
-    bind_main_window(&main_window, &quick_add, &intent_handler);
-    bind_quick_add(&main_window, &quick_add, intent_handler);
-
-    main_window.run()
+/// Constructed Slint shell kept on the UI thread.
+pub struct UiShell {
+    main_window: MainWindow,
+    quick_add: QuickAddWindow,
 }
 
-fn initialize_theme(main_window: &MainWindow, quick_add: &QuickAddWindow, config: UiShellConfig) {
+impl UiShell {
+    /// Constructs both windows, installs initial state, and binds typed intents.
+    ///
+    /// # Errors
+    ///
+    /// Returns a platform error when a window cannot be created.
+    pub fn new(
+        config: &UiShellConfig,
+        on_intent: impl Fn(UiIntent) + 'static,
+    ) -> Result<Self, slint::PlatformError> {
+        let main_window = MainWindow::new()?;
+        let quick_add = QuickAddWindow::new()?;
+        let intent_handler: Rc<dyn Fn(UiIntent)> = Rc::new(on_intent);
+
+        initialize_theme(&main_window, &quick_add, config);
+        apply_quadrants_state(&main_window, &config.quadrants);
+        bind_main_window(&main_window, &quick_add, &intent_handler);
+        bind_quick_add(&quick_add, intent_handler);
+
+        Ok(Self {
+            main_window,
+            quick_add,
+        })
+    }
+
+    /// Creates a cross-thread event sink that wakes the Slint event loop without polling.
+    #[must_use]
+    pub fn event_sink(&self) -> ApplicationEventSink {
+        let main_weak = self.main_window.as_weak();
+        Arc::new(move |event| {
+            drop(main_weak.upgrade_in_event_loop(move |main| {
+                apply_application_event(&main, event);
+            }));
+        })
+    }
+
+    /// Runs the Slint event loop until normal application shutdown.
+    ///
+    /// # Errors
+    ///
+    /// Returns an event-loop platform error.
+    pub fn run(self) -> Result<(), slint::PlatformError> {
+        let result = self.main_window.run();
+        drop(self.quick_add.hide());
+        result
+    }
+}
+
+fn initialize_theme(main_window: &MainWindow, quick_add: &QuickAddWindow, config: &UiShellConfig) {
     let mode = to_slint_theme_mode(config.theme_mode);
     let system_dark = config.system_theme == SystemTheme::Dark;
     main_window.invoke_apply_theme(mode, system_dark);
@@ -88,6 +127,33 @@ fn bind_main_window(
         }
     });
 
+    let move_handler = Rc::clone(intent_handler);
+    let move_main = main_window.as_weak();
+    main_window.on_task_move_requested(move |id, destination| {
+        let parsed = TaskId::from_str(id.as_str());
+        let placement = placement_from_destination(destination);
+        match (parsed, placement) {
+            (Ok(task_id), Some(placement)) => {
+                move_handler(UiIntent::MoveTask { task_id, placement });
+            }
+            _ => show_invalid_task_action(&move_main),
+        }
+    });
+
+    let complete_handler = Rc::clone(intent_handler);
+    let complete_main = main_window.as_weak();
+    main_window.on_task_complete_requested(move |id| match TaskId::from_str(id.as_str()) {
+        Ok(task_id) => complete_handler(UiIntent::CompleteTask(task_id)),
+        Err(_) => show_invalid_task_action(&complete_main),
+    });
+
+    let delete_handler = Rc::clone(intent_handler);
+    let delete_main = main_window.as_weak();
+    main_window.on_task_delete_confirmed(move |id| match TaskId::from_str(id.as_str()) {
+        Ok(task_id) => delete_handler(UiIntent::DeleteTask(task_id)),
+        Err(_) => show_invalid_task_action(&delete_main),
+    });
+
     let minimize_weak = main_window.as_weak();
     main_window.on_window_minimize(move || {
         if let Some(window) = minimize_weak.upgrade() {
@@ -120,11 +186,7 @@ fn bind_main_window(
     });
 }
 
-fn bind_quick_add(
-    main_window: &MainWindow,
-    quick_add: &QuickAddWindow,
-    intent_handler: Rc<dyn Fn(UiIntent)>,
-) {
+fn bind_quick_add(quick_add: &QuickAddWindow, intent_handler: Rc<dyn Fn(UiIntent)>) {
     let cancel_weak = quick_add.as_weak();
     quick_add.on_cancelled(move || {
         if let Some(window) = cancel_weak.upgrade() {
@@ -133,7 +195,6 @@ fn bind_quick_add(
     });
 
     let submit_weak = quick_add.as_weak();
-    let main_weak = main_window.as_weak();
     quick_add.on_submitted(move |title, destination| {
         let Some(window) = submit_weak.upgrade() else {
             return;
@@ -153,12 +214,6 @@ fn bind_quick_add(
             placement,
         }));
         drop(window.hide());
-        if let Some(main) = main_weak.upgrade() {
-            main.invoke_show_toast(
-                SharedString::from("Capture intent emitted. Persistence arrives in M2."),
-                ToastKind::Info,
-            );
-        }
     });
 
     let close_weak = quick_add.as_weak();
@@ -168,6 +223,46 @@ fn bind_quick_add(
         }
         slint::CloseRequestResponse::KeepWindowShown
     });
+}
+
+fn show_invalid_task_action(main: &slint::Weak<MainWindow>) {
+    if let Some(main) = main.upgrade() {
+        main.invoke_show_toast(
+            SharedString::from("That task action is no longer valid."),
+            ToastKind::Error,
+        );
+    }
+}
+
+fn apply_application_event(main: &MainWindow, event: ApplicationEvent) {
+    match event {
+        ApplicationEvent::QuadrantsChanged(state) => apply_quadrants_state(main, &state),
+        ApplicationEvent::OperationSucceeded(message) => {
+            main.invoke_show_toast(SharedString::from(message), ToastKind::Success);
+        }
+        ApplicationEvent::OperationFailed(error) => {
+            main.invoke_show_toast(SharedString::from(error.message), ToastKind::Error);
+        }
+    }
+}
+
+fn apply_quadrants_state(main: &MainWindow, state: &QuadrantsViewState) {
+    main.set_inbox_tasks(task_model(&state.inbox));
+    main.set_q1_tasks(task_model(&state.q1));
+    main.set_q2_tasks(task_model(&state.q2));
+    main.set_q3_tasks(task_model(&state.q3));
+    main.set_q4_tasks(task_model(&state.q4));
+}
+
+fn task_model(tasks: &[quadrant_application::TaskSummary]) -> ModelRc<TaskRow> {
+    let rows = tasks
+        .iter()
+        .map(|task| TaskRow {
+            id: SharedString::from(task.id.to_string()),
+            title: SharedString::from(task.title.as_str()),
+        })
+        .collect::<Vec<_>>();
+    ModelRc::from(Rc::new(VecModel::from(rows)))
 }
 
 fn to_slint_theme_mode(mode: ApplicationThemeMode) -> SlintThemeMode {

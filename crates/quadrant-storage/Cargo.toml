@@ -10,6 +10,12 @@ repository.workspace = true
 [dependencies]
 quadrant-application.workspace = true
 quadrant-domain.workspace = true
+rusqlite.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile = "3.27.0"
 
 [lints]
 workspace = true

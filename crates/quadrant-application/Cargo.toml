@@ -9,6 +9,8 @@ repository.workspace = true
 
 [dependencies]
 quadrant-domain.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
 
 [lints]
 workspace = true

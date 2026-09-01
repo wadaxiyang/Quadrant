@@ -12,6 +12,7 @@ quadrant-application.workspace = true
 quadrant-platform.workspace = true
 quadrant-storage.workspace = true
 quadrant-ui.workspace = true
+tokio.workspace = true
 
 [lints]
 workspace = true

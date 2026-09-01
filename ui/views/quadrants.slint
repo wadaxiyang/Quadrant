@@ -1,18 +1,70 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
+import { ScrollView } from "std-widgets.slint";
 import { Theme } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { PageHeader } from "../components/page_shell.slint";
-import { SurfaceCard } from "../components/common.slint";
+import { FluentButton, SegmentButton, SurfaceCard } from "../components/common.slint";
 
-component QuadrantShellCard inherits SurfaceCard {
+export struct TaskRow {
+    id: string,
+    title: string,
+}
+
+component TaskCard inherits Rectangle {
+    in property <TaskRow> task;
+    in property <int> destination;
+    callback move_requested(string, int);
+    callback complete_requested(string);
+    callback delete_requested(string);
+
+    height: 82px;
+    background: Theme.input_bg;
+    border-width: 1px;
+    border-color: Theme.input_border;
+    border-radius: 5px;
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 6px;
+
+        Text {
+            text: root.task.title;
+            color: Theme.text_primary;
+            font-size: 12px;
+            font-weight: 500;
+            overflow: elide;
+        }
+
+        HorizontalLayout {
+            spacing: 3px;
+            SegmentButton { min-width: 24px; text: "I"; selected: root.destination == 0; clicked => { root.move_requested(root.task.id, 0); } }
+            SegmentButton { min-width: 24px; text: "1"; selected: root.destination == 1; clicked => { root.move_requested(root.task.id, 1); } }
+            SegmentButton { min-width: 24px; text: "2"; selected: root.destination == 2; clicked => { root.move_requested(root.task.id, 2); } }
+            SegmentButton { min-width: 24px; text: "3"; selected: root.destination == 3; clicked => { root.move_requested(root.task.id, 3); } }
+            SegmentButton { min-width: 24px; text: "4"; selected: root.destination == 4; clicked => { root.move_requested(root.task.id, 4); } }
+            Rectangle { horizontal-stretch: 1; }
+            FluentButton { min-width: 44px; text: "Done"; primary: true; clicked => { root.complete_requested(root.task.id); } }
+            FluentButton { min-width: 26px; text: "×"; danger: true; clicked => { root.delete_requested(root.task.id); } }
+        }
+    }
+}
+
+component TaskColumn inherits SurfaceCard {
     in property <string> code;
     in property <string> title;
     in property <string> subtitle;
     in property <color> accent;
+    in property <int> destination;
+    in property <[TaskRow]> tasks;
+    callback move_requested(string, int);
+    callback complete_requested(string);
+    callback delete_requested(string);
 
     Rectangle {
+        x: 0px;
+        y: 0px;
         width: 4px;
         height: 100%;
         background: root.accent;
@@ -20,34 +72,54 @@ component QuadrantShellCard inherits SurfaceCard {
     }
 
     VerticalLayout {
-        padding: 16px;
-        spacing: 4px;
+        padding: 12px;
+        spacing: 7px;
 
         Text {
-            text: root.code + "  " + root.title;
+            text: root.code == "" ? root.title : root.code + "  " + root.title;
             color: Theme.text_primary;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 600;
         }
 
         Text {
             text: root.subtitle;
             color: Theme.text_secondary;
-            font-size: 11px;
+            font-size: 10px;
         }
 
-        Rectangle { vertical-stretch: 1; }
-
-        Text {
-            text: "Task cards arrive with M2 persistence";
-            color: Theme.text_secondary;
-            font-size: 11px;
-            horizontal-alignment: center;
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 6px;
+                for task in root.tasks: TaskCard {
+                    task: task;
+                    destination: root.destination;
+                    move_requested(id, destination) => { root.move_requested(id, destination); }
+                    complete_requested(id) => { root.complete_requested(id); }
+                    delete_requested(id) => { root.delete_requested(id); }
+                }
+                if root.tasks.length == 0: Text {
+                    text: "No active tasks";
+                    color: Theme.text_secondary;
+                    font-size: 11px;
+                    horizontal-alignment: center;
+                }
+            }
         }
     }
 }
 
 export component QuadrantsView inherits Rectangle {
+    in property <[TaskRow]> inbox_tasks;
+    in property <[TaskRow]> q1_tasks;
+    in property <[TaskRow]> q2_tasks;
+    in property <[TaskRow]> q3_tasks;
+    in property <[TaskRow]> q4_tasks;
+    callback move_requested(string, int);
+    callback complete_requested(string);
+    callback delete_requested(string);
+
     background: transparent;
 
     VerticalLayout {
@@ -63,16 +135,17 @@ export component QuadrantsView inherits Rectangle {
             spacing: 16px;
             vertical-stretch: 1;
 
-            SurfaceCard {
-                width: 220px;
-                VerticalLayout {
-                    padding: 16px;
-                    spacing: 8px;
-                    Text { text: "Inbox"; color: Theme.text_primary; font-size: 16px; font-weight: 600; }
-                    Text { text: "Unclassified captures appear here."; color: Theme.text_secondary; font-size: 11px; wrap: word-wrap; }
-                    Rectangle { vertical-stretch: 1; }
-                    Text { text: "Quick Add is ready for keyboard capture."; color: Theme.accent; font-size: 11px; wrap: word-wrap; }
-                }
+            TaskColumn {
+                width: 250px;
+                code: "";
+                title: "Inbox";
+                subtitle: "Unclassified captures";
+                accent: Theme.accent;
+                destination: 0;
+                tasks: root.inbox_tasks;
+                move_requested(id, destination) => { root.move_requested(id, destination); }
+                complete_requested(id) => { root.complete_requested(id); }
+                delete_requested(id) => { root.delete_requested(id); }
             }
 
             VerticalLayout {
@@ -81,14 +154,38 @@ export component QuadrantsView inherits Rectangle {
 
                 HorizontalLayout {
                     spacing: 12px;
-                    QuadrantShellCard { code: "Q1"; title: "Important + Urgent"; subtitle: "Do now"; accent: #d13438; }
-                    QuadrantShellCard { code: "Q2"; title: "Important + Not urgent"; subtitle: "Plan deliberately"; accent: #107c10; }
+                    TaskColumn {
+                        code: "Q1"; title: "Important + Urgent"; subtitle: "Do now"; accent: #d13438;
+                        destination: 1; tasks: root.q1_tasks;
+                        move_requested(id, destination) => { root.move_requested(id, destination); }
+                        complete_requested(id) => { root.complete_requested(id); }
+                        delete_requested(id) => { root.delete_requested(id); }
+                    }
+                    TaskColumn {
+                        code: "Q2"; title: "Important + Not urgent"; subtitle: "Plan deliberately"; accent: #107c10;
+                        destination: 2; tasks: root.q2_tasks;
+                        move_requested(id, destination) => { root.move_requested(id, destination); }
+                        complete_requested(id) => { root.complete_requested(id); }
+                        delete_requested(id) => { root.delete_requested(id); }
+                    }
                 }
 
                 HorizontalLayout {
                     spacing: 12px;
-                    QuadrantShellCard { code: "Q3"; title: "Not important + Urgent"; subtitle: "Delegate or contain"; accent: #ca5010; }
-                    QuadrantShellCard { code: "Q4"; title: "Not important + Not urgent"; subtitle: "Reduce or remove"; accent: #5c2d91; }
+                    TaskColumn {
+                        code: "Q3"; title: "Not important + Urgent"; subtitle: "Delegate or contain"; accent: #ca5010;
+                        destination: 3; tasks: root.q3_tasks;
+                        move_requested(id, destination) => { root.move_requested(id, destination); }
+                        complete_requested(id) => { root.complete_requested(id); }
+                        delete_requested(id) => { root.delete_requested(id); }
+                    }
+                    TaskColumn {
+                        code: "Q4"; title: "Not important + Not urgent"; subtitle: "Reduce or remove"; accent: #5c2d91;
+                        destination: 4; tasks: root.q4_tasks;
+                        move_requested(id, destination) => { root.move_requested(id, destination); }
+                        complete_requested(id) => { root.complete_requested(id); }
+                        delete_requested(id) => { root.delete_requested(id); }
+                    }
                 }
             }
         }
