@@ -6,7 +6,8 @@ use std::{
 };
 
 use quadrant_application::{
-    RepositoryError, RepositoryOperation, SettingsRepository, TaskRepository, ThemeMode,
+    ReorderDirection, RepositoryError, RepositoryOperation, SettingsRepository, TaskRepository,
+    ThemeMode,
 };
 use quadrant_domain::{
     NewTask, SortKey, Task, TaskDetailsUpdate, TaskId, TaskPlacement, TaskStatus, UtcTimestamp,
@@ -143,6 +144,62 @@ impl TaskRepository for SqliteStore {
             update_task_row(&transaction, &task)
                 .map_err(|error| RepositoryError::new(operation, error))?;
         }
+        transaction
+            .commit()
+            .map_err(|error| RepositoryError::new(operation, error))?;
+        Ok(task)
+    }
+
+    fn reorder_task(
+        &self,
+        id: TaskId,
+        direction: ReorderDirection,
+        now: UtcTimestamp,
+    ) -> Result<Task, RepositoryError> {
+        let operation = RepositoryOperation::UpdateTask;
+        let mut connection = self.lock(operation)?;
+        let transaction = immediate_transaction(&mut connection, operation)?;
+        let mut task = require_task(&transaction, id, operation)?;
+        if task.record().status != TaskStatus::Active {
+            return Err(RepositoryError::new(
+                operation,
+                "completed task cannot be reordered",
+            ));
+        }
+
+        let mut ordered = ordered_task_keys(&transaction, task.record().placement)
+            .map_err(|error| RepositoryError::new(operation, error))?;
+        let task_id = id.to_string();
+        let Some(current_index) = ordered.iter().position(|(row_id, _)| row_id == &task_id) else {
+            return Err(RepositoryError::new(
+                operation,
+                "task was not found in its placement",
+            ));
+        };
+        let insertion_index = match direction {
+            ReorderDirection::Up if current_index > 0 => current_index - 1,
+            ReorderDirection::Down if current_index + 1 < ordered.len() => current_index + 1,
+            ReorderDirection::Up | ReorderDirection::Down => {
+                transaction
+                    .commit()
+                    .map_err(|error| RepositoryError::new(operation, error))?;
+                return Ok(task);
+            }
+        };
+        ordered.remove(current_index);
+
+        let sort_key = if let Some(key) = insertion_sort_key(&ordered, insertion_index) {
+            key
+        } else {
+            rebalance_task_keys(&transaction, &mut ordered)
+                .map_err(|error| RepositoryError::new(operation, error))?;
+            insertion_sort_key(&ordered, insertion_index).ok_or_else(|| {
+                RepositoryError::new(operation, "task order key could not be allocated")
+            })?
+        };
+        task.move_to(task.record().placement, SortKey::from_i64(sort_key), now);
+        update_task_row(&transaction, &task)
+            .map_err(|error| RepositoryError::new(operation, error))?;
         transaction
             .commit()
             .map_err(|error| RepositoryError::new(operation, error))?;
@@ -324,6 +381,57 @@ fn next_sort_key(connection: &Connection, placement: TaskPlacement) -> rusqlite:
     })
 }
 
+fn ordered_task_keys(
+    connection: &Connection,
+    placement: TaskPlacement,
+) -> rusqlite::Result<Vec<(String, i64)>> {
+    let mut statement = connection.prepare(
+        "SELECT id, sort_key FROM tasks
+         WHERE status = 0 AND quadrant IS ?1
+         ORDER BY sort_key, created_at_utc, id",
+    )?;
+    statement
+        .query_map([mapping::placement_to_db(placement)], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?
+        .collect()
+}
+
+fn insertion_sort_key(ordered: &[(String, i64)], insertion_index: usize) -> Option<i64> {
+    let before = insertion_index
+        .checked_sub(1)
+        .and_then(|index| ordered.get(index))
+        .map(|(_, key)| *key);
+    let after = ordered.get(insertion_index).map(|(_, key)| *key);
+    match (before, after) {
+        (None, None) => Some(SortKey::INITIAL.value()),
+        (None, Some(after)) => after.checked_sub(SortKey::STEP),
+        (Some(before), None) => before.checked_add(SortKey::STEP),
+        (Some(before), Some(after)) => {
+            let gap = after.checked_sub(before)?;
+            (gap > 1).then(|| before + gap / 2)
+        }
+    }
+}
+
+fn rebalance_task_keys(
+    connection: &Connection,
+    ordered: &mut [(String, i64)],
+) -> rusqlite::Result<()> {
+    for (index, (id, key)) in ordered.iter_mut().enumerate() {
+        let ordinal = i64::try_from(index + 1)
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
+        *key = ordinal.checked_mul(SortKey::STEP).ok_or_else(|| {
+            rusqlite::Error::InvalidParameterName("task sort key overflow".to_owned())
+        })?;
+        connection.execute(
+            "UPDATE tasks SET sort_key = ?2 WHERE id = ?1",
+            params![id.as_str(), *key],
+        )?;
+    }
+    Ok(())
+}
+
 fn get_task(connection: &Connection, id: TaskId) -> rusqlite::Result<Option<Task>> {
     let sql = format!("SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?1");
     connection
@@ -433,8 +541,11 @@ fn update_task_row(connection: &Connection, task: &Task) -> rusqlite::Result<()>
 
 #[cfg(test)]
 mod tests {
-    use quadrant_application::{SettingsRepository, TaskRepository, ThemeMode};
-    use quadrant_domain::{NewTask, Quadrant, TaskId, TaskPlacement, TaskStatus, UtcTimestamp};
+    use quadrant_application::{ReorderDirection, SettingsRepository, TaskRepository, ThemeMode};
+    use quadrant_domain::{
+        LocalDate, NewTask, Quadrant, RecurrencePattern, RecurrenceRule, ScheduledInstant,
+        TaskDetailsUpdate, TaskId, TaskPlacement, TaskStatus, TaskTitle, TimeZoneId, UtcTimestamp,
+    };
     use uuid::Uuid;
 
     use super::SqliteStore;
@@ -526,6 +637,54 @@ mod tests {
     }
 
     #[test]
+    fn full_task_details_update_round_trips_transactionally() {
+        let store = SqliteStore::open_in_memory().expect("storage opens");
+        let id = task_id(3);
+        store
+            .create_task(
+                id,
+                NewTask::quick_capture("Original", TaskPlacement::Inbox).expect("valid draft"),
+                UtcTimestamp::from_unix_seconds(30),
+            )
+            .expect("task created");
+        let updated = store
+            .update_task(
+                id,
+                TaskDetailsUpdate {
+                    title: TaskTitle::new("Edited").expect("valid title"),
+                    notes: "Stored notes".to_owned(),
+                    placement: TaskPlacement::Quadrant(Quadrant::Q2),
+                    planned_on: Some(LocalDate::parse_iso("2026-09-04").expect("valid date")),
+                    due: Some(ScheduledInstant {
+                        at_utc: UtcTimestamp::from_unix_seconds(1_788_451_200),
+                        time_zone: TimeZoneId::new("Asia/Shanghai").expect("valid timezone"),
+                    }),
+                    reminder: Some(ScheduledInstant {
+                        at_utc: UtcTimestamp::from_unix_seconds(1_788_447_600),
+                        time_zone: TimeZoneId::new("Asia/Shanghai").expect("valid timezone"),
+                    }),
+                    recurrence: Some(
+                        RecurrenceRule::new(RecurrencePattern::Weekly).expect("valid recurrence"),
+                    ),
+                },
+                UtcTimestamp::from_unix_seconds(31),
+            )
+            .expect("task updated");
+
+        assert_eq!(updated.record().title.as_str(), "Edited");
+        assert_eq!(updated.record().notes, "Stored notes");
+        assert_eq!(
+            updated.record().placement,
+            TaskPlacement::Quadrant(Quadrant::Q2)
+        );
+        let restored = store
+            .get_task(id)
+            .expect("task query")
+            .expect("task exists");
+        assert_eq!(restored, updated);
+    }
+
+    #[test]
     fn theme_setting_round_trips_as_validated_json() {
         let store = SqliteStore::open_in_memory().expect("storage opens");
         assert_eq!(store.load_theme_mode().expect("theme query"), None);
@@ -535,6 +694,68 @@ mod tests {
         assert_eq!(
             store.load_theme_mode().expect("theme query"),
             Some(ThemeMode::Dark)
+        );
+    }
+
+    #[test]
+    fn reorder_uses_gaps_and_rebalances_when_keys_are_exhausted() {
+        let store = SqliteStore::open_in_memory().expect("storage opens");
+        let ids = [task_id(10), task_id(11), task_id(12)];
+        for (index, id) in ids.into_iter().enumerate() {
+            store
+                .create_task(
+                    id,
+                    NewTask::quick_capture(format!("Task {index}"), TaskPlacement::Inbox)
+                        .expect("valid draft"),
+                    UtcTimestamp::from_unix_seconds(40 + i64::try_from(index).expect("index")),
+                )
+                .expect("task created");
+        }
+        {
+            let connection = store.connection.lock().expect("connection lock");
+            for (index, id) in ids.into_iter().enumerate() {
+                connection
+                    .execute(
+                        "UPDATE tasks SET sort_key = ?2 WHERE id = ?1",
+                        rusqlite::params![id.to_string(), i64::try_from(index + 1).expect("index")],
+                    )
+                    .expect("compressed key");
+            }
+        }
+
+        store
+            .reorder_task(
+                ids[2],
+                ReorderDirection::Up,
+                UtcTimestamp::from_unix_seconds(50),
+            )
+            .expect("task reordered with rebalance");
+        let ordered = store.list_active_tasks().expect("ordered tasks");
+        let ordered_ids = ordered
+            .iter()
+            .map(|task| task.record().id)
+            .collect::<Vec<_>>();
+        assert_eq!(ordered_ids, vec![ids[0], ids[2], ids[1]]);
+        assert!(
+            ordered
+                .windows(2)
+                .all(|pair| pair[0].record().sort_key < pair[1].record().sort_key)
+        );
+
+        store
+            .reorder_task(
+                ids[2],
+                ReorderDirection::Down,
+                UtcTimestamp::from_unix_seconds(51),
+            )
+            .expect("task reordered down");
+        let ordered = store.list_active_tasks().expect("ordered tasks");
+        assert_eq!(
+            ordered
+                .iter()
+                .map(|task| task.record().id)
+                .collect::<Vec<_>>(),
+            ids
         );
     }
 }

@@ -193,6 +193,45 @@ export component FluentTextField inherits Rectangle {
     }
 }
 
+export component FluentTextArea inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder_text;
+    in property <bool> enabled: true;
+    callback edited(string);
+
+    forward-focus: area_input;
+    min-height: 76px;
+    background: Theme.input_bg;
+    border-width: 1px;
+    border-color: area_input.has-focus ? Theme.accent : Theme.input_border;
+    border-radius: 4px;
+    clip: true;
+
+    area_input := TextInput {
+        x: 12px;
+        y: 8px;
+        width: parent.width - 24px;
+        height: parent.height - 16px;
+        text <=> root.text;
+        color: Theme.text_primary;
+        font-size: 13px;
+        vertical-alignment: top;
+        single-line: false;
+        enabled: root.enabled;
+        edited => { root.edited(self.text); }
+    }
+
+    Text {
+        visible: root.text == "" && !area_input.has-focus;
+        x: 12px;
+        y: 8px;
+        width: parent.width - 24px;
+        text: root.placeholder_text;
+        color: Theme.text_secondary;
+        font-size: 13px;
+    }
+}
+
 export component SegmentButton inherits Rectangle {
     in property <string> text;
     in property <bool> selected: false;

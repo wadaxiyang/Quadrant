@@ -78,6 +78,44 @@ impl TaskApplication {
                     Err(error) => vec![failure_event(&error)],
                 }
             }
+            UiIntent::ReorderTask { task_id, direction } => {
+                match self
+                    .tasks
+                    .reorder_task(task_id, direction, self.clock.now())
+                {
+                    Ok(_) => self.refresh_after_success("Task reordered."),
+                    Err(error) => vec![failure_event(&error)],
+                }
+            }
+            UiIntent::OpenTaskEditor(task_id) => match self.tasks.get_task(task_id) {
+                Ok(Some(task)) => vec![ApplicationEvent::TaskEditorLoaded((&task).into())],
+                Ok(None) => vec![ApplicationEvent::OperationFailed(UserFacingError {
+                    message: "That task no longer exists.".to_owned(),
+                })],
+                Err(error) => vec![failure_event(&error)],
+            },
+            UiIntent::SubmitTaskEditor(submission) => {
+                let task_id = submission.task_id;
+                let update = match submission.into_update() {
+                    Ok(update) => update,
+                    Err(error) => {
+                        return vec![ApplicationEvent::TaskEditorValidationFailed(
+                            error.to_string(),
+                        )];
+                    }
+                };
+                match self.tasks.update_task(task_id, update, self.clock.now()) {
+                    Ok(_) => match self.load_quadrants() {
+                        Ok(state) => vec![
+                            ApplicationEvent::QuadrantsChanged(state),
+                            ApplicationEvent::TaskEditorSaved,
+                            ApplicationEvent::OperationSucceeded("Task updated.".to_owned()),
+                        ],
+                        Err(error) => vec![failure_event(&error)],
+                    },
+                    Err(error) => vec![failure_event(&error)],
+                }
+            }
             UiIntent::CompleteTask(task_id) => {
                 match self.tasks.complete_task(task_id, self.clock.now()) {
                     Ok(_) => self.refresh_after_success("Task completed."),

@@ -16,6 +16,10 @@ pub use quadrant_domain::{
 };
 pub use tasks::TaskApplication;
 
+use std::fmt;
+
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+
 /// A typed intent emitted by the presentation layer.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UiIntent {
@@ -34,6 +38,17 @@ pub enum UiIntent {
         /// Destination placement.
         placement: TaskPlacement,
     },
+    /// Move an active task one step within its current placement.
+    ReorderTask {
+        /// Task to reorder.
+        task_id: TaskId,
+        /// Relative movement requested by the user.
+        direction: ReorderDirection,
+    },
+    /// Load one task into the dedicated editor surface.
+    OpenTaskEditor(TaskId),
+    /// Validate and persist the task editor fields.
+    SubmitTaskEditor(TaskEditorSubmission),
     /// Complete an active task.
     CompleteTask(TaskId),
     /// Permanently delete a task while retaining immutable completion snapshots.
@@ -45,6 +60,259 @@ pub enum UiIntent {
         /// Validated replacement details.
         update: TaskDetailsUpdate,
     },
+}
+
+/// Relative manual-order operation within one task placement.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReorderDirection {
+    /// Move one visible position toward the start.
+    Up,
+    /// Move one visible position toward the end.
+    Down,
+}
+
+/// Recurrence choice exposed by the task editor without leaking Slint indices.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum RecurrenceChoice {
+    /// No recurrence.
+    #[default]
+    None,
+    /// Repeat daily.
+    Daily,
+    /// Repeat weekly.
+    Weekly,
+    /// Repeat monthly.
+    Monthly,
+    /// Repeat every validated number of days.
+    CustomDays,
+}
+
+/// Repository-backed values used to populate the task editor.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TaskEditorState {
+    /// Edited task identity.
+    pub task_id: TaskId,
+    /// Current title.
+    pub title: String,
+    /// Current notes.
+    pub notes: String,
+    /// Current placement.
+    pub placement: TaskPlacement,
+    /// Optional ISO calendar date.
+    pub planned_on: String,
+    /// Optional RFC 3339 UTC instant.
+    pub due_at: String,
+    /// Timezone semantics retained for the due instant.
+    pub due_time_zone: String,
+    /// Optional RFC 3339 UTC instant.
+    pub reminder_at: String,
+    /// Timezone semantics retained for the reminder instant.
+    pub reminder_time_zone: String,
+    /// Current recurrence choice.
+    pub recurrence: RecurrenceChoice,
+    /// Custom-day interval, empty for other recurrence choices.
+    pub custom_interval_days: String,
+}
+
+impl From<&Task> for TaskEditorState {
+    fn from(task: &Task) -> Self {
+        let record = task.record();
+        let (recurrence, custom_interval_days) =
+            match record.recurrence.map(RecurrenceRule::pattern) {
+                None => (RecurrenceChoice::None, String::new()),
+                Some(RecurrencePattern::Daily) => (RecurrenceChoice::Daily, String::new()),
+                Some(RecurrencePattern::Weekly) => (RecurrenceChoice::Weekly, String::new()),
+                Some(RecurrencePattern::Monthly) => (RecurrenceChoice::Monthly, String::new()),
+                Some(RecurrencePattern::CustomDays { interval_days }) => {
+                    (RecurrenceChoice::CustomDays, interval_days.to_string())
+                }
+            };
+        Self {
+            task_id: record.id,
+            title: record.title.as_str().to_owned(),
+            notes: record.notes.clone(),
+            placement: record.placement,
+            planned_on: record
+                .planned_on
+                .map(|date| date.to_string())
+                .unwrap_or_default(),
+            due_at: format_scheduled(record.due.as_ref()),
+            due_time_zone: record
+                .due
+                .as_ref()
+                .map_or_else(String::new, |value| value.time_zone.as_str().to_owned()),
+            reminder_at: format_scheduled(record.reminder.as_ref()),
+            reminder_time_zone: record
+                .reminder
+                .as_ref()
+                .map_or_else(String::new, |value| value.time_zone.as_str().to_owned()),
+            recurrence,
+            custom_interval_days,
+        }
+    }
+}
+
+fn format_scheduled(value: Option<&ScheduledInstant>) -> String {
+    value
+        .and_then(|scheduled| {
+            OffsetDateTime::from_unix_timestamp(scheduled.at_utc.unix_seconds()).ok()
+        })
+        .and_then(|instant| instant.format(&Rfc3339).ok())
+        .unwrap_or_default()
+}
+
+/// Raw editor fields crossing from presentation into application validation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TaskEditorSubmission {
+    /// Edited task identity.
+    pub task_id: TaskId,
+    /// Replacement title.
+    pub title: String,
+    /// Replacement notes.
+    pub notes: String,
+    /// Replacement placement.
+    pub placement: TaskPlacement,
+    /// Optional `YYYY-MM-DD` planned date.
+    pub planned_on: String,
+    /// Optional RFC 3339 due instant.
+    pub due_at: String,
+    /// Required timezone when `due_at` is set.
+    pub due_time_zone: String,
+    /// Optional RFC 3339 reminder instant.
+    pub reminder_at: String,
+    /// Required timezone when `reminder_at` is set.
+    pub reminder_time_zone: String,
+    /// Replacement recurrence choice.
+    pub recurrence: RecurrenceChoice,
+    /// Custom-day interval when the corresponding recurrence is selected.
+    pub custom_interval_days: String,
+}
+
+impl TaskEditorSubmission {
+    /// Parses presentation strings into validated domain update values.
+    ///
+    /// # Errors
+    ///
+    /// Returns a field-specific editor validation failure.
+    pub fn into_update(self) -> Result<TaskDetailsUpdate, TaskEditorValidationError> {
+        let title = TaskTitle::new(self.title).map_err(TaskEditorValidationError::Domain)?;
+        let planned_on = parse_optional_date(&self.planned_on)?;
+        let due = parse_scheduled("Due", &self.due_at, &self.due_time_zone)?;
+        let reminder = parse_scheduled("Reminder", &self.reminder_at, &self.reminder_time_zone)?;
+        let recurrence = match self.recurrence {
+            RecurrenceChoice::None => None,
+            RecurrenceChoice::Daily => Some(RecurrenceRule::new(RecurrencePattern::Daily)),
+            RecurrenceChoice::Weekly => Some(RecurrenceRule::new(RecurrencePattern::Weekly)),
+            RecurrenceChoice::Monthly => Some(RecurrenceRule::new(RecurrencePattern::Monthly)),
+            RecurrenceChoice::CustomDays => {
+                let days = self
+                    .custom_interval_days
+                    .trim()
+                    .parse::<u16>()
+                    .map_err(|_| TaskEditorValidationError::InvalidCustomInterval)?;
+                Some(RecurrenceRule::new(RecurrencePattern::CustomDays {
+                    interval_days: days,
+                }))
+            }
+        }
+        .transpose()
+        .map_err(|_| TaskEditorValidationError::InvalidCustomInterval)?;
+        if let (Some(reminder), Some(due)) = (&reminder, &due)
+            && reminder.at_utc > due.at_utc
+        {
+            return Err(TaskEditorValidationError::ReminderAfterDue);
+        }
+        Ok(TaskDetailsUpdate {
+            title,
+            notes: self.notes,
+            placement: self.placement,
+            planned_on,
+            due,
+            reminder,
+            recurrence,
+        })
+    }
+}
+
+fn parse_optional_date(value: &str) -> Result<Option<LocalDate>, TaskEditorValidationError> {
+    let value = value.trim();
+    if value.is_empty() {
+        Ok(None)
+    } else {
+        LocalDate::parse_iso(value)
+            .map(Some)
+            .map_err(|_| TaskEditorValidationError::InvalidPlannedDate)
+    }
+}
+
+fn parse_scheduled(
+    label: &'static str,
+    at: &str,
+    time_zone: &str,
+) -> Result<Option<ScheduledInstant>, TaskEditorValidationError> {
+    let at = at.trim();
+    let time_zone = time_zone.trim();
+    if at.is_empty() && time_zone.is_empty() {
+        return Ok(None);
+    }
+    if at.is_empty() || time_zone.is_empty() {
+        return Err(TaskEditorValidationError::IncompleteSchedule(label));
+    }
+    let instant = OffsetDateTime::parse(at, &Rfc3339)
+        .map_err(|_| TaskEditorValidationError::InvalidTimestamp(label))?;
+    let time_zone = TimeZoneId::new(time_zone)
+        .map_err(|_| TaskEditorValidationError::InvalidTimeZone(label))?;
+    Ok(Some(ScheduledInstant {
+        at_utc: UtcTimestamp::from_unix_seconds(instant.unix_timestamp()),
+        time_zone,
+    }))
+}
+
+/// Stable field-level task editor validation errors.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TaskEditorValidationError {
+    /// Domain title or schedule invariant failed.
+    Domain(TaskDomainError),
+    /// Planned date was not a real ISO date.
+    InvalidPlannedDate,
+    /// One half of a timestamp/timezone pair was missing.
+    IncompleteSchedule(&'static str),
+    /// Timestamp was not valid RFC 3339.
+    InvalidTimestamp(&'static str),
+    /// Timezone identifier was structurally invalid.
+    InvalidTimeZone(&'static str),
+    /// Custom recurrence was not in the supported range.
+    InvalidCustomInterval,
+    /// Reminder occurred after due time.
+    ReminderAfterDue,
+}
+
+impl fmt::Display for TaskEditorValidationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Domain(error) => error.fmt(formatter),
+            Self::InvalidPlannedDate => formatter.write_str("Planned date must use YYYY-MM-DD."),
+            Self::IncompleteSchedule(label) => {
+                write!(
+                    formatter,
+                    "{label} time and timezone must both be filled or both be empty."
+                )
+            }
+            Self::InvalidTimestamp(label) => {
+                write!(
+                    formatter,
+                    "{label} time must be RFC 3339, including its UTC offset."
+                )
+            }
+            Self::InvalidTimeZone(label) => {
+                write!(formatter, "{label} timezone is invalid.")
+            }
+            Self::InvalidCustomInterval => {
+                formatter.write_str("Custom recurrence must be between 1 and 365 days.")
+            }
+            Self::ReminderAfterDue => formatter.write_str("Reminder cannot be after due time."),
+        }
+    }
 }
 
 /// Top-level routes shared by the application and UI adapter.
@@ -196,6 +464,12 @@ impl QuadrantsViewState {
 pub enum ApplicationEvent {
     /// Replace the active Quadrants projection.
     QuadrantsChanged(QuadrantsViewState),
+    /// Populate and open the dedicated task editor.
+    TaskEditorLoaded(TaskEditorState),
+    /// Close the task editor after a successful save.
+    TaskEditorSaved,
+    /// Keep the editor open and show a field-validation message.
+    TaskEditorValidationFailed(String),
     /// Show stable positive feedback.
     OperationSucceeded(String),
     /// Show a stable user-facing failure without exposing raw diagnostics.
@@ -211,7 +485,10 @@ pub struct UserFacingError {
 
 #[cfg(test)]
 mod tests {
-    use super::{NavigationRoute, QuadrantsViewState, ThemeMode};
+    use super::{
+        NavigationRoute, QuadrantsViewState, RecurrenceChoice, RecurrencePattern,
+        TaskEditorSubmission, TaskId, TaskPlacement, ThemeMode,
+    };
 
     #[test]
     fn route_indices_round_trip() {
@@ -230,5 +507,60 @@ mod tests {
     #[test]
     fn empty_quadrants_projection_is_well_formed() {
         assert_eq!(QuadrantsViewState::default().inbox.len(), 0);
+    }
+
+    #[test]
+    fn task_editor_parses_dates_offsets_timezones_and_recurrence() {
+        let update = TaskEditorSubmission {
+            task_id: TaskId::generate(),
+            title: "  Edited task  ".to_owned(),
+            notes: "Details".to_owned(),
+            placement: TaskPlacement::Inbox,
+            planned_on: "2026-09-03".to_owned(),
+            due_at: "2026-09-03T09:00:00+08:00".to_owned(),
+            due_time_zone: "Asia/Shanghai".to_owned(),
+            reminder_at: "2026-09-03T08:30:00+08:00".to_owned(),
+            reminder_time_zone: "Asia/Shanghai".to_owned(),
+            recurrence: RecurrenceChoice::CustomDays,
+            custom_interval_days: "14".to_owned(),
+        }
+        .into_update()
+        .expect("valid editor fields");
+
+        assert_eq!(update.title.as_str(), "Edited task");
+        assert_eq!(
+            update.planned_on.expect("planned date").to_string(),
+            "2026-09-03"
+        );
+        assert_eq!(
+            update.due.expect("due time").time_zone.as_str(),
+            "Asia/Shanghai"
+        );
+        assert_eq!(
+            update.recurrence.expect("recurrence").pattern(),
+            RecurrencePattern::CustomDays { interval_days: 14 }
+        );
+    }
+
+    #[test]
+    fn task_editor_rejects_incomplete_and_inverted_schedules() {
+        let base = TaskEditorSubmission {
+            task_id: TaskId::generate(),
+            title: "Task".to_owned(),
+            notes: String::new(),
+            placement: TaskPlacement::Inbox,
+            planned_on: String::new(),
+            due_at: "2026-09-03T09:00:00+08:00".to_owned(),
+            due_time_zone: "Asia/Shanghai".to_owned(),
+            reminder_at: "2026-09-03T10:00:00+08:00".to_owned(),
+            reminder_time_zone: "Asia/Shanghai".to_owned(),
+            recurrence: RecurrenceChoice::None,
+            custom_interval_days: String::new(),
+        };
+        assert!(base.clone().into_update().is_err());
+
+        let mut incomplete = base;
+        incomplete.reminder_at.clear();
+        assert!(incomplete.into_update().is_err());
     }
 }

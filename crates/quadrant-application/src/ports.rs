@@ -5,7 +5,7 @@ use std::{error::Error, fmt, time::SystemTime};
 use quadrant_domain::{NewTask, Task, TaskDetailsUpdate, TaskId, TaskPlacement, UtcTimestamp};
 use uuid::Uuid;
 
-use crate::ThemeMode;
+use crate::{ReorderDirection, ThemeMode};
 
 /// Semantic repository operation used for error classification.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -105,6 +105,18 @@ pub trait TaskRepository: Send + Sync {
         &self,
         id: TaskId,
         placement: TaskPlacement,
+        now: UtcTimestamp,
+    ) -> Result<Task, RepositoryError>;
+
+    /// Moves an active task one position within its current placement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an update failure or a missing/invalid task error.
+    fn reorder_task(
+        &self,
+        id: TaskId,
+        direction: ReorderDirection,
         now: UtcTimestamp,
     ) -> Result<Task, RepositoryError>;
 

@@ -16,6 +16,7 @@ import { SettingsView } from "views/settings.slint";
 import { AboutView } from "views/about.slint";
 
 export { QuickAddWindow } from "components/quick_add.slint";
+export { TaskEditorWindow } from "components/task_editor.slint";
 
 export component MainWindow inherits Window {
     title: "Quadrant";
@@ -46,6 +47,8 @@ export component MainWindow inherits Window {
     callback quick_add_requested;
     callback theme_selected(ThemeMode);
     callback task_move_requested(string, int);
+    callback task_edit_requested(string);
+    callback task_reorder_requested(string, int);
     callback task_complete_requested(string);
     callback task_delete_confirmed(string);
     callback window_close;
@@ -117,6 +120,8 @@ export component MainWindow inherits Window {
                         q3_tasks: root.q3_tasks;
                         q4_tasks: root.q4_tasks;
                         move_requested(id, destination) => { root.task_move_requested(id, destination); }
+                        edit_requested(id) => { root.task_edit_requested(id); }
+                        reorder_requested(id, direction) => { root.task_reorder_requested(id, direction); }
                         complete_requested(id) => { root.task_complete_requested(id); }
                         delete_requested(id) => {
                             root.pending_delete_id = id;

@@ -16,10 +16,12 @@ component TaskCard inherits Rectangle {
     in property <TaskRow> task;
     in property <int> destination;
     callback move_requested(string, int);
+    callback edit_requested(string);
+    callback reorder_requested(string, int);
     callback complete_requested(string);
     callback delete_requested(string);
 
-    height: 82px;
+    height: 88px;
     background: Theme.input_bg;
     border-width: 1px;
     border-color: Theme.input_border;
@@ -29,12 +31,20 @@ component TaskCard inherits Rectangle {
         padding: 8px;
         spacing: 6px;
 
-        Text {
-            text: root.task.title;
-            color: Theme.text_primary;
-            font-size: 12px;
-            font-weight: 500;
-            overflow: elide;
+        HorizontalLayout {
+            spacing: 4px;
+            Text {
+                text: root.task.title;
+                color: Theme.text_primary;
+                font-size: 12px;
+                font-weight: 500;
+                overflow: elide;
+                horizontal-stretch: 1;
+            }
+            FluentButton { min-width: 28px; text: "Up"; clicked => { root.reorder_requested(root.task.id, -1); } }
+            FluentButton { min-width: 28px; text: "Dn"; clicked => { root.reorder_requested(root.task.id, 1); } }
+            FluentButton { min-width: 32px; text: "Edit"; clicked => { root.edit_requested(root.task.id); } }
+            FluentButton { min-width: 24px; text: "×"; danger: true; clicked => { root.delete_requested(root.task.id); } }
         }
 
         HorizontalLayout {
@@ -46,7 +56,6 @@ component TaskCard inherits Rectangle {
             SegmentButton { min-width: 24px; text: "4"; selected: root.destination == 4; clicked => { root.move_requested(root.task.id, 4); } }
             Rectangle { horizontal-stretch: 1; }
             FluentButton { min-width: 44px; text: "Done"; primary: true; clicked => { root.complete_requested(root.task.id); } }
-            FluentButton { min-width: 26px; text: "×"; danger: true; clicked => { root.delete_requested(root.task.id); } }
         }
     }
 }
@@ -59,6 +68,8 @@ component TaskColumn inherits SurfaceCard {
     in property <int> destination;
     in property <[TaskRow]> tasks;
     callback move_requested(string, int);
+    callback edit_requested(string);
+    callback reorder_requested(string, int);
     callback complete_requested(string);
     callback delete_requested(string);
 
@@ -96,6 +107,8 @@ component TaskColumn inherits SurfaceCard {
                     task: task;
                     destination: root.destination;
                     move_requested(id, destination) => { root.move_requested(id, destination); }
+                    edit_requested(id) => { root.edit_requested(id); }
+                    reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
                     complete_requested(id) => { root.complete_requested(id); }
                     delete_requested(id) => { root.delete_requested(id); }
                 }
@@ -117,6 +130,8 @@ export component QuadrantsView inherits Rectangle {
     in property <[TaskRow]> q3_tasks;
     in property <[TaskRow]> q4_tasks;
     callback move_requested(string, int);
+    callback edit_requested(string);
+    callback reorder_requested(string, int);
     callback complete_requested(string);
     callback delete_requested(string);
 
@@ -144,6 +159,8 @@ export component QuadrantsView inherits Rectangle {
                 destination: 0;
                 tasks: root.inbox_tasks;
                 move_requested(id, destination) => { root.move_requested(id, destination); }
+                edit_requested(id) => { root.edit_requested(id); }
+                reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
                 complete_requested(id) => { root.complete_requested(id); }
                 delete_requested(id) => { root.delete_requested(id); }
             }
@@ -158,6 +175,8 @@ export component QuadrantsView inherits Rectangle {
                         code: "Q1"; title: "Important + Urgent"; subtitle: "Do now"; accent: #d13438;
                         destination: 1; tasks: root.q1_tasks;
                         move_requested(id, destination) => { root.move_requested(id, destination); }
+                        edit_requested(id) => { root.edit_requested(id); }
+                        reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
                         complete_requested(id) => { root.complete_requested(id); }
                         delete_requested(id) => { root.delete_requested(id); }
                     }
@@ -165,6 +184,8 @@ export component QuadrantsView inherits Rectangle {
                         code: "Q2"; title: "Important + Not urgent"; subtitle: "Plan deliberately"; accent: #107c10;
                         destination: 2; tasks: root.q2_tasks;
                         move_requested(id, destination) => { root.move_requested(id, destination); }
+                        edit_requested(id) => { root.edit_requested(id); }
+                        reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
                         complete_requested(id) => { root.complete_requested(id); }
                         delete_requested(id) => { root.delete_requested(id); }
                     }
@@ -176,6 +197,8 @@ export component QuadrantsView inherits Rectangle {
                         code: "Q3"; title: "Not important + Urgent"; subtitle: "Delegate or contain"; accent: #ca5010;
                         destination: 3; tasks: root.q3_tasks;
                         move_requested(id, destination) => { root.move_requested(id, destination); }
+                        edit_requested(id) => { root.edit_requested(id); }
+                        reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
                         complete_requested(id) => { root.complete_requested(id); }
                         delete_requested(id) => { root.delete_requested(id); }
                     }
@@ -183,6 +206,8 @@ export component QuadrantsView inherits Rectangle {
                         code: "Q4"; title: "Not important + Not urgent"; subtitle: "Reduce or remove"; accent: #5c2d91;
                         destination: 4; tasks: root.q4_tasks;
                         move_requested(id, destination) => { root.move_requested(id, destination); }
+                        edit_requested(id) => { root.edit_requested(id); }
+                        reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
                         complete_requested(id) => { root.complete_requested(id); }
                         delete_requested(id) => { root.delete_requested(id); }
                     }
