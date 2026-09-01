@@ -12,6 +12,7 @@ This file is ordered by implementation dependency, not by speculative feature de
 6. [x] Create `quadrant-ui` binding boundary.
 7. [x] Vendor/adapt Sidebar + Theme + Common primitives from wsl-dashboard baseline commit with SPDX retained.
 8. [x] Create semantic icon abstraction suitable for Windows/Linux/macOS.
+9. [x] Retain CI as a manual-only fallback; use local fmt/clippy/test before push.
 
 ## P0 — Product parity inventory
 

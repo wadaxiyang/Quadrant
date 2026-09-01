@@ -4,7 +4,7 @@ Updated: **2026-08-31**
 
 ## Current state
 
-M0 is complete and verified. The working tree now contains—and `.gitignore` no longer excludes—the bootstrap docs, a full GPL-3.0-only license, third-party notices, a Rust 2024 Cargo workspace, six target crates, a compiled Slint UI shell, vendored cross-platform Fluent SVG icons, and baseline CI. These files remain uncommitted for the user to review.
+M0 is complete and verified. The working tree now contains—and `.gitignore` no longer excludes—the bootstrap docs, a full GPL-3.0-only license, third-party notices, a Rust 2024 Cargo workspace, six target crates, a compiled Slint UI shell, vendored cross-platform Fluent SVG icons, and an optional manual CI workflow. These files remain uncommitted for the user to review.
 
 The active UI has a wsl-dashboard-derived 54/200px animated Sidebar with all seven required routes. Content is intentionally placeholder-only; no task persistence or production business logic has been added.
 
@@ -18,7 +18,7 @@ The active UI has a wsl-dashboard-derived 54/200px animated Sidebar with all sev
 - Platform foundation: normalized `PlatformCapabilities`
 - Storage crate: boundary marker only; `rusqlite` and migrations are not implemented
 - Provenance: `THIRD-PARTY-NOTICES.md`, `docs/09_SOURCE_MAP.md`, per-file SPDX headers, `assets/icons/LICENSE-MIT`
-- CI: fmt, strict clippy, tests on Linux; target checks on Windows and macOS
+- CI: optional manual-only workflow; pushes and pull requests do not trigger Actions
 
 ## Verification completed
 
@@ -51,6 +51,7 @@ Do not begin M2 storage/domain expansion until the M1 shell boundary is coherent
 - wsl-dashboard pinned UI source: `948589a255a4bd8a3ff9c3de49e2e13109378fcd`
 - Microsoft Fluent UI System Icons pinned source: `4d685f77b2cb8f3f412a74ec8d920c8c91149528`
 - stable Rust policy, developer toolchain 1.94.1, MSRV 1.92, committed Cargo.lock
+- local fmt/clippy/test verification before push; GitHub Actions only through explicit `workflow_dispatch`
 
 ## Local-only artifacts
 

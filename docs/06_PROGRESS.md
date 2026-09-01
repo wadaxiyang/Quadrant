@@ -16,7 +16,7 @@ Legend: `[ ]` not started, `[-]` in progress, `[x]` complete, `[!]` blocked.
 - [x] Isolate legacy .NET source at `legacy/dotnet-reference/` as read-only reference
 - [x] Record exact legacy feature inventory for the first task workflow in source map
 - [x] Vendor/adapt first wsl-dashboard UI primitives with provenance
-- [x] Add baseline CI for fmt/clippy/test and target builds
+- [x] Add optional manual CI for fmt/clippy/test and target builds; local verification is primary
 
 ## M1 — UI shell
 

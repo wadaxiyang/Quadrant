@@ -13,7 +13,7 @@ Last updated: **2026-08-31**
 
 ## Rewrite status
 
-M0 is complete. The repository now contains a Rust 2024 workspace with all six target crates, a compiled Slint application shell, GPL-3.0-only licensing, provenance records, cross-platform SVG icons, and baseline CI. The legacy .NET 10/WPF implementation remains under `legacy/dotnet-reference/` as a read-only product reference.
+M0 is complete. The repository now contains a Rust 2024 workspace with all six target crates, a compiled Slint application shell, GPL-3.0-only licensing, provenance records, cross-platform SVG icons, and an optional manual CI workflow. The legacy .NET 10/WPF implementation remains under `legacy/dotnet-reference/` as a read-only product reference.
 
 There is **no need to migrate or remain compatible with the old database**, because the application has not been released to users.
 
@@ -71,7 +71,7 @@ Workspace crates:
 
 UI source lives under root `ui/`; migrations under root `migrations/`; persistent agent memory under `docs/`.
 
-The workspace uses Cargo resolver 3, declares Rust 1.92 as its MSRV, pins the repository developer toolchain to stable Rust 1.94.1, checks rolling stable in CI, and pins Slint/`slint-build` to 1.17.1 for the initial shell.
+The workspace uses Cargo resolver 3, declares Rust 1.92 as its MSRV, pins the repository developer toolchain to stable Rust 1.94.1, and pins Slint/`slint-build` to 1.17.1 for the initial shell. Required verification runs locally before push; GitHub Actions is manual-only and is not triggered by pushes or pull requests.
 
 The first implemented boundary types are `TaskPlacement`/`Quadrant` in `quadrant-domain`, `NavigationRoute`/`UiIntent` in `quadrant-application`, and `PlatformCapabilities` in `quadrant-platform`. These are foundations, not the M2 domain implementation.
 

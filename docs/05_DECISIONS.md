@@ -93,7 +93,7 @@ Quadrant may reproduce the Fluent icon language of wsl-dashboard but must not re
 **Status:** Accepted  
 **Date:** 2026-08-31
 
-Quadrant pins the repository developer toolchain to stable Rust 1.94.1 through `rust-toolchain.toml`, while CI also checks the current stable channel. Workspace packages declare Rust 1.92 as the initial minimum supported Rust version, matching the pinned wsl-dashboard baseline's toolchain floor. `Cargo.lock` is committed for reproducible application builds.
+Quadrant pins the repository developer toolchain to stable Rust 1.94.1 through `rust-toolchain.toml`; the optional manual CI workflow checks the current stable channel when explicitly run. Workspace packages declare Rust 1.92 as the initial minimum supported Rust version, matching the pinned wsl-dashboard baseline's toolchain floor. `Cargo.lock` is committed for reproducible application builds.
 
 ## D-014 — Pin initial Slint pipeline to 1.17.1
 
@@ -108,3 +108,11 @@ The M0 UI pipeline pins `slint` and `slint-build` to 1.17.1, the version used by
 **Date:** 2026-08-31
 
 Quadrant's first cross-platform icon assets come from Microsoft Fluent UI System Icons commit `4d685f77b2cb8f3f412a74ec8d920c8c91149528` (release 1.1.339), licensed MIT. The UI consumes them through semantic properties in `ui/icons.slint`; exact files and license copies are recorded in `09_SOURCE_MAP.md` and `THIRD-PARTY-NOTICES.md`.
+
+## D-016 — Local verification is primary; GitHub Actions is manual-only
+
+**Status:** Accepted
+
+**Date:** 2026-08-31
+
+Formatting, clippy, tests, and relevant target checks are run locally before pushing. `.github/workflows/ci.yml` is retained only as an optional `workflow_dispatch` workflow for explicit manual runs. Pushes and pull requests must not automatically consume GitHub Actions CI minutes.
