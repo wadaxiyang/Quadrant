@@ -8,18 +8,19 @@ use std::{
 };
 
 use quadrant_application::{
-    ApplicationEvent, DesktopEvent, DesktopSettings, FocusMode, FocusSession, FocusStartRequest,
-    FocusStatus, FocusViewState, NavigationRoute, PomodoroKind, PomodoroSettings, Quadrant,
-    QuadrantsViewState, QuickAddSubmission, RecurrenceChoice, ReorderDirection, SystemTheme,
-    TaskEditorState, TaskEditorSubmission, TaskId, TaskPlacement,
-    ThemeMode as ApplicationThemeMode, TodayViewState, UiIntent, UtcTimestamp, WindowCloseBehavior,
-    WindowMinimizeBehavior,
+    ApplicationEvent, CompletedViewState, DesktopEvent, DesktopSettings, FocusMode, FocusSession,
+    FocusStartRequest, FocusStatus, FocusViewState, NavigationRoute, PomodoroKind,
+    PomodoroSettings, Quadrant, QuadrantsViewState, QuickAddSubmission, RecurrenceChoice,
+    ReorderDirection, ReviewRange, ReviewViewState, SystemTheme, TaskEditorState,
+    TaskEditorSubmission, TaskId, TaskPlacement, ThemeMode as ApplicationThemeMode, TodayViewState,
+    UiIntent, UtcTimestamp, WindowCloseBehavior, WindowMinimizeBehavior,
 };
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, TimerMode, VecModel};
 
 use crate::{
-    FocusTaskRow, MainWindow, QuickAddWindow, TaskEditorWindow, TaskRow,
-    ThemeMode as SlintThemeMode, ToastKind, TodayTaskRow,
+    CompletedTaskRow, FocusTaskRow, MainWindow, QuickAddWindow, ReviewActivityRow,
+    ReviewQuadrantRow, ReviewRecentRow, TaskEditorWindow, TaskRow, ThemeMode as SlintThemeMode,
+    ToastKind, TodayTaskRow,
 };
 
 /// Initial state supplied by the composition root.
@@ -35,6 +36,10 @@ pub struct UiShellConfig {
     pub today: TodayViewState,
     /// Initial repository-backed Focus projection.
     pub focus: FocusViewState,
+    /// Initial repository-backed Review projection.
+    pub review: ReviewViewState,
+    /// Initial bounded Completed projection.
+    pub completed: CompletedViewState,
     /// Persisted desktop lifecycle policy.
     pub desktop_settings: DesktopSettings,
 }
@@ -92,6 +97,8 @@ impl UiShell {
         apply_quadrants_state(&main_window, &config.quadrants);
         apply_today_state(&main_window, &config.today);
         apply_focus_state(&main_window, &config.focus, &focus_session);
+        apply_review_state(&main_window, &config.review);
+        apply_completed_state(&main_window, &config.completed);
         bind_main_window(&main_window, &quick_add, &task_editor, &intent_handler);
         bind_quick_add(&quick_add, Rc::clone(&intent_handler));
         bind_task_editor(&task_editor, intent_handler);
@@ -255,7 +262,41 @@ fn bind_main_window(
 
     bind_task_actions(main_window, intent_handler);
     bind_focus_actions(main_window, intent_handler);
+    bind_history_actions(main_window, intent_handler);
     bind_main_window_controls(main_window);
+}
+
+fn bind_history_actions(main_window: &MainWindow, intent_handler: &Rc<dyn Fn(UiIntent)>) {
+    let range_handler = Rc::clone(intent_handler);
+    let range_main = main_window.as_weak();
+    main_window.on_review_range_selected(move |index| {
+        if let Some(range) = ReviewRange::from_index(index) {
+            range_handler(UiIntent::SetReviewRange(range));
+        } else {
+            show_invalid_history_action(&range_main);
+        }
+    });
+
+    let reopen_handler = Rc::clone(intent_handler);
+    let reopen_main = main_window.as_weak();
+    main_window.on_completed_reopen_requested(move |id| match TaskId::from_str(id.as_str()) {
+        Ok(task_id) => reopen_handler(UiIntent::ReopenTask(task_id)),
+        Err(_) => show_invalid_history_action(&reopen_main),
+    });
+
+    let load_handler = Rc::clone(intent_handler);
+    main_window.on_completed_load_more_requested(move || {
+        load_handler(UiIntent::LoadMoreCompleted);
+    });
+}
+
+fn show_invalid_history_action(main: &slint::Weak<MainWindow>) {
+    if let Some(main) = main.upgrade() {
+        main.invoke_show_toast(
+            SharedString::from("That history action is no longer valid."),
+            ToastKind::Error,
+        );
+    }
 }
 
 fn bind_focus_actions(main_window: &MainWindow, intent_handler: &Rc<dyn Fn(UiIntent)>) {
@@ -571,6 +612,8 @@ fn apply_application_event(
         ApplicationEvent::QuadrantsChanged(state) => apply_quadrants_state(main, &state),
         ApplicationEvent::TodayChanged(state) => apply_today_state(main, &state),
         ApplicationEvent::FocusChanged(state) => apply_focus_state(main, &state, focus_session),
+        ApplicationEvent::ReviewChanged(state) => apply_review_state(main, &state),
+        ApplicationEvent::CompletedChanged(state) => apply_completed_state(main, &state),
         ApplicationEvent::ReminderDue(alert) => {
             main.invoke_show_toast(
                 SharedString::from(format!("Reminder: {}", alert.title)),
@@ -757,6 +800,192 @@ fn format_duration(seconds: u64) -> String {
     } else {
         format!("{minutes}m")
     }
+}
+
+fn apply_review_state(main: &MainWindow, state: &ReviewViewState) {
+    main.set_review_range(state.range.index());
+    main.set_review_completed_value(SharedString::from(
+        state.current.completed_tasks.to_string(),
+    ));
+    main.set_review_completed_hint(SharedString::from(comparison_hint(
+        state.current.completed_tasks,
+        state.previous.map(|value| value.completed_tasks),
+    )));
+    main.set_review_focus_value(SharedString::from(format_duration(
+        state.current.focus_seconds,
+    )));
+    main.set_review_focus_hint(SharedString::from(comparison_hint(
+        state.current.focus_seconds,
+        state.previous.map(|value| value.focus_seconds),
+    )));
+    main.set_review_sessions_value(SharedString::from(state.current.focus_sessions.to_string()));
+    main.set_review_sessions_hint(SharedString::from(comparison_hint(
+        state.current.focus_sessions,
+        state.previous.map(|value| value.focus_sessions),
+    )));
+    main.set_review_average_value(SharedString::from(format_duration(
+        state.current.average_focus_seconds(),
+    )));
+    main.set_review_state_summary(SharedString::from(format!(
+        "Inbox {} · Overdue {}",
+        state.current_inbox_count, state.current_overdue_count
+    )));
+    main.set_review_activity(review_activity_model(state));
+    main.set_review_activity_completed_max(saturating_i32(state.completed_activity_max));
+    main.set_review_activity_focus_max(saturating_i32(state.focus_activity_max));
+    main.set_review_quadrants(review_quadrant_model(state));
+    main.set_review_quadrant_completed_max(saturating_i32(
+        state
+            .quadrants
+            .iter()
+            .map(|value| value.completed)
+            .max()
+            .unwrap_or(0)
+            .max(1),
+    ));
+    main.set_review_quadrant_focus_max(saturating_i32(
+        state
+            .quadrants
+            .iter()
+            .map(|value| value.focus_seconds)
+            .max()
+            .unwrap_or(0)
+            .max(1),
+    ));
+    main.set_review_longest_focus(SharedString::from(format_duration(
+        state.focus.longest_session_seconds,
+    )));
+    main.set_review_top_task(SharedString::from(
+        state
+            .focus
+            .most_focused_task_title
+            .as_deref()
+            .unwrap_or("No linked task"),
+    ));
+    main.set_review_top_task_detail(SharedString::from(
+        if state.focus.most_focused_task_title.is_some() {
+            format!(
+                "{} across {} session{}",
+                format_duration(state.focus.most_focused_task_seconds),
+                state.focus.most_focused_task_sessions,
+                if state.focus.most_focused_task_sessions == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            )
+        } else {
+            "Complete linked Focus sessions to see a leader.".to_owned()
+        },
+    ));
+    main.set_review_top_quadrant(SharedString::from(
+        state.focus.most_focused_quadrant.map_or_else(
+            || "No quadrant Focus yet".to_owned(),
+            |quadrant| {
+                format!(
+                    "Top quadrant: {} · {}",
+                    quadrant_label(quadrant),
+                    format_duration(state.focus.most_focused_quadrant_seconds)
+                )
+            },
+        ),
+    ));
+    main.set_review_recent(review_recent_model(state));
+}
+
+fn comparison_hint(current: u64, previous: Option<u64>) -> String {
+    previous.map_or_else(
+        || "All retained history".to_owned(),
+        |previous| {
+            let delta = i128::from(current) - i128::from(previous);
+            format!("{delta:+} vs previous period")
+        },
+    )
+}
+
+fn review_activity_model(state: &ReviewViewState) -> ModelRc<ReviewActivityRow> {
+    let rows = state
+        .activity
+        .iter()
+        .map(|point| ReviewActivityRow {
+            label: SharedString::from(activity_label(state.range, point.date)),
+            completed: saturating_i32(point.completed),
+            focus_seconds: saturating_i32(point.focus_seconds),
+        })
+        .collect::<Vec<_>>();
+    ModelRc::from(Rc::new(VecModel::from(rows)))
+}
+
+fn activity_label(range: ReviewRange, date: quadrant_application::LocalDate) -> String {
+    if range == ReviewRange::AllTime {
+        format!("{:04}-{:02}", date.year(), date.month())
+    } else {
+        format!("{:02}-{:02}", date.month(), date.day())
+    }
+}
+
+fn review_quadrant_model(state: &ReviewViewState) -> ModelRc<ReviewQuadrantRow> {
+    let rows = state
+        .quadrants
+        .iter()
+        .map(|value| ReviewQuadrantRow {
+            label: SharedString::from(value.quadrant.map_or("Inbox / Unlinked", quadrant_label)),
+            completed: saturating_i32(value.completed),
+            focus_seconds: saturating_i32(value.focus_seconds),
+            focus_text: SharedString::from(format_duration(value.focus_seconds)),
+        })
+        .collect::<Vec<_>>();
+    ModelRc::from(Rc::new(VecModel::from(rows)))
+}
+
+fn review_recent_model(state: &ReviewViewState) -> ModelRc<ReviewRecentRow> {
+    let rows = state
+        .recent_completed
+        .iter()
+        .map(|item| {
+            let placement = item.quadrant.map_or("Inbox", quadrant_label);
+            let overdue = if item.was_overdue {
+                " · was overdue"
+            } else {
+                ""
+            };
+            ReviewRecentRow {
+                title: SharedString::from(item.title.as_str()),
+                metadata: SharedString::from(format!(
+                    "{} · {placement}{overdue}",
+                    item.completed_local_date
+                )),
+            }
+        })
+        .collect::<Vec<_>>();
+    ModelRc::from(Rc::new(VecModel::from(rows)))
+}
+
+fn apply_completed_state(main: &MainWindow, state: &CompletedViewState) {
+    let rows = state
+        .tasks
+        .iter()
+        .map(|task| CompletedTaskRow {
+            id: SharedString::from(task.id.to_string()),
+            title: SharedString::from(task.title.as_str()),
+            metadata: SharedString::from(task.metadata.as_str()),
+        })
+        .collect::<Vec<_>>();
+    main.set_completed_tasks(ModelRc::from(Rc::new(VecModel::from(rows))));
+    main.set_completed_has_more(state.has_more);
+}
+
+const fn quadrant_label(quadrant: Quadrant) -> &'static str {
+    match quadrant {
+        Quadrant::Q1 => "Q1",
+        Quadrant::Q2 => "Q2",
+        Quadrant::Q3 => "Q3",
+        Quadrant::Q4 => "Q4",
+    }
+}
+
+fn saturating_i32(value: u64) -> i32 {
+    i32::try_from(value).unwrap_or(i32::MAX)
 }
 
 fn focus_task_model(tasks: &[quadrant_application::FocusTaskSummary]) -> ModelRc<FocusTaskRow> {

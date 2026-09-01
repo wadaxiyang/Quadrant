@@ -3,17 +3,23 @@
 #![forbid(unsafe_code)]
 
 mod focus;
+mod history;
 mod ports;
 mod reminders;
 mod tasks;
 mod today;
 
 pub use focus::{FocusApplication, FocusScheduler, FocusSchedulerHandle};
+pub use history::{
+    CompletedTaskSummary, CompletedViewState, HistoryApplication, HistoryLoadError,
+    ReviewActivityPoint, ReviewDateRange, ReviewFocusHighlights, ReviewQuadrantValue, ReviewQuery,
+    ReviewQueryData, ReviewRange, ReviewRecentCompletion, ReviewTotals, ReviewViewState,
+};
 pub use ports::{
-    AutostartError, AutostartService, CalendarError, Clock, FocusRepository,
+    AutostartError, AutostartService, CalendarError, Clock, CompletedRepository, FocusRepository,
     FocusSessionIdGenerator, ReminderRepository, RepositoryError, RepositoryOperation,
-    SettingsRepository, SystemClock, TaskIdGenerator, TaskRepository, TodayContextSource,
-    TodayRepository, UuidFocusSessionIdGenerator, UuidTaskIdGenerator,
+    ReviewRepository, SettingsRepository, SystemClock, TaskIdGenerator, TaskRepository,
+    TodayContextSource, TodayRepository, UuidFocusSessionIdGenerator, UuidTaskIdGenerator,
 };
 pub use quadrant_domain::{
     FocusDomainError, FocusMode, FocusSession, FocusSessionId, FocusSessionRecord, FocusStatus,
@@ -57,6 +63,10 @@ pub enum UiIntent {
     CancelFocus,
     /// Persist validated Pomodoro defaults and automatic continuation choices.
     SetPomodoroSettings(PomodoroSettings),
+    /// Change the active Review date range.
+    SetReviewRange(ReviewRange),
+    /// Increase the bounded Completed history page size.
+    LoadMoreCompleted,
     /// Move an active task into Inbox or a quadrant.
     MoveTask {
         /// Task to move.
@@ -77,6 +87,8 @@ pub enum UiIntent {
     SubmitTaskEditor(TaskEditorSubmission),
     /// Complete an active task.
     CompleteTask(TaskId),
+    /// Restore a completed task and revert its latest active completion event.
+    ReopenTask(TaskId),
     /// Permanently delete a task while retaining immutable completion snapshots.
     DeleteTask(TaskId),
     /// Persist edited task details.
@@ -97,6 +109,7 @@ impl UiIntent {
             Self::SubmitQuickAdd(_)
                 | Self::SubmitTaskEditor(_)
                 | Self::CompleteTask(_)
+                | Self::ReopenTask(_)
                 | Self::DeleteTask(_)
                 | Self::UpdateTask { .. }
         )
@@ -114,6 +127,17 @@ impl UiIntent {
                 | Self::FinishFocus
                 | Self::CancelFocus
                 | Self::SetPomodoroSettings(_)
+        )
+    }
+
+    /// Returns whether the Review/Completed query service owns this intent.
+    #[must_use]
+    pub const fn is_history_intent(&self) -> bool {
+        matches!(
+            self,
+            Self::Navigate(NavigationRoute::Review | NavigationRoute::Completed)
+                | Self::SetReviewRange(_)
+                | Self::LoadMoreCompleted
         )
     }
 
@@ -140,8 +164,18 @@ impl UiIntent {
                 | Self::SubmitTaskEditor(_)
                 | Self::MoveTask { .. }
                 | Self::CompleteTask(_)
+                | Self::ReopenTask(_)
                 | Self::DeleteTask(_)
                 | Self::UpdateTask { .. }
+        )
+    }
+
+    /// Returns whether Review or Completed projections may have changed.
+    #[must_use]
+    pub const fn affects_history_projection(&self) -> bool {
+        matches!(
+            self,
+            Self::CompleteTask(_) | Self::ReopenTask(_) | Self::DeleteTask(_) | Self::FinishFocus
         )
     }
 }
@@ -640,6 +674,10 @@ pub enum ApplicationEvent {
     TodayChanged(TodayViewState),
     /// Replace the repository-backed Focus projection.
     FocusChanged(FocusViewState),
+    /// Replace the Review dashboard projection.
+    ReviewChanged(ReviewViewState),
+    /// Replace the bounded Completed history projection.
+    CompletedChanged(CompletedViewState),
     /// Surface an application reminder through the active presentation adapter.
     ReminderDue(ReminderAlert),
     /// Populate and open the dedicated task editor.

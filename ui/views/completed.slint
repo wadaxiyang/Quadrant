@@ -1,19 +1,68 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { PageHeader, EmptyState } from "../components/page_shell.slint";
+import { FluentButton, SurfaceCard } from "../components/common.slint";
+
+export struct CompletedTaskRow {
+    id: string,
+    title: string,
+    metadata: string,
+}
+
+component CompletedTaskCard inherits SurfaceCard {
+    in property <CompletedTaskRow> task;
+    callback reopen_requested(string);
+    callback delete_requested(string);
+    height: 68px;
+    HorizontalLayout {
+        padding: 10px; spacing: 8px;
+        VerticalLayout {
+            horizontal-stretch: 1; spacing: 4px;
+            Text { text: root.task.title; color: Theme.text_primary; font-size: 13px; font-weight: 600; overflow: elide; }
+            Text { text: root.task.metadata; color: Theme.text_secondary; font-size: 10px; overflow: elide; }
+        }
+        FluentButton { width: 78px; text: "Restore"; primary: true; clicked => { root.reopen_requested(root.task.id); } }
+        FluentButton { width: 92px; text: "Delete"; danger: true; clicked => { root.delete_requested(root.task.id); } }
+    }
+}
 
 export component CompletedView inherits Rectangle {
-    VerticalLayout {
-        padding: UiConstants.page_padding;
-        spacing: 16px;
-        PageHeader { title: "Completed"; subtitle: "Bounded history with explicit reopen behavior."; }
-        EmptyState {
-            vertical-stretch: 1;
-            title: "Completed history will stay bounded";
-            message: "This view will page through persistent completion history instead of loading everything into Slint.";
-            milestone: "Completed queries and reopen behavior arrive in M5";
+    in property <[CompletedTaskRow]> tasks;
+    in property <bool> has_more: false;
+    callback reopen_requested(string);
+    callback delete_requested(string);
+    callback load_more_requested;
+
+    ScrollView {
+        width: 100%; height: 100%;
+        VerticalLayout {
+            padding: UiConstants.page_padding; spacing: 12px;
+            PageHeader { title: "Completed"; subtitle: "Restore unfinished work or permanently remove the task row."; }
+            if root.tasks.length == 0: EmptyState {
+                height: 290px;
+                title: "No completed tasks";
+                message: "Completed tasks remain here until restored or deleted. Review snapshots survive deletion.";
+                milestone: "History is repository-backed and bounded";
+            }
+            for task in root.tasks: CompletedTaskCard {
+                task: task;
+                reopen_requested(id) => { root.reopen_requested(id); }
+                delete_requested(id) => { root.delete_requested(id); }
+            }
+            if root.has_more: FluentButton {
+                width: 132px; text: "Load 50 more";
+                clicked => { root.load_more_requested(); }
+            }
+            if root.tasks.length > 0 && !root.has_more: Text {
+                text: "End of completed history";
+                color: Theme.text_secondary;
+                font-size: 10px;
+                horizontal-alignment: center;
+            }
         }
     }
 }

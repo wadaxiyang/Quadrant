@@ -9,6 +9,7 @@ use quadrant_domain::{
 use uuid::Uuid;
 
 use crate::{DesktopSettings, FocusDaySummary, ReorderDirection, ThemeMode, TodayContext};
+use crate::{ReviewQuery, ReviewQueryData};
 
 /// Semantic repository operation used for error classification.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -39,6 +40,8 @@ pub enum RepositoryOperation {
     ReadFocus,
     /// Creating or transitioning a focus session.
     WriteFocus,
+    /// Reading Review aggregates or completed-task history.
+    ReadHistory,
 }
 
 /// Storage adapter failure with typed operation context and diagnostic detail.
@@ -153,6 +156,7 @@ pub trait TaskRepository: Send + Sync {
         id: TaskId,
         next_occurrence_id: TaskId,
         now: UtcTimestamp,
+        completed_local_date: LocalDate,
     ) -> Result<Task, RepositoryError>;
 
     /// Reopens a completed task and reconciles its latest completion event.
@@ -309,6 +313,26 @@ pub trait FocusRepository: Send + Sync {
     ///
     /// Returns a focus query failure.
     fn latest_pomodoro_focus_task_id(&self) -> Result<Option<TaskId>, RepositoryError>;
+}
+
+/// Read-optimized Review aggregation capability.
+pub trait ReviewRepository: Send + Sync {
+    /// Loads range totals, trends, quadrant metrics, focus highlights, and recent completions.
+    ///
+    /// # Errors
+    ///
+    /// Returns a history query or mapping failure.
+    fn load_review(&self, query: ReviewQuery) -> Result<ReviewQueryData, RepositoryError>;
+}
+
+/// Bounded completed-task history capability.
+pub trait CompletedRepository: Send + Sync {
+    /// Lists the most recently completed tasks, newest first, up to `limit` rows.
+    ///
+    /// # Errors
+    ///
+    /// Returns a history query or task mapping failure.
+    fn list_completed_tasks(&self, limit: u32) -> Result<Vec<Task>, RepositoryError>;
 }
 
 /// Platform capability for registering login/startup launch behavior.

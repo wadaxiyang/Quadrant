@@ -1,25 +1,168 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
-import { PageHeader, MetricCard, EmptyState } from "../components/page_shell.slint";
+import { MetricCard, PageHeader } from "../components/page_shell.slint";
+import { SegmentButton, SurfaceCard } from "../components/common.slint";
+
+export struct ReviewActivityRow {
+    label: string,
+    completed: int,
+    focus_seconds: int,
+}
+
+export struct ReviewQuadrantRow {
+    label: string,
+    completed: int,
+    focus_seconds: int,
+    focus_text: string,
+}
+
+export struct ReviewRecentRow {
+    title: string,
+    metadata: string,
+}
+
+component ActivityRow inherits Rectangle {
+    in property <ReviewActivityRow> item;
+    in property <int> completed_max: 1;
+    in property <int> focus_max: 1;
+    height: 38px;
+    HorizontalLayout {
+        spacing: 8px;
+        Text { width: 76px; text: root.item.label; color: Theme.text_secondary; font-size: 10px; vertical-alignment: center; }
+        VerticalLayout {
+            horizontal-stretch: 1; spacing: 4px;
+            Rectangle {
+                height: 9px; background: Theme.input_bg; border-radius: 3px;
+                Rectangle { width: parent.width * root.item.completed / root.completed_max; height: 100%; background: Theme.accent; border-radius: 3px; }
+            }
+            Rectangle {
+                height: 9px; background: Theme.input_bg; border-radius: 3px;
+                Rectangle { width: parent.width * root.item.focus_seconds / root.focus_max; height: 100%; background: Theme.success; border-radius: 3px; }
+            }
+        }
+        Text { width: 70px; text: root.item.completed + " / " + root.item.focus_seconds / 60 + "m"; color: Theme.text_secondary; font-size: 9px; vertical-alignment: center; horizontal-alignment: right; }
+    }
+}
+
+component QuadrantRow inherits Rectangle {
+    in property <ReviewQuadrantRow> item;
+    in property <int> completed_max: 1;
+    in property <int> focus_max: 1;
+    height: 44px;
+    HorizontalLayout {
+        spacing: 8px;
+        Text { width: 54px; text: root.item.label; color: Theme.text_primary; font-size: 11px; font-weight: 600; vertical-alignment: center; }
+        VerticalLayout {
+            horizontal-stretch: 1; spacing: 4px;
+            Rectangle { height: 8px; background: Theme.input_bg; border-radius: 3px;
+                Rectangle { width: parent.width * root.item.completed / root.completed_max; height: 100%; background: Theme.accent; border-radius: 3px; }
+            }
+            Rectangle { height: 8px; background: Theme.input_bg; border-radius: 3px;
+                Rectangle { width: parent.width * root.item.focus_seconds / root.focus_max; height: 100%; background: Theme.success; border-radius: 3px; }
+            }
+        }
+        Text { width: 82px; text: root.item.completed + " · " + root.item.focus_text; color: Theme.text_secondary; font-size: 9px; vertical-alignment: center; horizontal-alignment: right; }
+    }
+}
 
 export component ReviewView inherits Rectangle {
-    VerticalLayout {
-        padding: UiConstants.page_padding;
-        spacing: 16px;
-        PageHeader { title: "Review"; subtitle: "Completion and focus history, summarized from persistent events."; }
-        HorizontalLayout {
-            spacing: 12px;
-            MetricCard { label: "Completed tasks"; hint: "No history query yet"; }
-            MetricCard { label: "Focused time"; hint: "No focus sessions yet"; }
-            MetricCard { label: "Focus sessions"; hint: "No history query yet"; }
-        }
-        EmptyState {
-            vertical-stretch: 1;
-            title: "Review grows from real history";
-            message: "Charts and trends will use completion events and focus sessions—not mutable UI counters.";
-            milestone: "Review aggregation arrives in M5";
+    in-out property <int> selected_range: 0;
+    in property <string> completed_value: "0";
+    in property <string> completed_hint;
+    in property <string> focus_value: "0m";
+    in property <string> focus_hint;
+    in property <string> sessions_value: "0";
+    in property <string> sessions_hint;
+    in property <string> average_value: "0m";
+    in property <string> state_summary;
+    in property <[ReviewActivityRow]> activity;
+    in property <int> activity_completed_max: 1;
+    in property <int> activity_focus_max: 1;
+    in property <[ReviewQuadrantRow]> quadrants;
+    in property <int> quadrant_completed_max: 1;
+    in property <int> quadrant_focus_max: 1;
+    in property <string> longest_focus;
+    in property <string> top_task;
+    in property <string> top_task_detail;
+    in property <string> top_quadrant;
+    in property <[ReviewRecentRow]> recent;
+    callback range_selected(int);
+
+    ScrollView {
+        width: 100%; height: 100%;
+        VerticalLayout {
+            padding: UiConstants.page_padding; spacing: 14px;
+            PageHeader { title: "Review"; subtitle: "Completion and productive Focus history from immutable events."; }
+            HorizontalLayout {
+                spacing: 7px;
+                SegmentButton { width: 76px; text: "7 days"; selected: root.selected_range == 0; clicked => { root.selected_range = 0; root.range_selected(0); } }
+                SegmentButton { width: 76px; text: "30 days"; selected: root.selected_range == 1; clicked => { root.selected_range = 1; root.range_selected(1); } }
+                SegmentButton { width: 76px; text: "90 days"; selected: root.selected_range == 2; clicked => { root.selected_range = 2; root.range_selected(2); } }
+                SegmentButton { width: 76px; text: "All time"; selected: root.selected_range == 3; clicked => { root.selected_range = 3; root.range_selected(3); } }
+                Rectangle { horizontal-stretch: 1; }
+                Text { text: root.state_summary; color: Theme.text_secondary; font-size: 10px; vertical-alignment: center; }
+            }
+            HorizontalLayout {
+                spacing: 10px;
+                MetricCard { horizontal-stretch: 1; label: "Completed"; value: root.completed_value; hint: root.completed_hint; }
+                MetricCard { horizontal-stretch: 1; label: "Focused time"; value: root.focus_value; hint: root.focus_hint; }
+                MetricCard { horizontal-stretch: 1; label: "Focus sessions"; value: root.sessions_value; hint: root.sessions_hint; }
+                MetricCard { horizontal-stretch: 1; label: "Average focus"; value: root.average_value; hint: "productive sessions only"; }
+            }
+            HorizontalLayout {
+                spacing: 12px;
+                SurfaceCard {
+                    horizontal-stretch: 2; min-height: 230px;
+                    VerticalLayout {
+                        padding: 14px; spacing: 7px;
+                        Text { text: "Activity"; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
+                        Text { text: "Blue: completions · Green: productive Focus"; color: Theme.text_secondary; font-size: 9px; }
+                        for item in root.activity: ActivityRow { item: item; completed_max: root.activity_completed_max; focus_max: root.activity_focus_max; }
+                    }
+                }
+                SurfaceCard {
+                    horizontal-stretch: 1; min-height: 230px;
+                    VerticalLayout {
+                        padding: 14px; spacing: 7px;
+                        Text { text: "By placement"; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
+                        Text { text: "Completed tasks · Focus time"; color: Theme.text_secondary; font-size: 9px; }
+                        for item in root.quadrants: QuadrantRow { item: item; completed_max: root.quadrant_completed_max; focus_max: root.quadrant_focus_max; }
+                    }
+                }
+            }
+            HorizontalLayout {
+                spacing: 12px;
+                SurfaceCard {
+                    horizontal-stretch: 1; min-height: 178px;
+                    VerticalLayout {
+                        padding: 14px; spacing: 7px;
+                        Text { text: "Focus highlights"; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
+                        Text { text: "Longest session"; color: Theme.text_secondary; font-size: 10px; }
+                        Text { text: root.longest_focus; color: Theme.text_primary; font-size: 15px; font-weight: 600; }
+                        Text { text: "Most focused task"; color: Theme.text_secondary; font-size: 10px; }
+                        Text { text: root.top_task; color: Theme.text_primary; font-size: 12px; font-weight: 600; overflow: elide; }
+                        Text { text: root.top_task_detail; color: Theme.text_secondary; font-size: 10px; }
+                        Text { text: root.top_quadrant; color: Theme.text_secondary; font-size: 10px; }
+                    }
+                }
+                SurfaceCard {
+                    horizontal-stretch: 2; min-height: 178px;
+                    VerticalLayout {
+                        padding: 14px; spacing: 7px;
+                        Text { text: "Recent completions"; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
+                        if root.recent.length == 0: Text { text: "No active completion history yet."; color: Theme.text_secondary; font-size: 11px; }
+                        for item in root.recent: HorizontalLayout {
+                            height: 26px;
+                            Text { horizontal-stretch: 1; text: item.title; color: Theme.text_primary; font-size: 11px; overflow: elide; }
+                            Text { text: item.metadata; color: Theme.text_secondary; font-size: 9px; vertical-alignment: center; }
+                        }
+                    }
+                }
+            }
         }
     }
 }

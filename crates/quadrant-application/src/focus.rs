@@ -597,6 +597,7 @@ mod tests {
             _id: TaskId,
             _next_occurrence_id: TaskId,
             _now: UtcTimestamp,
+            _completed_local_date: LocalDate,
         ) -> Result<Task, RepositoryError> {
             Err(test_error(RepositoryOperation::TransitionTask))
         }

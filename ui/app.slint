@@ -10,8 +10,8 @@ import { ToastHost, ToastKind } from "components/toast.slint";
 import { QuadrantsView, TaskRow } from "views/quadrants.slint";
 import { TodayTaskRow, TodayView } from "views/today.slint";
 import { FocusTaskRow, FocusView } from "views/focus.slint";
-import { ReviewView } from "views/review.slint";
-import { CompletedView } from "views/completed.slint";
+import { ReviewActivityRow, ReviewQuadrantRow, ReviewRecentRow, ReviewView } from "views/review.slint";
+import { CompletedTaskRow, CompletedView } from "views/completed.slint";
 import { SettingsView } from "views/settings.slint";
 import { AboutView } from "views/about.slint";
 
@@ -62,6 +62,28 @@ export component MainWindow inherits Window {
     in-out property <string> long_break_interval: "4";
     in-out property <bool> auto_start_break: false;
     in-out property <bool> auto_start_focus: false;
+    in-out property <int> review_range: 0;
+    in-out property <string> review_completed_value: "0";
+    in-out property <string> review_completed_hint;
+    in-out property <string> review_focus_value: "0m";
+    in-out property <string> review_focus_hint;
+    in-out property <string> review_sessions_value: "0";
+    in-out property <string> review_sessions_hint;
+    in-out property <string> review_average_value: "0m";
+    in-out property <string> review_state_summary;
+    in-out property <[ReviewActivityRow]> review_activity;
+    in-out property <int> review_activity_completed_max: 1;
+    in-out property <int> review_activity_focus_max: 1;
+    in-out property <[ReviewQuadrantRow]> review_quadrants;
+    in-out property <int> review_quadrant_completed_max: 1;
+    in-out property <int> review_quadrant_focus_max: 1;
+    in-out property <string> review_longest_focus: "0m";
+    in-out property <string> review_top_task: "No linked task";
+    in-out property <string> review_top_task_detail;
+    in-out property <string> review_top_quadrant;
+    in-out property <[ReviewRecentRow]> review_recent;
+    in-out property <[CompletedTaskRow]> completed_tasks;
+    in-out property <bool> completed_has_more: false;
     in-out property <bool> launch_at_startup: false;
     in-out property <bool> start_hidden: false;
     in-out property <bool> close_to_tray: true;
@@ -87,6 +109,9 @@ export component MainWindow inherits Window {
     callback focus_finish_requested;
     callback focus_cancel_requested;
     callback focus_settings_changed(string, string, string, string, bool, bool);
+    callback review_range_selected(int);
+    callback completed_reopen_requested(string);
+    callback completed_load_more_requested;
     callback window_close;
     callback window_minimize;
     callback window_maximize;
@@ -201,8 +226,42 @@ export component MainWindow inherits Window {
                             root.focus_settings_changed(focus, short_break, long_break, interval, auto_break, auto_focus);
                         }
                     }
-                    if root.current_route == 3: ReviewView { }
-                    if root.current_route == 4: CompletedView { }
+                    if root.current_route == 3: ReviewView {
+                        selected_range <=> root.review_range;
+                        completed_value: root.review_completed_value;
+                        completed_hint: root.review_completed_hint;
+                        focus_value: root.review_focus_value;
+                        focus_hint: root.review_focus_hint;
+                        sessions_value: root.review_sessions_value;
+                        sessions_hint: root.review_sessions_hint;
+                        average_value: root.review_average_value;
+                        state_summary: root.review_state_summary;
+                        activity: root.review_activity;
+                        activity_completed_max: root.review_activity_completed_max;
+                        activity_focus_max: root.review_activity_focus_max;
+                        quadrants: root.review_quadrants;
+                        quadrant_completed_max: root.review_quadrant_completed_max;
+                        quadrant_focus_max: root.review_quadrant_focus_max;
+                        longest_focus: root.review_longest_focus;
+                        top_task: root.review_top_task;
+                        top_task_detail: root.review_top_task_detail;
+                        top_quadrant: root.review_top_quadrant;
+                        recent: root.review_recent;
+                        range_selected(range) => { root.review_range_selected(range); }
+                    }
+                    if root.current_route == 4: CompletedView {
+                        tasks: root.completed_tasks;
+                        has_more: root.completed_has_more;
+                        reopen_requested(id) => { root.completed_reopen_requested(id); }
+                        delete_requested(id) => {
+                            root.pending_delete_id = id;
+                            root.dialog_mode = 1;
+                            root.dialog_title = "Delete completed task?";
+                            root.dialog_message = "This permanently deletes the task row. Its completion snapshot remains in Review.";
+                            root.dialog_visible = true;
+                        }
+                        load_more_requested => { root.completed_load_more_requested(); }
+                    }
                     if root.current_route == 5: SettingsView {
                         theme_mode: Theme.mode;
                         launch_at_startup: root.launch_at_startup;

@@ -94,7 +94,9 @@ impl TaskApplication {
             | UiIntent::ResumeFocus
             | UiIntent::FinishFocus
             | UiIntent::CancelFocus
-            | UiIntent::SetPomodoroSettings(_) => Vec::new(),
+            | UiIntent::SetPomodoroSettings(_)
+            | UiIntent::SetReviewRange(_)
+            | UiIntent::LoadMoreCompleted => Vec::new(),
             UiIntent::SetTheme(mode) => match self.settings.save_theme_mode(mode, self.clock.now())
             {
                 Ok(()) => Vec::new(),
@@ -164,11 +166,22 @@ impl TaskApplication {
                 }
             }
             UiIntent::CompleteTask(task_id) => {
+                let now = self.clock.now();
+                let local_date = match self.today_context.today_context(now) {
+                    Ok(context) => context.local_date,
+                    Err(error) => return vec![load_failure_event(&error.into())],
+                };
                 match self
                     .tasks
-                    .complete_task(task_id, self.ids.generate(), self.clock.now())
+                    .complete_task(task_id, self.ids.generate(), now, local_date)
                 {
                     Ok(_) => self.refresh_after_success("Task completed."),
+                    Err(error) => vec![failure_event(&error)],
+                }
+            }
+            UiIntent::ReopenTask(task_id) => {
+                match self.tasks.reopen_task(task_id, self.clock.now()) {
+                    Ok(_) => self.refresh_after_success("Task restored."),
                     Err(error) => vec![failure_event(&error)],
                 }
             }
@@ -257,6 +270,7 @@ fn failure_event(error: &RepositoryError) -> ApplicationEvent {
         crate::RepositoryOperation::WriteSettings => "Settings could not be saved.",
         crate::RepositoryOperation::ReadFocus => "Focus state could not be loaded.",
         crate::RepositoryOperation::WriteFocus => "The Focus session could not be changed.",
+        crate::RepositoryOperation::ReadHistory => "History could not be loaded.",
         crate::RepositoryOperation::Open | crate::RepositoryOperation::Migrate => {
             "Quadrant storage is unavailable."
         }

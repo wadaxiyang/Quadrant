@@ -108,6 +108,30 @@ impl LocalDate {
         }
         Self::from_calendar_date(year, month, day)
     }
+
+    /// Adds a signed number of calendar days without introducing timezone semantics.
+    #[must_use]
+    pub fn checked_add_days(self, days: i64) -> Option<Self> {
+        self.0.checked_add(time::Duration::days(days)).map(Self)
+    }
+
+    /// Returns the calendar year.
+    #[must_use]
+    pub const fn year(self) -> i32 {
+        self.0.year()
+    }
+
+    /// Returns the one-based calendar month.
+    #[must_use]
+    pub const fn month(self) -> u8 {
+        self.0.month() as u8
+    }
+
+    /// Returns the one-based day of month.
+    #[must_use]
+    pub const fn day(self) -> u8 {
+        self.0.day()
+    }
 }
 
 impl fmt::Display for LocalDate {

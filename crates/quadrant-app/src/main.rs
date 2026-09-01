@@ -3,11 +3,12 @@
 use std::sync::Arc;
 
 use quadrant_application::{
-    ApplicationEvent, AutostartService, Clock, FocusApplication, FocusRepository, FocusScheduler,
-    FocusSessionIdGenerator, ReminderAlert, ReminderDelivery, ReminderDeliveryError,
-    ReminderRepository, ReminderScheduler, SettingsRepository, SystemClock, SystemThemeSource,
-    TaskApplication, TaskIdGenerator, TaskRepository, TodayContextSource, TodayRepository,
-    UiIntent, UserFacingError, UuidFocusSessionIdGenerator, UuidTaskIdGenerator,
+    ApplicationEvent, AutostartService, Clock, CompletedRepository, FocusApplication,
+    FocusRepository, FocusScheduler, FocusSessionIdGenerator, HistoryApplication, ReminderAlert,
+    ReminderDelivery, ReminderDeliveryError, ReminderRepository, ReminderScheduler,
+    ReviewRepository, SettingsRepository, SystemClock, SystemThemeSource, TaskApplication,
+    TaskIdGenerator, TaskRepository, TodayContextSource, TodayRepository, UiIntent,
+    UserFacingError, UuidFocusSessionIdGenerator, UuidTaskIdGenerator,
 };
 
 #[allow(clippy::too_many_lines)] // Composition root keeps all concrete wiring visible in one place.
@@ -30,6 +31,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let today_tasks: Arc<dyn TodayRepository> = store.clone();
     let reminders: Arc<dyn ReminderRepository> = store.clone();
     let focus_repository: Arc<dyn FocusRepository> = store.clone();
+    let review_repository: Arc<dyn ReviewRepository> = store.clone();
+    let completed_repository: Arc<dyn CompletedRepository> = store.clone();
     let settings: Arc<dyn SettingsRepository> = store.clone();
     let autostart: Arc<dyn AutostartService> =
         Arc::new(quadrant_platform::PlatformAutostartService);
@@ -55,9 +58,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         focus_ids,
         today_context,
     );
+    let history_application = HistoryApplication::new(
+        review_repository,
+        completed_repository,
+        Arc::clone(&clock),
+        Arc::new(quadrant_platform::PlatformTodayContextSource),
+    );
     let initial_quadrants = application.load_quadrants()?;
     let initial_today = application.load_today()?;
     let initial_focus = focus_application.load_state()?;
+    let initial_review = history_application.load_review()?;
+    let initial_completed = history_application.load_completed()?;
     let theme_mode = store.load_theme_mode()?.unwrap_or_default();
     let desktop_settings = settings.load_desktop_settings()?;
     let autostart_reconcile_failed = reconcile_autostart(&*autostart, desktop_settings);
@@ -69,6 +80,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         quadrants: initial_quadrants,
         today: initial_today,
         focus: initial_focus,
+        review: initial_review,
+        completed: initial_completed,
         desktop_settings,
     };
 
@@ -103,10 +116,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let affects_focus = intent.affects_focus_schedule();
             let refreshes_focus = intent.affects_focus_projection();
             let is_focus = intent.is_focus_intent();
+            let is_history = intent.is_history_intent();
+            let refreshes_history = intent.affects_history_projection();
             let application = application.clone();
             let focus_application = focus_application.clone();
+            let history_application = history_application.clone();
             let events = tokio::task::spawn_blocking(move || {
-                if is_focus {
+                let mut events = if is_history {
+                    history_application.handle(&intent)
+                } else if is_focus {
                     focus_application.handle(&intent)
                 } else {
                     let mut events = application.handle(intent);
@@ -114,7 +132,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         events.push(ApplicationEvent::FocusChanged(state));
                     }
                     events
+                };
+                if refreshes_history {
+                    events.extend(history_application.refresh_after_mutation());
                 }
+                events
             })
             .await;
             match events {

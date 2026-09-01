@@ -6,6 +6,7 @@ mod connection;
 mod focus;
 mod mapping;
 mod migrations;
+mod review;
 mod store;
 
 pub use store::SqliteStore;

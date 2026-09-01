@@ -25,6 +25,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "focus_state",
         sql: include_str!("../../../migrations/0003_focus_state.sql"),
     },
+    Migration {
+        version: 4,
+        name: "review_history",
+        sql: include_str!("../../../migrations/0004_review_history.sql"),
+    },
 ];
 
 pub(crate) fn apply(connection: &mut Connection) -> Result<(), RepositoryError> {
@@ -90,7 +95,13 @@ fn adopt_untracked_schema(connection: &mut Connection) -> Result<i64, Repository
     }
     let task_columns = table_columns(connection, "tasks")?;
     let focus_columns = table_columns(connection, "focus_sessions")?;
-    let base_version = if focus_columns.iter().any(|column| column == "pomodoro_kind")
+    let completion_columns = table_columns(connection, "task_completion_events")?;
+    let base_version = if completion_columns
+        .iter()
+        .any(|column| column == "reverted_at_utc")
+    {
+        4
+    } else if focus_columns.iter().any(|column| column == "pomodoro_kind")
         && focus_columns.iter().any(|column| column == "status")
     {
         3
@@ -176,10 +187,17 @@ mod tests {
                 row.get::<_, i64>(0)
             })
             .expect("version query");
-        assert_eq!(version, 3);
+        assert_eq!(version, 4);
         let focus_columns =
             super::table_columns(&connection, "focus_sessions").expect("focus columns load");
         assert!(focus_columns.iter().any(|column| column == "pomodoro_kind"));
         assert!(focus_columns.iter().any(|column| column == "status"));
+        let completion_columns = super::table_columns(&connection, "task_completion_events")
+            .expect("completion columns load");
+        assert!(
+            completion_columns
+                .iter()
+                .any(|column| column == "reverted_at_utc")
+        );
     }
 }

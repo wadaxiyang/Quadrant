@@ -248,11 +248,15 @@ impl TaskRepository for SqliteStore {
         id: TaskId,
         next_occurrence_id: TaskId,
         now: UtcTimestamp,
+        completed_local_date: LocalDate,
     ) -> Result<Task, RepositoryError> {
         let operation = RepositoryOperation::TransitionTask;
         let mut connection = self.lock(operation)?;
         let transaction = immediate_transaction(&mut connection, operation)?;
         let mut task = require_task(&transaction, id, operation)?;
+        let due_at_snapshot = task.record().due.as_ref().map(|due| due.at_utc);
+        let planned_on_snapshot = task.record().planned_on;
+        let was_overdue = due_at_snapshot.is_some_and(|due| due < now);
         let next_draft = task
             .next_recurrence_draft()
             .map_err(|error| RepositoryError::new(operation, error))?;
@@ -265,8 +269,9 @@ impl TaskRepository for SqliteStore {
             .execute(
                 "INSERT INTO task_completion_events(
                      id, task_id, task_title_snapshot, quadrant_snapshot, completed_at_utc,
-                     recurrence_occurrence_key
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                     recurrence_occurrence_key, completed_local_date,
+                     due_at_utc_snapshot, planned_on_snapshot, was_overdue
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 params![
                     Uuid::now_v7().to_string(),
                     snapshot.task_id.to_string(),
@@ -276,6 +281,10 @@ impl TaskRepository for SqliteStore {
                     task.record()
                         .recurrence
                         .map(|_| snapshot.task_id.to_string()),
+                    completed_local_date.to_string(),
+                    due_at_snapshot.map(UtcTimestamp::unix_seconds),
+                    planned_on_snapshot.map(|date| date.to_string()),
+                    was_overdue,
                 ],
             )
             .map_err(|error| RepositoryError::new(operation, error))?;
@@ -308,13 +317,23 @@ impl TaskRepository for SqliteStore {
             .map_err(|error| RepositoryError::new(operation, error))?;
         transaction
             .execute(
-                "DELETE FROM task_completion_events
+                "UPDATE tasks SET reminder_delivered_for_utc = reminder_at_utc WHERE id = ?1",
+                [id.to_string()],
+            )
+            .map_err(|error| RepositoryError::new(operation, error))?;
+        transaction
+            .execute(
+                "UPDATE task_completion_events SET reverted_at_utc = ?3
                  WHERE id = (
                      SELECT id FROM task_completion_events
-                     WHERE task_id = ?1 AND completed_at_utc = ?2
+                     WHERE task_id = ?1 AND completed_at_utc = ?2 AND reverted_at_utc IS NULL
                      ORDER BY id DESC LIMIT 1
                  )",
-                params![id.to_string(), completed_at.unix_seconds()],
+                params![
+                    id.to_string(),
+                    completed_at.unix_seconds(),
+                    now.unix_seconds()
+                ],
             )
             .map_err(|error| RepositoryError::new(operation, error))?;
         transaction
@@ -947,7 +966,7 @@ mod tests {
     #[test]
     fn empty_database_migrates_and_enables_foreign_keys() {
         let store = SqliteStore::open_in_memory().expect("storage opens");
-        assert_eq!(store.schema_version().expect("schema version"), 3);
+        assert_eq!(store.schema_version().expect("schema version"), 4);
         let enabled = store
             .connection
             .lock()
@@ -961,8 +980,17 @@ mod tests {
     fn create_move_complete_reopen_and_delete_are_transactional() {
         let store = SqliteStore::open_in_memory().expect("storage opens");
         let id = task_id(1);
-        let draft =
+        let mut draft =
             NewTask::quick_capture("Persist me", TaskPlacement::Inbox).expect("valid task draft");
+        draft.planned_on = Some(LocalDate::parse_iso("2026-09-01").expect("valid date"));
+        draft.due = Some(ScheduledInstant {
+            at_utc: UtcTimestamp::from_unix_seconds(11),
+            time_zone: TimeZoneId::new("Asia/Shanghai").expect("valid timezone"),
+        });
+        draft.reminder = Some(ScheduledInstant {
+            at_utc: UtcTimestamp::from_unix_seconds(11),
+            time_zone: TimeZoneId::new("Asia/Shanghai").expect("valid timezone"),
+        });
         store
             .create_task(id, draft, UtcTimestamp::from_unix_seconds(10))
             .expect("task created");
@@ -979,16 +1007,71 @@ mod tests {
         );
 
         let completed = store
-            .complete_task(id, task_id(101), UtcTimestamp::from_unix_seconds(12))
+            .complete_task(
+                id,
+                task_id(101),
+                UtcTimestamp::from_unix_seconds(12),
+                LocalDate::parse_iso("2026-09-01").expect("valid date"),
+            )
             .expect("task completed");
         assert_eq!(completed.record().status, TaskStatus::Completed);
         let reopened = store
             .reopen_task(id, UtcTimestamp::from_unix_seconds(13))
             .expect("task reopened");
         assert_eq!(reopened.record().status, TaskStatus::Active);
+        assert!(
+            store
+                .list_pending_reminders()
+                .expect("restored reminder query")
+                .is_empty(),
+            "restoring a task must not revive its old reminder"
+        );
+        let completion_snapshot = store
+            .connection
+            .lock()
+            .expect("connection lock")
+            .query_row(
+                "SELECT task_title_snapshot, quadrant_snapshot, completed_local_date,
+                        due_at_utc_snapshot, planned_on_snapshot, was_overdue, reverted_at_utc
+                 FROM task_completion_events WHERE task_id = ?1",
+                [id.to_string()],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, i64>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, bool>(5)?,
+                        row.get::<_, i64>(6)?,
+                    ))
+                },
+            )
+            .expect("completion snapshot");
+        assert_eq!(
+            completion_snapshot,
+            (
+                "Persist me".to_owned(),
+                1,
+                "2026-09-01".to_owned(),
+                11,
+                "2026-09-01".to_owned(),
+                true,
+                13,
+            )
+        );
 
         store.delete_task(id).expect("task deleted");
         assert!(store.get_task(id).expect("task query").is_none());
+        let retained_task_id = store
+            .connection
+            .lock()
+            .expect("connection lock")
+            .query_row("SELECT task_id FROM task_completion_events", [], |row| {
+                row.get::<_, Option<String>>(0)
+            })
+            .expect("retained completion snapshot");
+        assert_eq!(retained_task_id, None);
     }
 
     #[test]
@@ -1015,7 +1098,12 @@ mod tests {
 
         assert!(
             store
-                .complete_task(id, task_id(102), UtcTimestamp::from_unix_seconds(21),)
+                .complete_task(
+                    id,
+                    task_id(102),
+                    UtcTimestamp::from_unix_seconds(21),
+                    LocalDate::parse_iso("2026-09-01").expect("valid date"),
+                )
                 .is_err()
         );
         let task = store
@@ -1106,6 +1194,7 @@ mod tests {
                 task_id(30),
                 task_id(103),
                 UtcTimestamp::from_unix_seconds(10),
+                LocalDate::parse_iso("2026-09-01").expect("valid date"),
             )
             .expect("due task completed");
 
@@ -1226,6 +1315,7 @@ mod tests {
                 source_id,
                 next_id,
                 UtcTimestamp::from_unix_seconds(1_770_000_000),
+                LocalDate::parse_iso("2026-02-02").expect("valid date"),
             )
             .expect("recurring task completes");
         assert_recurring_completion(&store, source_id, next_id, reminder_at);
