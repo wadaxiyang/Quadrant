@@ -1,12 +1,49 @@
 //! Platform capability boundary and target-specific integrations.
 
-use std::{env, io, path::PathBuf};
+mod desktop;
+mod instance;
+mod notifications;
+#[cfg(target_os = "windows")]
+mod windows;
+
+use std::{env, fmt, io, path::PathBuf, sync::Arc};
 
 use jiff::{Timestamp, tz::TimeZone};
 use quadrant_application::{
-    CalendarError, LocalDate, SystemTheme, SystemThemeSource, TodayContext, TodayContextSource,
-    UtcTimestamp,
+    CalendarError, DesktopEvent, LocalDate, SystemTheme, SystemThemeSource, TodayContext,
+    TodayContextSource, UtcTimestamp,
 };
+
+pub use desktop::DesktopIntegration;
+pub use instance::{ActivationListener, SingleInstanceCoordinator};
+pub use notifications::PlatformNotificationDelivery;
+
+/// Thread-safe desktop event destination implemented by the UI adapter.
+pub type DesktopEventSink = Arc<dyn Fn(DesktopEvent) + Send + Sync>;
+
+/// Normalized platform integration failure without leaking backend error types.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PlatformIntegrationError {
+    detail: String,
+}
+
+impl PlatformIntegrationError {
+    /// Wraps diagnostic context from a platform implementation.
+    #[must_use]
+    pub fn new(detail: impl fmt::Display) -> Self {
+        Self {
+            detail: detail.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for PlatformIntegrationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.detail)
+    }
+}
+
+impl std::error::Error for PlatformIntegrationError {}
 
 /// Capabilities exposed to application/UI code without leaking OS checks.
 #[allow(clippy::struct_excessive_bools)] // Independent feature flags, not one state machine.
@@ -22,6 +59,8 @@ pub struct PlatformCapabilities {
     pub native_notifications: bool,
     /// Whether a native window backdrop is available.
     pub native_backdrop: bool,
+    /// Whether primary-instance activation forwarding is available.
+    pub single_instance: bool,
 }
 
 /// Cross-platform theme source used until native observation is implemented.

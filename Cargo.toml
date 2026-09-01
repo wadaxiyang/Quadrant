@@ -24,14 +24,32 @@ quadrant-platform = { path = "crates/quadrant-platform" }
 quadrant-ui = { path = "crates/quadrant-ui" }
 rusqlite = { version = "0.40.2", features = ["bundled"] }
 jiff = "0.2.35"
+interprocess = { version = "2.4.3", features = ["tokio"] }
+notify-rust = "4.18.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
+single-instance = "0.3.3"
 slint = "=1.17.1"
 slint-build = "=1.17.1"
 thiserror = "2.0.20"
 time = { version = "0.3.55", features = ["formatting", "parsing", "serde"] }
-tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.53.1", features = ["io-util", "macros", "rt-multi-thread", "sync", "time"] }
 uuid = { version = "1.26.0", features = ["serde", "v7"] }
+
+[workspace.dependencies.global-hotkey]
+version = "0.8.0"
+
+[workspace.dependencies.tray-icon]
+version = "0.24.2"
+default-features = false
+
+[workspace.dependencies.windows]
+version = "0.62.2"
+features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+]
 
 [workspace.lints.rust]
 missing_docs = "warn"

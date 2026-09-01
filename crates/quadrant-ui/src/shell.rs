@@ -3,9 +3,10 @@
 use std::{rc::Rc, str::FromStr, sync::Arc};
 
 use quadrant_application::{
-    ApplicationEvent, NavigationRoute, Quadrant, QuadrantsViewState, QuickAddSubmission,
-    RecurrenceChoice, ReorderDirection, SystemTheme, TaskEditorState, TaskEditorSubmission, TaskId,
-    TaskPlacement, ThemeMode as ApplicationThemeMode, TodayViewState, UiIntent,
+    ApplicationEvent, DesktopEvent, NavigationRoute, Quadrant, QuadrantsViewState,
+    QuickAddSubmission, RecurrenceChoice, ReorderDirection, SystemTheme, TaskEditorState,
+    TaskEditorSubmission, TaskId, TaskPlacement, ThemeMode as ApplicationThemeMode, TodayViewState,
+    UiIntent,
 };
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, VecModel};
 
@@ -29,6 +30,9 @@ pub struct UiShellConfig {
 
 /// Thread-safe sink used by application-runtime work to enqueue typed UI events.
 pub type ApplicationEventSink = Arc<dyn Fn(ApplicationEvent) + Send + Sync>;
+
+/// Thread-safe sink used by hotkeys, tray, and redirected launches.
+pub type DesktopEventSink = Arc<dyn Fn(DesktopEvent) + Send + Sync>;
 
 /// Constructed Slint shell kept on the UI thread.
 pub struct UiShell {
@@ -79,6 +83,28 @@ impl UiShell {
         })
     }
 
+    /// Creates a desktop-shell sink that marshals platform events onto the Slint event loop.
+    #[must_use]
+    pub fn desktop_event_sink(&self) -> DesktopEventSink {
+        let main_weak = self.main_window.as_weak();
+        let quick_add_weak = self.quick_add.as_weak();
+        Arc::new(move |event| {
+            let quick_add_weak = quick_add_weak.clone();
+            drop(main_weak.upgrade_in_event_loop(move |main| match event {
+                DesktopEvent::ShowMainWindow => {
+                    main.window().set_minimized(false);
+                    drop(main.show());
+                }
+                DesktopEvent::OpenQuickAdd => {
+                    if let Some(quick_add) = quick_add_weak.upgrade() {
+                        show_quick_add(&quick_add, &main);
+                    }
+                }
+                DesktopEvent::ExitRequested => drop(slint::quit_event_loop()),
+            }));
+        })
+    }
+
     /// Runs the Slint event loop until normal application shutdown.
     ///
     /// # Errors
@@ -123,18 +149,10 @@ fn bind_main_window(
     let open_handler = Rc::clone(intent_handler);
     main_window.on_quick_add_requested(move || {
         open_handler(UiIntent::OpenQuickAdd);
-        if let Some(window) = quick_add_weak.upgrade() {
-            window.set_title_text(SharedString::default());
-            window.set_destination(0);
-            window.set_error_message(SharedString::default());
-            if window.show().is_err()
-                && let Some(main) = main_weak.upgrade()
-            {
-                main.invoke_show_toast(
-                    SharedString::from("Quick Add could not be opened."),
-                    ToastKind::Error,
-                );
-            }
+        if let Some(window) = quick_add_weak.upgrade()
+            && let Some(main) = main_weak.upgrade()
+        {
+            show_quick_add(&window, &main);
         }
     });
 
@@ -154,6 +172,18 @@ fn bind_main_window(
 
     bind_task_actions(main_window, intent_handler);
     bind_main_window_controls(main_window);
+}
+
+fn show_quick_add(quick_add: &QuickAddWindow, main: &MainWindow) {
+    quick_add.set_title_text(SharedString::default());
+    quick_add.set_destination(0);
+    quick_add.set_error_message(SharedString::default());
+    if quick_add.show().is_err() {
+        main.invoke_show_toast(
+            SharedString::from("Quick Add could not be opened."),
+            ToastKind::Error,
+        );
+    }
 }
 
 fn bind_task_actions(main_window: &MainWindow, intent_handler: &Rc<dyn Fn(UiIntent)>) {

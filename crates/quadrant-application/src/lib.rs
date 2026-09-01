@@ -503,6 +503,17 @@ pub enum ApplicationEvent {
     OperationFailed(UserFacingError),
 }
 
+/// Desktop-shell events emitted by platform integrations or redirected launches.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DesktopEvent {
+    /// Restore and show the main application window.
+    ShowMainWindow,
+    /// Open the lightweight Quick Add surface without requiring main-window focus.
+    OpenQuickAdd,
+    /// End the UI event loop through the normal application shutdown path.
+    ExitRequested,
+}
+
 /// Stable UI-safe error information.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UserFacingError {

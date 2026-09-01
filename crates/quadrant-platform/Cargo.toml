@@ -8,8 +8,17 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+interprocess.workspace = true
 jiff.workspace = true
+notify-rust.workspace = true
 quadrant-application.workspace = true
+single-instance.workspace = true
+tokio.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+global-hotkey.workspace = true
+tray-icon.workspace = true
+windows.workspace = true
 
 [lints]
 workspace = true
