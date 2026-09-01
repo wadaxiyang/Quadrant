@@ -1,3 +1,10 @@
+# Local-only project manuals and agent memory. At the repository root,
+# only README.md and the extensionless LICENSE are published.
+/docs/
+/AGENTS.md
+/*.md
+!/README.md
+
 # Read-only legacy implementation
 /legacy/
 
