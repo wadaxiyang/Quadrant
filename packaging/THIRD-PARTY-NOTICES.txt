@@ -1,0 +1,25 @@
+Quadrant Third-Party Notices
+============================
+
+wsl-dashboard
+-------------
+Quadrant's Slint theme, constants, common controls, sidebar, title bar, and
+modal interaction pattern are derived from the handwritten Fluent-style UI in
+https://github.com/owu/wsl-dashboard at commit
+948589a255a4bd8a3ff9c3de49e2e13109378fcd (v0.11.0).
+
+Copyright (c) 2026 owu <wqh@live.com>
+License: GPL-3.0-only
+
+Microsoft Fluent UI System Icons
+--------------------------------
+The SVG icons bundled with Quadrant are selected from
+https://github.com/microsoft/fluentui-system-icons at commit
+4d685f77b2cb8f3f412a74ec8d920c8c91149528 (package release 1.1.339).
+
+Copyright (c) 2020 Microsoft Corporation
+License: MIT
+The upstream MIT text is included at assets/icons/LICENSE-MIT in source form.
+
+Quadrant itself is distributed under GPL-3.0-only. Corresponding source is
+available from https://github.com/wadaxiyang/Quadrant.

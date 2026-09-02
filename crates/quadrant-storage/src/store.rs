@@ -1,7 +1,7 @@
 //! Transactional `rusqlite` task and settings repository implementation.
 
 use std::{
-    path::Path,
+    path::{Path, PathBuf},
     sync::{Mutex, MutexGuard},
 };
 
@@ -28,6 +28,7 @@ const TASK_COLUMNS: &str = "id, title, notes, quadrant, status, planned_on,
 #[derive(Debug)]
 pub struct SqliteStore {
     connection: Mutex<Connection>,
+    pub(crate) database_path: Option<PathBuf>,
 }
 
 impl SqliteStore {
@@ -37,8 +38,10 @@ impl SqliteStore {
     ///
     /// Returns an operation-classified repository error on open/configuration/migration failure.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, RepositoryError> {
-        connection::open(path.as_ref()).map(|connection| Self {
+        let path = path.as_ref();
+        connection::open(path).map(|connection| Self {
             connection: Mutex::new(connection),
+            database_path: Some(path.to_path_buf()),
         })
     }
 
@@ -50,6 +53,7 @@ impl SqliteStore {
     pub fn open_in_memory() -> Result<Self, RepositoryError> {
         connection::open_in_memory().map(|connection| Self {
             connection: Mutex::new(connection),
+            database_path: None,
         })
     }
 

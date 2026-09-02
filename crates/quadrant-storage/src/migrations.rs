@@ -9,6 +9,8 @@ struct Migration {
     sql: &'static str,
 }
 
+pub(crate) const CURRENT_SCHEMA_VERSION: i64 = 4;
+
 const MIGRATIONS: &[Migration] = &[
     Migration {
         version: 1,

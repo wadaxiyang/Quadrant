@@ -14,6 +14,23 @@ pub(crate) fn current_system_theme() -> quadrant_application::SystemTheme {
     theme::current_system_theme()
 }
 
+pub(crate) fn show_startup_error(detail: &str) {
+    use windows::{
+        Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_OK, MessageBoxW},
+        core::HSTRING,
+    };
+
+    let message = HSTRING::from(format!(
+        "Quadrant could not start. Your existing data was not intentionally deleted.\n\n{detail}\n\nCheck the data directory and restore/recovery files before trying again."
+    ));
+    let title = HSTRING::from("Quadrant startup error");
+    // SAFETY: both HSTRING values own valid, NUL-terminated UTF-16 buffers for
+    // the duration of this modal call; no window owner is required at startup.
+    unsafe {
+        let _ = MessageBoxW(None, &message, &title, MB_OK | MB_ICONERROR);
+    }
+}
+
 use std::{
     sync::{Arc, mpsc},
     thread,

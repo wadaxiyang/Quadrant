@@ -7,12 +7,15 @@ import { PageHeader } from "../components/page_shell.slint";
 import { FluentButton, SurfaceCard } from "../components/common.slint";
 
 export component AboutView inherits Rectangle {
+    in property <string> application_version: "0.1.0";
+    in property <bool> can_open_releases: true;
     callback show_notices;
+    callback open_releases;
 
     VerticalLayout {
         padding: UiConstants.page_padding;
         spacing: 16px;
-        PageHeader { title: "About"; subtitle: "Quadrant Tasks · version 0.1.0"; }
+        PageHeader { title: "About"; subtitle: "Quadrant Tasks · version " + root.application_version; }
         SurfaceCard {
             vertical-stretch: 1;
             VerticalLayout {
@@ -24,7 +27,11 @@ export component AboutView inherits Rectangle {
                 Text { text: "Fluent UI components are derived from owu/wsl-dashboard (GPL-3.0-only)."; color: Theme.text_secondary; font-size: 12px; wrap: word-wrap; }
                 Text { text: "Icons: Microsoft Fluent UI System Icons (MIT)."; color: Theme.text_secondary; font-size: 12px; }
                 Rectangle { vertical-stretch: 1; }
-                FluentButton { width: 132px; text: "Source notices"; clicked => { root.show_notices(); } }
+                HorizontalLayout {
+                    spacing: 8px;
+                    FluentButton { width: 132px; text: "Source notices"; clicked => { root.show_notices(); } }
+                    FluentButton { width: 132px; text: "Releases"; primary: true; enabled: root.can_open_releases; clicked => { root.open_releases(); } }
+                }
             }
         }
     }

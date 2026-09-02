@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
+import { ScrollView } from "std-widgets.slint";
 import { Theme, ThemeMode } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { PageHeader } from "../components/page_shell.slint";
-import { SegmentButton, SurfaceCard } from "../components/common.slint";
+import { FluentButton, SegmentButton, SurfaceCard } from "../components/common.slint";
 
 component BooleanSettingRow inherits Rectangle {
     in property <string> title;
@@ -55,87 +56,149 @@ export component SettingsView inherits Rectangle {
     in property <bool> global_hotkey_available: false;
     in property <bool> native_notifications_available: false;
     in property <bool> single_instance_available: false;
+    in property <string> backup_directory;
+    in property <string> latest_backup: "No backup created yet";
+    in property <bool> restore_pending: false;
+    in property <string> application_version: "0.1.0";
+    in property <string> update_description;
+    in property <bool> can_open_releases: true;
     callback theme_selected(ThemeMode);
     callback desktop_settings_changed(bool, bool, bool, bool);
+    callback create_backup_requested;
+    callback open_backup_directory_requested;
+    callback restore_latest_requested;
+    callback open_releases_requested;
 
-    VerticalLayout {
-        padding: UiConstants.page_padding;
-        spacing: 16px;
-        PageHeader { title: "Settings"; subtitle: "Persistent preferences with explicit platform capabilities."; }
+    ScrollView {
+        width: 100%; height: 100%;
+        VerticalLayout {
+            padding: UiConstants.page_padding;
+            spacing: 16px;
+            PageHeader { title: "Settings"; subtitle: "Persistent preferences, backups, and platform capabilities."; }
 
-        SurfaceCard {
-            height: 132px;
-            VerticalLayout {
-                padding: 16px;
-                spacing: 10px;
-                Text { text: "Appearance"; color: Theme.text_primary; font-size: 15px; font-weight: 600; }
-                Text { text: "System follows the normalized platform theme source."; color: Theme.text_secondary; font-size: 11px; }
-                HorizontalLayout {
+            SurfaceCard {
+                height: 132px;
+                VerticalLayout {
+                    padding: 16px;
+                    spacing: 10px;
+                    Text { text: "Appearance"; color: Theme.text_primary; font-size: 15px; font-weight: 600; }
+                    Text { text: "System follows the normalized platform theme source."; color: Theme.text_secondary; font-size: 11px; }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        SegmentButton { width: 104px; text: "System"; selected: root.theme_mode == ThemeMode.system; clicked => { root.theme_selected(ThemeMode.system); } }
+                        SegmentButton { width: 104px; text: "Light"; selected: root.theme_mode == ThemeMode.light; clicked => { root.theme_selected(ThemeMode.light); } }
+                        SegmentButton { width: 104px; text: "Dark"; selected: root.theme_mode == ThemeMode.dark; clicked => { root.theme_selected(ThemeMode.dark); } }
+                    }
+                }
+            }
+
+            SurfaceCard {
+                height: 316px;
+                VerticalLayout {
+                    padding: 16px;
+                    spacing: 4px;
+                    Text { text: "Desktop integration"; color: Theme.text_primary; font-size: 15px; font-weight: 600; }
+                    Text {
+                        text: "Quick Add: " + (root.global_hotkey_available ? "ready" : "unavailable")
+                            + "  •  Notifications: " + (root.native_notifications_available ? "ready" : "unavailable")
+                            + "  •  Single instance: " + (root.single_instance_available ? "ready" : "unavailable");
+                        color: Theme.text_secondary;
+                        font-size: 11px;
+                        wrap: word-wrap;
+                    }
+                    BooleanSettingRow {
+                        title: "Launch at startup";
+                        description: root.autostart_supported ? "Start Quadrant after login." : "Unavailable on this platform.";
+                        value: root.launch_at_startup;
+                        enabled: root.autostart_supported;
+                        changed(value) => {
+                            root.launch_at_startup = value;
+                            root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray);
+                        }
+                    }
+                    BooleanSettingRow {
+                        title: "Start in background";
+                        description: root.tray_supported ? "Do not show the main window at process startup." : "Requires a working tray icon.";
+                        value: root.start_hidden;
+                        enabled: root.tray_supported;
+                        changed(value) => {
+                            root.start_hidden = value;
+                            root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray);
+                        }
+                    }
+                    BooleanSettingRow {
+                        title: "Close to tray";
+                        description: root.tray_supported ? "Close hides the window; Exit remains available in the tray." : "Requires a working tray icon.";
+                        value: root.close_to_tray;
+                        enabled: root.tray_supported;
+                        changed(value) => {
+                            root.close_to_tray = value;
+                            root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray);
+                        }
+                    }
+                    BooleanSettingRow {
+                        title: "Minimize to tray";
+                        description: root.tray_supported ? "Minimize hides the window instead of using the taskbar." : "Requires a working tray icon.";
+                        value: root.minimize_to_tray;
+                        enabled: root.tray_supported;
+                        changed(value) => {
+                            root.minimize_to_tray = value;
+                            root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray);
+                        }
+                    }
+                }
+            }
+
+            SurfaceCard {
+                height: 176px;
+                VerticalLayout {
+                    padding: 16px;
                     spacing: 8px;
-                    SegmentButton { width: 104px; text: "System"; selected: root.theme_mode == ThemeMode.system; clicked => { root.theme_selected(ThemeMode.system); } }
-                    SegmentButton { width: 104px; text: "Light"; selected: root.theme_mode == ThemeMode.light; clicked => { root.theme_selected(ThemeMode.light); } }
-                    SegmentButton { width: 104px; text: "Dark"; selected: root.theme_mode == ThemeMode.dark; clicked => { root.theme_selected(ThemeMode.dark); } }
-                }
-            }
-        }
-
-        SurfaceCard {
-            height: 316px;
-            VerticalLayout {
-                padding: 16px;
-                spacing: 4px;
-                Text { text: "Desktop integration"; color: Theme.text_primary; font-size: 15px; font-weight: 600; }
-                Text {
-                    text: "Quick Add: " + (root.global_hotkey_available ? "ready" : "unavailable")
-                        + "  •  Notifications: " + (root.native_notifications_available ? "ready" : "unavailable")
-                        + "  •  Single instance: " + (root.single_instance_available ? "ready" : "unavailable");
-                    color: Theme.text_secondary;
-                    font-size: 11px;
-                    wrap: word-wrap;
-                }
-                BooleanSettingRow {
-                    title: "Launch at startup";
-                    description: root.autostart_supported ? "Start Quadrant after login." : "Unavailable on this platform.";
-                    value: root.launch_at_startup;
-                    enabled: root.autostart_supported;
-                    changed(value) => {
-                        root.launch_at_startup = value;
-                        root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray);
+                    Text { text: "Backup and restore"; color: Theme.text_primary; font-size: 15px; font-weight: 600; }
+                    Text { text: root.latest_backup; color: Theme.text_secondary; font-size: 11px; overflow: elide; }
+                    Text {
+                        text: root.restore_pending ? "A validated restore will be applied after restart." : root.backup_directory;
+                        color: root.restore_pending ? Theme.danger : Theme.text_secondary;
+                        font-size: 10px;
+                        overflow: elide;
                     }
-                }
-                BooleanSettingRow {
-                    title: "Start in background";
-                    description: root.tray_supported ? "Do not show the main window at process startup." : "Requires a working tray icon.";
-                    value: root.start_hidden;
-                    enabled: root.tray_supported;
-                    changed(value) => {
-                        root.start_hidden = value;
-                        root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray);
-                    }
-                }
-                BooleanSettingRow {
-                    title: "Close to tray";
-                    description: root.tray_supported ? "Close hides the window; Exit remains available in the tray." : "Requires a working tray icon.";
-                    value: root.close_to_tray;
-                    enabled: root.tray_supported;
-                    changed(value) => {
-                        root.close_to_tray = value;
-                        root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray);
-                    }
-                }
-                BooleanSettingRow {
-                    title: "Minimize to tray";
-                    description: root.tray_supported ? "Minimize hides the window instead of using the taskbar." : "Requires a working tray icon.";
-                    value: root.minimize_to_tray;
-                    enabled: root.tray_supported;
-                    changed(value) => {
-                        root.minimize_to_tray = value;
-                        root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray);
+                    HorizontalLayout {
+                        spacing: 8px;
+                        FluentButton { width: 116px; text: "Create backup"; primary: true; clicked => { root.create_backup_requested(); } }
+                        FluentButton { width: 110px; text: "Open folder"; clicked => { root.open_backup_directory_requested(); } }
+                        FluentButton {
+                            width: 132px;
+                            text: "Restore latest";
+                            danger: true;
+                            enabled: root.latest_backup != "No backup created yet" && !root.restore_pending;
+                            clicked => { root.restore_latest_requested(); }
+                        }
                     }
                 }
             }
-        }
 
-        Rectangle { vertical-stretch: 1; }
+            SurfaceCard {
+                height: 116px;
+                HorizontalLayout {
+                    padding: 16px;
+                    spacing: 12px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 6px;
+                        Text { text: "Updates · version " + root.application_version; color: Theme.text_primary; font-size: 15px; font-weight: 600; }
+                        Text { text: root.update_description; color: Theme.text_secondary; font-size: 11px; wrap: word-wrap; }
+                        Text { text: "Quadrant never replaces its running executable in-process."; color: Theme.text_secondary; font-size: 10px; }
+                    }
+                    FluentButton {
+                        width: 118px;
+                        text: "Open releases";
+                        enabled: root.can_open_releases;
+                        clicked => { root.open_releases_requested(); }
+                    }
+                }
+            }
+
+            Rectangle { height: 8px; }
+        }
     }
 }

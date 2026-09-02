@@ -84,6 +84,12 @@ export component MainWindow inherits Window {
     in-out property <[ReviewRecentRow]> review_recent;
     in-out property <[CompletedTaskRow]> completed_tasks;
     in-out property <bool> completed_has_more: false;
+    in-out property <string> application_version: "0.1.0";
+    in-out property <string> backup_directory;
+    in-out property <string> latest_backup: "No backup created yet";
+    in-out property <bool> restore_pending: false;
+    in-out property <string> update_description;
+    in-out property <bool> can_open_releases: true;
     in-out property <bool> launch_at_startup: false;
     in-out property <bool> start_hidden: false;
     in-out property <bool> close_to_tray: true;
@@ -112,6 +118,10 @@ export component MainWindow inherits Window {
     callback review_range_selected(int);
     callback completed_reopen_requested(string);
     callback completed_load_more_requested;
+    callback create_backup_requested;
+    callback open_backup_directory_requested;
+    callback backup_restore_confirmed;
+    callback open_release_page_requested;
     callback window_close;
     callback window_minimize;
     callback window_maximize;
@@ -142,7 +152,7 @@ export component MainWindow inherits Window {
 
             TitleBar {
                 title: "Quadrant";
-                version: "0.1.0";
+                version: root.application_version;
                 is_maximized: root.maximized;
                 theme_mode: Theme.mode;
                 close => { root.window_close(); }
@@ -273,6 +283,12 @@ export component MainWindow inherits Window {
                         global_hotkey_available: root.global_hotkey_available;
                         native_notifications_available: root.native_notifications_available;
                         single_instance_available: root.single_instance_available;
+                        backup_directory: root.backup_directory;
+                        latest_backup: root.latest_backup;
+                        restore_pending: root.restore_pending;
+                        application_version: root.application_version;
+                        update_description: root.update_description;
+                        can_open_releases: root.can_open_releases;
                         theme_selected(mode) => {
                             Theme.mode = mode;
                             root.theme_selected(mode);
@@ -284,14 +300,26 @@ export component MainWindow inherits Window {
                             root.minimize_to_tray = minimize_to_tray;
                             root.desktop_settings_changed(launch, start_hidden, close_to_tray, minimize_to_tray);
                         }
+                        create_backup_requested => { root.create_backup_requested(); }
+                        open_backup_directory_requested => { root.open_backup_directory_requested(); }
+                        restore_latest_requested => {
+                            root.dialog_mode = 2;
+                            root.dialog_title = "Restore latest backup?";
+                            root.dialog_message = "The backup will be validated and staged. It replaces current data only after you exit and reopen Quadrant; the previous database is retained in the recovery folder.";
+                            root.dialog_visible = true;
+                        }
+                        open_releases_requested => { root.open_release_page_requested(); }
                     }
                     if root.current_route == 6: AboutView {
+                        application_version: root.application_version;
+                        can_open_releases: root.can_open_releases;
                         show_notices => {
                             root.dialog_mode = 0;
                             root.dialog_title = "Source and license notices";
-                            root.dialog_message = "Quadrant is GPL-3.0-only. Fluent UI components are derived from owu/wsl-dashboard at commit 948589a. Icons are Microsoft Fluent UI System Icons under the MIT License.";
+                            root.dialog_message = "Quadrant is GPL-3.0-only. Fluent UI components are derived from owu/wsl-dashboard at commit 948589a. Icons are Microsoft Fluent UI System Icons under the MIT License. Release archives include third-party notices and the locked Rust dependency license inventory.";
                             root.dialog_visible = true;
                         }
+                        open_releases => { root.open_release_page_requested(); }
                     }
                 }
             }
@@ -314,13 +342,15 @@ export component MainWindow inherits Window {
         shown: root.dialog_visible;
         title: root.dialog_title;
         message: root.dialog_message;
-        primary_text: root.dialog_mode == 1 ? "Delete" : "Close";
-        show_secondary: root.dialog_mode == 1;
+        primary_text: root.dialog_mode == 1 ? "Delete" : (root.dialog_mode == 2 ? "Stage restore" : "Close");
+        show_secondary: root.dialog_mode == 1 || root.dialog_mode == 2;
         secondary_text: "Cancel";
         accepted => {
             if (root.dialog_mode == 1) {
                 root.task_delete_confirmed(root.pending_delete_id);
                 root.pending_delete_id = "";
+            } else if (root.dialog_mode == 2) {
+                root.backup_restore_confirmed();
             }
             root.dialog_visible = false;
         }

@@ -96,7 +96,11 @@ impl TaskApplication {
             | UiIntent::CancelFocus
             | UiIntent::SetPomodoroSettings(_)
             | UiIntent::SetReviewRange(_)
-            | UiIntent::LoadMoreCompleted => Vec::new(),
+            | UiIntent::LoadMoreCompleted
+            | UiIntent::CreateBackup
+            | UiIntent::StageLatestRestore
+            | UiIntent::OpenBackupDirectory
+            | UiIntent::OpenReleasePage => Vec::new(),
             UiIntent::SetTheme(mode) => match self.settings.save_theme_mode(mode, self.clock.now())
             {
                 Ok(()) => Vec::new(),
@@ -271,6 +275,7 @@ fn failure_event(error: &RepositoryError) -> ApplicationEvent {
         crate::RepositoryOperation::ReadFocus => "Focus state could not be loaded.",
         crate::RepositoryOperation::WriteFocus => "The Focus session could not be changed.",
         crate::RepositoryOperation::ReadHistory => "History could not be loaded.",
+        crate::RepositoryOperation::MaintainData => "Data maintenance could not be completed.",
         crate::RepositoryOperation::Open | crate::RepositoryOperation::Migrate => {
             "Quadrant storage is unavailable."
         }

@@ -4,10 +4,12 @@
 
 mod focus;
 mod history;
+mod maintenance;
 mod ports;
 mod reminders;
 mod tasks;
 mod today;
+mod updates;
 
 pub use focus::{FocusApplication, FocusScheduler, FocusSchedulerHandle};
 pub use history::{
@@ -15,11 +17,13 @@ pub use history::{
     ReviewActivityPoint, ReviewDateRange, ReviewFocusHighlights, ReviewQuadrantValue, ReviewQuery,
     ReviewQueryData, ReviewRange, ReviewRecentCompletion, ReviewTotals, ReviewViewState,
 };
+pub use maintenance::{BackupInfo, MaintenanceApplication, MaintenanceState};
 pub use ports::{
-    AutostartError, AutostartService, CalendarError, Clock, CompletedRepository, FocusRepository,
-    FocusSessionIdGenerator, ReminderRepository, RepositoryError, RepositoryOperation,
-    ReviewRepository, SettingsRepository, SystemClock, TaskIdGenerator, TaskRepository,
-    TodayContextSource, TodayRepository, UuidFocusSessionIdGenerator, UuidTaskIdGenerator,
+    AutostartError, AutostartService, CalendarError, Clock, CompletedRepository, ExternalOpener,
+    FocusRepository, FocusSessionIdGenerator, MaintenanceRepository, PlatformActionError,
+    ReminderRepository, RepositoryError, RepositoryOperation, ReviewRepository, SettingsRepository,
+    SystemClock, TaskIdGenerator, TaskRepository, TodayContextSource, TodayRepository,
+    UuidFocusSessionIdGenerator, UuidTaskIdGenerator,
 };
 pub use quadrant_domain::{
     FocusDomainError, FocusMode, FocusSession, FocusSessionId, FocusSessionRecord, FocusStatus,
@@ -33,6 +37,7 @@ pub use reminders::{
 };
 pub use tasks::{ApplicationLoadError, TaskApplication};
 pub use today::{TodayContext, TodayTaskSummary, TodayViewState};
+pub use updates::{DistributionChannel, UpdateViewState};
 
 use std::fmt;
 
@@ -67,6 +72,14 @@ pub enum UiIntent {
     SetReviewRange(ReviewRange),
     /// Increase the bounded Completed history page size.
     LoadMoreCompleted,
+    /// Create a validated `SQLite` backup in the application backup directory.
+    CreateBackup,
+    /// Validate and stage the newest backup for the next startup.
+    StageLatestRestore,
+    /// Open the application-private backup directory.
+    OpenBackupDirectory,
+    /// Open the distribution-neutral GitHub Releases page.
+    OpenReleasePage,
     /// Move an active task into Inbox or a quadrant.
     MoveTask {
         /// Task to move.
@@ -138,6 +151,18 @@ impl UiIntent {
             Self::Navigate(NavigationRoute::Review | NavigationRoute::Completed)
                 | Self::SetReviewRange(_)
                 | Self::LoadMoreCompleted
+        )
+    }
+
+    /// Returns whether the maintenance/release service owns this intent.
+    #[must_use]
+    pub const fn is_maintenance_intent(&self) -> bool {
+        matches!(
+            self,
+            Self::CreateBackup
+                | Self::StageLatestRestore
+                | Self::OpenBackupDirectory
+                | Self::OpenReleasePage
         )
     }
 
@@ -678,6 +703,8 @@ pub enum ApplicationEvent {
     ReviewChanged(ReviewViewState),
     /// Replace the bounded Completed history projection.
     CompletedChanged(CompletedViewState),
+    /// Replace the Settings data-maintenance projection.
+    MaintenanceChanged(MaintenanceState),
     /// Surface an application reminder through the active presentation adapter.
     ReminderDue(ReminderAlert),
     /// Populate and open the dedicated task editor.

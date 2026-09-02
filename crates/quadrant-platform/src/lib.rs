@@ -2,6 +2,7 @@
 
 mod autostart;
 mod desktop;
+mod external;
 mod instance;
 mod notifications;
 #[cfg(target_os = "windows")]
@@ -19,8 +20,17 @@ const DATABASE_FILE_NAME: &str = "quadrant-rust.db";
 
 pub use autostart::PlatformAutostartService;
 pub use desktop::DesktopIntegration;
+pub use external::PlatformExternalOpener;
 pub use instance::{ActivationListener, SingleInstanceCoordinator};
 pub use notifications::PlatformNotificationDelivery;
+
+/// Reports a fatal startup failure before the Slint shell exists.
+pub fn report_startup_error(error: &dyn std::fmt::Display) {
+    let detail = error.to_string();
+    eprintln!("Quadrant could not start: {detail}");
+    #[cfg(target_os = "windows")]
+    windows::show_startup_error(&detail);
+}
 
 /// Thread-safe desktop event destination implemented by the UI adapter.
 pub type DesktopEventSink = Arc<dyn Fn(DesktopEvent) + Send + Sync>;

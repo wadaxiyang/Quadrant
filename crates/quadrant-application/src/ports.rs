@@ -1,6 +1,6 @@
 //! Application-owned persistence and clock ports.
 
-use std::{error::Error, fmt, time::SystemTime};
+use std::{error::Error, fmt, path::Path, time::SystemTime};
 
 use quadrant_domain::{
     FocusSession, FocusSessionId, FocusStatus, LocalDate, NewTask, PomodoroSettings, Task,
@@ -8,7 +8,10 @@ use quadrant_domain::{
 };
 use uuid::Uuid;
 
-use crate::{DesktopSettings, FocusDaySummary, ReorderDirection, ThemeMode, TodayContext};
+use crate::{
+    BackupInfo, DesktopSettings, FocusDaySummary, MaintenanceState, ReorderDirection, ThemeMode,
+    TodayContext,
+};
 use crate::{ReviewQuery, ReviewQueryData};
 
 /// Semantic repository operation used for error classification.
@@ -42,6 +45,8 @@ pub enum RepositoryOperation {
     WriteFocus,
     /// Reading Review aggregates or completed-task history.
     ReadHistory,
+    /// Creating, validating, or staging a local database backup.
+    MaintainData,
 }
 
 /// Storage adapter failure with typed operation context and diagnostic detail.
@@ -333,6 +338,64 @@ pub trait CompletedRepository: Send + Sync {
     ///
     /// Returns a history query or task mapping failure.
     fn list_completed_tasks(&self, limit: u32) -> Result<Vec<Task>, RepositoryError>;
+}
+
+/// SQLite-consistent backup and staged-restore capability.
+pub trait MaintenanceRepository: Send + Sync {
+    /// Returns the current backup directory, latest valid-looking file, and pending state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an I/O or metadata query failure.
+    fn maintenance_state(&self) -> Result<MaintenanceState, RepositoryError>;
+
+    /// Creates and validates a new immutable backup snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns a snapshot, filesystem, schema, or integrity-check failure.
+    fn create_backup(&self, now: UtcTimestamp) -> Result<BackupInfo, RepositoryError>;
+
+    /// Validates the newest backup and stages it for the next process startup.
+    ///
+    /// # Errors
+    ///
+    /// Returns a missing-backup, validation, or filesystem failure.
+    fn stage_latest_restore(&self) -> Result<BackupInfo, RepositoryError>;
+}
+
+/// Platform-owned opening of local paths and external URLs.
+pub trait ExternalOpener: Send + Sync {
+    /// Opens a directory in the native file manager.
+    ///
+    /// # Errors
+    ///
+    /// Returns a normalized platform failure.
+    fn open_path(&self, path: &Path) -> Result<(), PlatformActionError>;
+
+    /// Opens an HTTPS URL in the user's default browser.
+    ///
+    /// # Errors
+    ///
+    /// Returns a normalized platform failure.
+    fn open_url(&self, url: &str) -> Result<(), PlatformActionError>;
+}
+
+/// Normalized external-action failure without OS details in application code.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[error("{detail}")]
+pub struct PlatformActionError {
+    detail: String,
+}
+
+impl PlatformActionError {
+    /// Wraps platform diagnostic context.
+    #[must_use]
+    pub fn new(detail: impl fmt::Display) -> Self {
+        Self {
+            detail: detail.to_string(),
+        }
+    }
 }
 
 /// Platform capability for registering login/startup launch behavior.

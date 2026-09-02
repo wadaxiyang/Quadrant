@@ -9,11 +9,11 @@ use std::{
 
 use quadrant_application::{
     ApplicationEvent, CompletedViewState, DesktopEvent, DesktopSettings, FocusMode, FocusSession,
-    FocusStartRequest, FocusStatus, FocusViewState, NavigationRoute, PomodoroKind,
-    PomodoroSettings, Quadrant, QuadrantsViewState, QuickAddSubmission, RecurrenceChoice,
-    ReorderDirection, ReviewRange, ReviewViewState, SystemTheme, TaskEditorState,
+    FocusStartRequest, FocusStatus, FocusViewState, MaintenanceState, NavigationRoute,
+    PomodoroKind, PomodoroSettings, Quadrant, QuadrantsViewState, QuickAddSubmission,
+    RecurrenceChoice, ReorderDirection, ReviewRange, ReviewViewState, SystemTheme, TaskEditorState,
     TaskEditorSubmission, TaskId, TaskPlacement, ThemeMode as ApplicationThemeMode, TodayViewState,
-    UiIntent, UtcTimestamp, WindowCloseBehavior, WindowMinimizeBehavior,
+    UiIntent, UpdateViewState, UtcTimestamp, WindowCloseBehavior, WindowMinimizeBehavior,
 };
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, TimerMode, VecModel};
 
@@ -26,6 +26,10 @@ use crate::{
 /// Initial state supplied by the composition root.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UiShellConfig {
+    /// Canonical Cargo package version shown by every UI surface.
+    pub application_version: String,
+    /// Static distribution/update ownership state.
+    pub updates: UpdateViewState,
     /// User-selected theme behavior.
     pub theme_mode: ApplicationThemeMode,
     /// Current normalized platform appearance.
@@ -40,6 +44,8 @@ pub struct UiShellConfig {
     pub review: ReviewViewState,
     /// Initial bounded Completed projection.
     pub completed: CompletedViewState,
+    /// Initial backup/restore projection.
+    pub maintenance: MaintenanceState,
     /// Persisted desktop lifecycle policy.
     pub desktop_settings: DesktopSettings,
 }
@@ -99,6 +105,11 @@ impl UiShell {
         apply_focus_state(&main_window, &config.focus, &focus_session);
         apply_review_state(&main_window, &config.review);
         apply_completed_state(&main_window, &config.completed);
+        apply_maintenance_state(&main_window, &config.maintenance);
+        main_window
+            .set_application_version(SharedString::from(config.application_version.as_str()));
+        main_window.set_update_description(SharedString::from(config.updates.description.as_str()));
+        main_window.set_can_open_releases(config.updates.can_open_releases);
         bind_main_window(&main_window, &quick_add, &task_editor, &intent_handler);
         bind_quick_add(&quick_add, Rc::clone(&intent_handler));
         bind_task_editor(&task_editor, intent_handler);
@@ -263,7 +274,28 @@ fn bind_main_window(
     bind_task_actions(main_window, intent_handler);
     bind_focus_actions(main_window, intent_handler);
     bind_history_actions(main_window, intent_handler);
+    bind_maintenance_actions(main_window, intent_handler);
     bind_main_window_controls(main_window);
+}
+
+fn bind_maintenance_actions(main_window: &MainWindow, intent_handler: &Rc<dyn Fn(UiIntent)>) {
+    let create_handler = Rc::clone(intent_handler);
+    main_window.on_create_backup_requested(move || create_handler(UiIntent::CreateBackup));
+
+    let open_handler = Rc::clone(intent_handler);
+    main_window.on_open_backup_directory_requested(move || {
+        open_handler(UiIntent::OpenBackupDirectory);
+    });
+
+    let restore_handler = Rc::clone(intent_handler);
+    main_window.on_backup_restore_confirmed(move || {
+        restore_handler(UiIntent::StageLatestRestore);
+    });
+
+    let release_handler = Rc::clone(intent_handler);
+    main_window.on_open_release_page_requested(move || {
+        release_handler(UiIntent::OpenReleasePage);
+    });
 }
 
 fn bind_history_actions(main_window: &MainWindow, intent_handler: &Rc<dyn Fn(UiIntent)>) {
@@ -614,6 +646,7 @@ fn apply_application_event(
         ApplicationEvent::FocusChanged(state) => apply_focus_state(main, &state, focus_session),
         ApplicationEvent::ReviewChanged(state) => apply_review_state(main, &state),
         ApplicationEvent::CompletedChanged(state) => apply_completed_state(main, &state),
+        ApplicationEvent::MaintenanceChanged(state) => apply_maintenance_state(main, &state),
         ApplicationEvent::ReminderDue(alert) => {
             main.invoke_show_toast(
                 SharedString::from(format!("Reminder: {}", alert.title)),
@@ -973,6 +1006,40 @@ fn apply_completed_state(main: &MainWindow, state: &CompletedViewState) {
         .collect::<Vec<_>>();
     main.set_completed_tasks(ModelRc::from(Rc::new(VecModel::from(rows))));
     main.set_completed_has_more(state.has_more);
+}
+
+fn apply_maintenance_state(main: &MainWindow, state: &MaintenanceState) {
+    main.set_backup_directory(SharedString::from(
+        state.backup_directory.to_string_lossy().as_ref(),
+    ));
+    main.set_latest_backup(SharedString::from(
+        state.latest_backup.as_ref().map_or_else(
+            || "No backup created yet".to_owned(),
+            |backup| {
+                let filename = backup.path.file_name().map_or_else(
+                    || backup.path.display().to_string(),
+                    |value| value.to_string_lossy().into_owned(),
+                );
+                format!(
+                    "Latest: {filename} · {}",
+                    format_file_size(backup.size_bytes)
+                )
+            },
+        ),
+    ));
+    main.set_restore_pending(state.restore_pending);
+}
+
+fn format_file_size(bytes: u64) -> String {
+    const KIB: u64 = 1024;
+    const MIB: u64 = KIB * 1024;
+    if bytes >= MIB {
+        format!("{} MiB", bytes.div_ceil(MIB))
+    } else if bytes >= KIB {
+        format!("{} KiB", bytes.div_ceil(KIB))
+    } else {
+        format!("{bytes} B")
+    }
 }
 
 const fn quadrant_label(quadrant: Quadrant) -> &'static str {

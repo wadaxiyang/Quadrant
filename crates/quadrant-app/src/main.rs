@@ -4,15 +4,23 @@ use std::sync::Arc;
 
 use quadrant_application::{
     ApplicationEvent, AutostartService, Clock, CompletedRepository, FocusApplication,
-    FocusRepository, FocusScheduler, FocusSessionIdGenerator, HistoryApplication, ReminderAlert,
-    ReminderDelivery, ReminderDeliveryError, ReminderRepository, ReminderScheduler,
-    ReviewRepository, SettingsRepository, SystemClock, SystemThemeSource, TaskApplication,
-    TaskIdGenerator, TaskRepository, TodayContextSource, TodayRepository, UiIntent,
-    UserFacingError, UuidFocusSessionIdGenerator, UuidTaskIdGenerator,
+    FocusRepository, FocusScheduler, FocusSessionIdGenerator, HistoryApplication,
+    MaintenanceApplication, MaintenanceRepository, ReminderAlert, ReminderDelivery,
+    ReminderDeliveryError, ReminderRepository, ReminderScheduler, ReviewRepository,
+    SettingsRepository, SystemClock, SystemThemeSource, TaskApplication, TaskIdGenerator,
+    TaskRepository, TodayContextSource, TodayRepository, UiIntent, UserFacingError,
+    UuidFocusSessionIdGenerator, UuidTaskIdGenerator,
 };
 
+fn main() {
+    if let Err(error) = run() {
+        quadrant_platform::report_startup_error(error.as_ref());
+        std::process::exit(1);
+    }
+}
+
 #[allow(clippy::too_many_lines)] // Composition root keeps all concrete wiring visible in one place.
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn run() -> Result<(), Box<dyn std::error::Error>> {
     let database_path = quadrant_platform::PlatformPaths.database_path()?;
     let runtime = application_runtime()?;
     let single_instance =
@@ -21,18 +29,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         single_instance.notify_primary()?;
         return Ok(());
     }
+    let applied_restore = quadrant_storage::apply_pending_restore(&database_path)?;
     let activation_listener = {
         let _runtime_context = runtime.enter();
         single_instance.bind_activation_listener()?
     };
 
-    let store = Arc::new(quadrant_storage::SqliteStore::open(database_path)?);
+    let store = Arc::new(quadrant_storage::SqliteStore::open(&database_path)?);
     let tasks: Arc<dyn TaskRepository> = store.clone();
     let today_tasks: Arc<dyn TodayRepository> = store.clone();
     let reminders: Arc<dyn ReminderRepository> = store.clone();
     let focus_repository: Arc<dyn FocusRepository> = store.clone();
     let review_repository: Arc<dyn ReviewRepository> = store.clone();
     let completed_repository: Arc<dyn CompletedRepository> = store.clone();
+    let maintenance_repository: Arc<dyn MaintenanceRepository> = store.clone();
     let settings: Arc<dyn SettingsRepository> = store.clone();
     let autostart: Arc<dyn AutostartService> =
         Arc::new(quadrant_platform::PlatformAutostartService);
@@ -64,17 +74,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&clock),
         Arc::new(quadrant_platform::PlatformTodayContextSource),
     );
+    let maintenance_application = MaintenanceApplication::new(
+        maintenance_repository,
+        Arc::new(quadrant_platform::PlatformExternalOpener),
+        Arc::clone(&clock),
+    );
     let initial_quadrants = application.load_quadrants()?;
     let initial_today = application.load_today()?;
     let initial_focus = focus_application.load_state()?;
     let initial_review = history_application.load_review()?;
     let initial_completed = history_application.load_completed()?;
+    let initial_maintenance = maintenance_application.load_state()?;
     let theme_mode = store.load_theme_mode()?.unwrap_or_default();
     let desktop_settings = settings.load_desktop_settings()?;
     let autostart_reconcile_failed = reconcile_autostart(&*autostart, desktop_settings);
 
     let theme_source = quadrant_platform::PlatformThemeSource;
     let config = quadrant_ui::UiShellConfig {
+        application_version: env!("CARGO_PKG_VERSION").to_owned(),
+        updates: quadrant_application::UpdateViewState::from_build(
+            env!("CARGO_PKG_VERSION"),
+            option_env!("QUADRANT_DISTRIBUTION_CHANNEL"),
+        ),
         theme_mode,
         system_theme: theme_source.current_theme(),
         quadrants: initial_quadrants,
@@ -82,6 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         focus: initial_focus,
         review: initial_review,
         completed: initial_completed,
+        maintenance: initial_maintenance,
         desktop_settings,
     };
 
@@ -100,6 +122,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         start_desktop_integration(Arc::clone(&desktop_event_sink), &event_sink);
     shell.set_platform_capabilities(ui_capabilities(desktop_integration.as_ref(), &*autostart));
     report_autostart_reconcile_failure(autostart_reconcile_failed, &event_sink);
+    report_applied_restore(applied_restore.as_ref(), &event_sink);
     let reminder_delivery = native_reminder_delivery(Arc::clone(&event_sink));
     let (reminder_scheduler, reminder_handle) =
         ReminderScheduler::new(reminders, clock, reminder_delivery);
@@ -117,12 +140,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let refreshes_focus = intent.affects_focus_projection();
             let is_focus = intent.is_focus_intent();
             let is_history = intent.is_history_intent();
+            let is_maintenance = intent.is_maintenance_intent();
             let refreshes_history = intent.affects_history_projection();
             let application = application.clone();
             let focus_application = focus_application.clone();
             let history_application = history_application.clone();
+            let maintenance_application = maintenance_application.clone();
             let events = tokio::task::spawn_blocking(move || {
-                let mut events = if is_history {
+                let mut events = if is_maintenance {
+                    maintenance_application.handle(&intent)
+                } else if is_history {
                     history_application.handle(&intent)
                 } else if is_focus {
                     focus_application.handle(&intent)
@@ -173,6 +200,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     runtime.block_on(activation_worker)?;
     ui_result?;
     Ok(())
+}
+
+fn report_applied_restore(
+    restore: Option<&quadrant_storage::AppliedRestore>,
+    event_sink: &quadrant_ui::ApplicationEventSink,
+) {
+    let Some(restore) = restore else {
+        return;
+    };
+    let message = restore.recovery_directory.as_ref().map_or_else(
+        || "The staged backup was restored.".to_owned(),
+        |directory| {
+            format!(
+                "The staged backup was restored. Previous data is in {}.",
+                directory.display()
+            )
+        },
+    );
+    event_sink(ApplicationEvent::OperationSucceeded(message));
 }
 
 fn application_runtime() -> std::io::Result<tokio::runtime::Runtime> {
