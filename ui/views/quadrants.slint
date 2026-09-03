@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { ScrollView } from "std-widgets.slint";
-import { Theme, Typography } from "../theme.slint";
+import { Elevation, Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { PageHeader } from "../components/page_shell.slint";
-import { Badge, FluentButton, SegmentButton, SurfaceCard } from "../components/common.slint";
+import { Badge, FluentButton, SegmentButton, SurfaceCard, TaskRowShell } from "../components/common.slint";
 import { IconButton } from "../components/icon.slint";
 import { Icons } from "../icons.slint";
 
@@ -14,7 +14,7 @@ export struct TaskRow {
     title: string,
 }
 
-component TaskCard inherits Rectangle {
+component TaskCard inherits TaskRowShell {
     in property <TaskRow> task;
     in property <int> destination;
     callback move_requested(string, int);
@@ -23,13 +23,7 @@ component TaskCard inherits Rectangle {
     callback complete_requested(string);
     callback delete_requested(string);
 
-    height: 64px;
-    background: card_touch.has-hover ? Theme.card_hover : Theme.input_bg;
-    border-width: 1px;
-    border-color: Theme.input_border;
-    border-radius: UiConstants.control_radius;
-
-    card_touch := TouchArea { }
+    row_height: 60px;
 
     HorizontalLayout {
         padding-left: UiConstants.space_8;
@@ -80,8 +74,8 @@ component TaskCard inherits Rectangle {
         close-policy: close-on-click-outside;
 
         SurfaceCard {
-            drop-shadow-blur: 12px;
-            drop-shadow-color: #00000044;
+            drop-shadow-blur: Elevation.popup_blur;
+            drop-shadow-color: Elevation.popup_shadow;
 
             VerticalLayout {
                 padding: UiConstants.space_8;
@@ -104,8 +98,8 @@ component TaskCard inherits Rectangle {
         close-policy: close-on-click-outside;
 
         SurfaceCard {
-            drop-shadow-blur: 12px;
-            drop-shadow-color: #00000044;
+            drop-shadow-blur: Elevation.popup_blur;
+            drop-shadow-color: Elevation.popup_shadow;
 
             VerticalLayout {
                 padding: UiConstants.space_8;

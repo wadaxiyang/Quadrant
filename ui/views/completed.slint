@@ -5,7 +5,7 @@ import { ScrollView } from "std-widgets.slint";
 import { Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { EmptyState, PageHeader } from "../components/page_shell.slint";
-import { FluentButton, SurfaceCard } from "../components/common.slint";
+import { FluentButton, SurfaceCard, TaskRowShell } from "../components/common.slint";
 import { IconButton } from "../components/icon.slint";
 import { Icons } from "../icons.slint";
 
@@ -15,12 +15,14 @@ export struct CompletedTaskRow {
     metadata: string,
 }
 
-component CompletedTaskListRow inherits Rectangle {
+component CompletedTaskListRow inherits TaskRowShell {
     in property <CompletedTaskRow> task;
     callback reopen_requested(string);
     callback delete_requested(string);
 
-    height: 64px;
+    row_height: 60px;
+    background: transparent;
+    border-width: 0px;
 
     HorizontalLayout {
         padding-left: UiConstants.space_12;

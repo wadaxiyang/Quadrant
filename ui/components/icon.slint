@@ -28,21 +28,45 @@ export component FluentIcon inherits Rectangle {
     }
 }
 
+export component TooltipHost inherits Rectangle {
+    in property <string> text;
+    in property <bool> shown: false;
+
+    visible: root.shown && root.text != "";
+    width: tooltip_label.preferred-width + UiConstants.space_16;
+    height: 28px;
+    background: Theme.dark_mode ? #f2f2f2 : #2b2b2b;
+    border-radius: UiConstants.control_radius;
+    z: 500;
+
+    tooltip_label := Text {
+        text: root.text;
+        color: Theme.dark_mode ? #202020 : #ffffff;
+        font-size: Typography.caption;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
 export component IconButton inherits Rectangle {
     in property <image> icon;
     in property <string> tooltip;
     in property <bool> danger: false;
     in property <bool> enabled: true;
+    // Development-gallery overrides; false in product surfaces.
+    in property <bool> preview_hover: false;
+    in property <bool> preview_pressed: false;
+    in property <bool> preview_focus: false;
     callback clicked;
 
     width: UiConstants.icon_button_size;
     height: UiConstants.icon_button_size;
     border-radius: UiConstants.control_radius;
-    border-width: keyboard_focus.has-focus ? 2px : 0px;
+    border-width: (keyboard_focus.has-focus || root.preview_focus) ? 2px : 0px;
     border-color: Theme.focus_ring;
     background: !root.enabled ? transparent :
-                button_touch.pressed ? (root.danger ? Theme.danger_bg : Theme.selected_bg) :
-                button_touch.has-hover ? (root.danger ? Theme.danger_bg : Theme.control_bg_hover) : transparent;
+                (button_touch.pressed || root.preview_pressed) ? (root.danger ? Theme.danger_bg : Theme.selected_bg) :
+                (button_touch.has-hover || root.preview_hover) ? (root.danger ? Theme.danger_bg : Theme.control_bg_hover) : transparent;
     opacity: root.enabled ? 1 : 0.45;
     forward-focus: keyboard_focus;
     accessible-role: button;
@@ -55,7 +79,7 @@ export component IconButton inherits Rectangle {
         y: (parent.height - self.height) / 2;
         source: root.icon;
         icon_color: root.danger ? Theme.danger :
-                    button_touch.has-hover ? Theme.text_primary : Theme.icon_neutral;
+                    (button_touch.has-hover || root.preview_hover) ? Theme.text_primary : Theme.icon_neutral;
     }
 
     keyboard_focus := FocusScope {
@@ -75,21 +99,10 @@ export component IconButton inherits Rectangle {
         clicked => { root.clicked(); }
     }
 
-    if root.tooltip != "" && button_touch.has-hover: Rectangle {
+    TooltipHost {
         x: (parent.width - self.width) / 2;
         y: parent.height + UiConstants.space_4;
-        width: tooltip_label.preferred-width + UiConstants.space_16;
-        height: 28px;
-        background: Theme.dark_mode ? #f2f2f2 : #2b2b2b;
-        border-radius: UiConstants.control_radius;
-        z: 500;
-
-        tooltip_label := Text {
-            text: root.tooltip;
-            color: Theme.dark_mode ? #202020 : #ffffff;
-            font-size: Typography.caption;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
+        text: root.tooltip;
+        shown: button_touch.has-hover;
     }
 }

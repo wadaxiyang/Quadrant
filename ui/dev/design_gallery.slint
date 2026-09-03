@@ -17,6 +17,51 @@ component GalleryLabel inherits Text {
     font-weight: Typography.semibold;
 }
 
+component StateSpecimen inherits VerticalLayout {
+    in property <string> label;
+    spacing: UiConstants.space_4;
+    GalleryLabel { text: root.label; horizontal-alignment: center; }
+}
+
+component ModalTextSample inherits SurfaceCard {
+    in property <string> sample_title;
+    in property <string> sample_message;
+    preferred-height: sample_layout.preferred-height;
+    elevated: true;
+
+    sample_layout := VerticalLayout {
+        padding: UiConstants.space_16;
+        spacing: UiConstants.space_8;
+        Text {
+            text: root.sample_title;
+            color: Theme.text_primary;
+            font-size: Typography.subtitle;
+            font-weight: Typography.semibold;
+        }
+        Text {
+            text: root.sample_message;
+            color: Theme.text_secondary;
+            font-size: Typography.body;
+            wrap: word-wrap;
+        }
+    }
+}
+
+component CardStateSample inherits SurfaceCard {
+    in property <string> label;
+    min-height: 56px;
+    accessible_name: root.label;
+
+    Text {
+        text: root.label;
+        color: Theme.text_primary;
+        font-size: Typography.caption;
+        font-weight: Typography.semibold;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
 export component DesignGalleryWindow inherits Window {
     title: "Quadrant Design Gallery";
     preferred-width: 1040px;
@@ -94,17 +139,29 @@ export component DesignGalleryWindow inherits Window {
             }
 
             SurfaceCard {
-                height: 112px;
-                HorizontalLayout {
+                preferred-height: button_states.preferred-height;
+                button_states := VerticalLayout {
                     padding: UiConstants.space_16;
                     spacing: UiConstants.space_12;
-                    alignment: center;
-                    GalleryLabel { text: "Buttons"; width: 92px; }
-                    FluentButton { width: 112px; text: "Secondary"; }
-                    FluentButton { width: 96px; text: "Primary"; primary: true; }
-                    FluentButton { text: "Add task"; icon: Icons.add; show_icon: true; primary: true; }
-                    FluentButton { width: 96px; text: "Danger"; danger: true; }
-                    FluentButton { width: 96px; text: "Disabled"; enabled: false; }
+                    GalleryLabel { text: "Button interaction states"; }
+                    HorizontalLayout {
+                        spacing: UiConstants.space_12;
+                        StateSpecimen { horizontal-stretch: 1; label: "Normal"; FluentButton { text: "Button"; } }
+                        StateSpecimen { horizontal-stretch: 1; label: "Hover"; FluentButton { text: "Button"; preview_hover: true; } }
+                        StateSpecimen { horizontal-stretch: 1; label: "Pressed"; FluentButton { text: "Button"; preview_pressed: true; } }
+                        StateSpecimen { horizontal-stretch: 1; label: "Keyboard focus"; FluentButton { text: "Button"; preview_focus: true; } }
+                        StateSpecimen { horizontal-stretch: 1; label: "Disabled"; FluentButton { text: "Button"; enabled: false; } }
+                        StateSpecimen { horizontal-stretch: 1; label: "Danger"; FluentButton { text: "Delete"; danger: true; primary: true; } }
+                    }
+                    HorizontalLayout {
+                        spacing: UiConstants.space_8;
+                        GalleryLabel { text: "Segment"; width: 72px; vertical-alignment: center; }
+                        SegmentButton { text: "Selected"; selected: true; }
+                        SegmentButton { text: "Hover"; preview_hover: true; }
+                        SegmentButton { text: "Pressed"; preview_pressed: true; }
+                        SegmentButton { text: "Focus"; preview_focus: true; }
+                        Rectangle { horizontal-stretch: 1; }
+                    }
                 }
             }
 
@@ -145,35 +202,65 @@ export component DesignGalleryWindow inherits Window {
             }
 
             SurfaceCard {
-                height: 112px;
-                HorizontalLayout {
+                preferred-height: icon_states.preferred-height;
+                icon_states := VerticalLayout {
                     padding: UiConstants.space_16;
                     spacing: UiConstants.space_12;
-                    alignment: center;
-                    GalleryLabel { text: "Icons"; width: 92px; }
-                    IconButton { icon: Icons.add; tooltip: "Add task"; }
-                    IconButton { icon: Icons.edit; tooltip: "Edit task"; }
-                    IconButton { icon: Icons.delete; tooltip: "Delete task"; danger: true; }
-                    IconButton { icon: Icons.dismiss; tooltip: "Dismiss"; enabled: false; }
-                    Rectangle { width: UiConstants.space_12; }
-                    FluentIcon { source: Icons.quadrants_regular; size: 20px; }
-                    FluentIcon { source: Icons.quadrants_filled; size: 20px; icon_color: Theme.accent; }
-                    FluentIcon { source: Icons.status_info; size: 24px; icon_color: Theme.accent; }
-                    FluentIcon { source: Icons.status_success; size: 24px; icon_color: Theme.success; }
-                    FluentIcon { source: Icons.status_warning; size: 24px; icon_color: Theme.warning; }
-                    FluentIcon { source: Icons.status_error; size: 24px; icon_color: Theme.danger; }
+                    GalleryLabel { text: "IconButton interaction states"; }
+                    HorizontalLayout {
+                        spacing: UiConstants.space_12;
+                        StateSpecimen { horizontal-stretch: 1; label: "Normal"; IconButton { icon: Icons.add; tooltip: "Normal"; } }
+                        StateSpecimen { horizontal-stretch: 1; label: "Hover"; IconButton { icon: Icons.add; tooltip: "Hover"; preview_hover: true; } }
+                        StateSpecimen { horizontal-stretch: 1; label: "Pressed"; IconButton { icon: Icons.add; tooltip: "Pressed"; preview_pressed: true; } }
+                        StateSpecimen { horizontal-stretch: 1; label: "Keyboard focus"; IconButton { icon: Icons.add; tooltip: "Focused"; preview_focus: true; } }
+                        StateSpecimen { horizontal-stretch: 1; label: "Danger"; IconButton { icon: Icons.delete; tooltip: "Delete"; danger: true; preview_hover: true; } }
+                        StateSpecimen { horizontal-stretch: 1; label: "Disabled"; IconButton { icon: Icons.dismiss; tooltip: "Disabled"; enabled: false; } }
+                    }
+                    HorizontalLayout {
+                        spacing: UiConstants.space_12;
+                        GalleryLabel { text: "Semantic icons"; width: 116px; vertical-alignment: center; }
+                        FluentIcon { source: Icons.quadrants_regular; size: 20px; }
+                        FluentIcon { source: Icons.quadrants_filled; size: 20px; icon_color: Theme.accent; }
+                        FluentIcon { source: Icons.status_info; size: 24px; icon_color: Theme.accent; }
+                        FluentIcon { source: Icons.status_success; size: 24px; icon_color: Theme.success; }
+                        FluentIcon { source: Icons.status_warning; size: 24px; icon_color: Theme.warning; }
+                        FluentIcon { source: Icons.status_error; size: 24px; icon_color: Theme.danger; }
+                        Rectangle { horizontal-stretch: 1; }
+                    }
                 }
             }
 
             SurfaceCard {
-                height: 176px;
-                HorizontalLayout {
+                preferred-height: card_states.preferred-height;
+                card_states := VerticalLayout {
+                    padding: UiConstants.space_16;
+                    spacing: UiConstants.space_12;
+                    GalleryLabel { text: "SurfaceCard variants"; }
+                    HorizontalLayout {
+                        spacing: UiConstants.space_12;
+                        CardStateSample { horizontal-stretch: 1; label: "Base"; }
+                        CardStateSample { horizontal-stretch: 1; label: "Hover"; interactive: true; preview_hover: true; }
+                        CardStateSample { horizontal-stretch: 1; label: "Pressed"; interactive: true; preview_pressed: true; }
+                        CardStateSample { horizontal-stretch: 1; label: "Elevated"; elevated: true; }
+                        CardStateSample { horizontal-stretch: 1; label: "Selected"; selected: true; }
+                        CardStateSample { horizontal-stretch: 1; label: "Keyboard focus"; interactive: true; preview_focus: true; }
+                        CardStateSample { horizontal-stretch: 1; label: "Disabled"; interactive: true; enabled: false; }
+                    }
+                }
+            }
+
+            SurfaceCard {
+                preferred-height: inputs_layout.preferred-height;
+                inputs_layout := HorizontalLayout {
                     padding: UiConstants.space_16;
                     spacing: UiConstants.space_16;
                     GalleryLabel { text: "Inputs"; width: 92px; }
                     VerticalLayout {
                         spacing: UiConstants.space_8;
                         FluentTextField { text <=> root.sample_text; placeholder_text: "Task title"; }
+                        FluentTextField { text: "Focused value"; preview_focus: true; }
+                        FluentTextField { text: "Invalid value"; error_text: "Explain the problem beside the field."; }
+                        FluentTextField { text: "Disabled value"; enabled: false; }
                         FluentTextArea { height: 80px; text: root.sample_text; placeholder_text: "Notes"; }
                     }
                     VerticalLayout {
@@ -205,6 +292,7 @@ export component DesignGalleryWindow inherits Window {
                             shown: true;
                             message: "Information uses the shared SVG and type scale.";
                             kind: ToastKind.info;
+                            auto_dismiss: false;
                         }
                     }
                     Rectangle {
@@ -214,15 +302,17 @@ export component DesignGalleryWindow inherits Window {
                             shown: true;
                             message: "The task was completed successfully.";
                             kind: ToastKind.success;
+                            auto_dismiss: false;
                         }
                     }
                     Rectangle {
-                        height: 56px;
+                        height: 76px;
                         ToastHost {
                             width: min(parent.width, 420px);
                             shown: true;
-                            message: "Something needs attention before continuing.";
+                            message: "This deliberately long error wraps onto a second line so critical details remain visible at the maximum toast width.";
                             kind: ToastKind.error;
+                            auto_dismiss: false;
                         }
                     }
                 }
@@ -249,6 +339,20 @@ export component DesignGalleryWindow inherits Window {
                         FluentButton { text: "Show warning"; clicked => { root.sample_modal_kind = 1; root.sample_modal_visible = true; } }
                         FluentButton { text: "Show danger"; danger: true; clicked => { root.sample_modal_kind = 2; root.sample_modal_visible = true; } }
                         Rectangle { horizontal-stretch: 1; }
+                    }
+
+                    HorizontalLayout {
+                        spacing: UiConstants.space_16;
+                        ModalTextSample {
+                            horizontal-stretch: 1;
+                            sample_title: "Short confirmation";
+                            sample_message: "Save these changes?";
+                        }
+                        ModalTextSample {
+                            horizontal-stretch: 1;
+                            sample_title: "Long wrapped confirmation";
+                            sample_message: "This longer modal copy demonstrates content-driven height when a decision needs enough context to remain clear without clipping or relying on a fixed dialog height.";
+                        }
                     }
                 }
             }

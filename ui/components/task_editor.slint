@@ -1,18 +1,27 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { Palette, ScrollView } from "std-widgets.slint";
+import { Date, DatePickerPopup, Palette, ScrollView, Time, TimePickerPopup } from "std-widgets.slint";
 import { Theme, ThemeMode, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { Icons } from "../icons.slint";
 import { FluentButton, FluentTextArea, FluentTextField, SegmentButton, SurfaceCard } from "common.slint";
-import { FluentIcon } from "icon.slint";
+import { FluentIcon, IconButton } from "icon.slint";
 import { SectionHeader } from "page_shell.slint";
 
 component FieldLabel inherits Text {
     color: Theme.text_secondary;
     font-size: Typography.caption;
     font-weight: Typography.semibold;
+}
+
+component FieldError inherits Text {
+    in property <string> message;
+    visible: root.message != "";
+    text: root.message;
+    color: Theme.danger;
+    font-size: Typography.caption;
+    wrap: word-wrap;
 }
 
 export component TaskEditorWindow inherits Window {
@@ -41,8 +50,39 @@ export component TaskEditorWindow inherits Window {
     in-out property <string> custom_interval_days;
     in-out property <string> error_message;
 
+    // Human-readable editor state. Legacy ISO properties above remain public
+    // for source compatibility; the Rust adapter translates these values.
+    in-out property <bool> planned_selected: false;
+    in-out property <Date> planned_date: { year: 2026, month: 1, day: 1 };
+    in-out property <bool> due_selected: false;
+    in-out property <Date> due_date: { year: 2026, month: 1, day: 1 };
+    in-out property <Time> due_time: { hour: 9, minute: 0, second: 0 };
+    in-out property <bool> reminder_selected: false;
+    in-out property <Date> reminder_date: { year: 2026, month: 1, day: 1 };
+    in-out property <Time> reminder_time: { hour: 8, minute: 30, second: 0 };
+
+    in-out property <string> title_error;
+    in-out property <string> planned_error;
+    in-out property <string> due_error;
+    in-out property <string> due_time_zone_error;
+    in-out property <string> reminder_error;
+    in-out property <string> reminder_time_zone_error;
+    in-out property <string> recurrence_error;
+
     callback submitted(string, string, string, int, string, string, string, string, string, int, string);
     callback cancelled;
+
+    function two_digits(value: int) -> string {
+        return (value < 10 ? "0" : "") + value;
+    }
+
+    function date_text(value: Date) -> string {
+        return value.year + "-" + root.two_digits(value.month) + "-" + root.two_digits(value.day);
+    }
+
+    function time_text(value: Time) -> string {
+        return root.two_digits(value.hour) + ":" + root.two_digits(value.minute);
+    }
 
     public function apply_theme(mode: ThemeMode, system_dark: bool) {
         Theme.mode = mode;
@@ -155,7 +195,13 @@ export component TaskEditorWindow inherits Window {
                             title_field := FluentTextField {
                                 text <=> root.title_text;
                                 placeholder_text: "Task title";
-                                edited(value) => { if (value != "") { root.error_message = ""; } }
+                                error_text: root.title_error;
+                                edited(value) => {
+                                    if (value != "") {
+                                        root.title_error = "";
+                                        root.error_message = "";
+                                    }
+                                }
                             }
 
                             FieldLabel { text: "Notes"; }
@@ -187,61 +233,108 @@ export component TaskEditorWindow inherits Window {
 
                             SectionHeader {
                                 title: "Schedule";
-                                description: "Dates remain optional; date-time values retain their existing ISO format.";
+                                description: "Choose local dates and times; Quadrant stores the corresponding UTC instant.";
                             }
 
                             FieldLabel { text: "Planned date"; }
-                            FluentTextField {
-                                text <=> root.planned_on;
-                                placeholder_text: "YYYY-MM-DD (optional)";
-                            }
-
-                            HorizontalLayout {
-                                spacing: UiConstants.space_8;
-
-                                VerticalLayout {
-                                    horizontal-stretch: 2;
-                                    spacing: UiConstants.space_4;
-                                    FieldLabel { text: "Due date and time"; }
-                                    FluentTextField {
-                                        text <=> root.due_at;
-                                        placeholder_text: "2026-09-03T09:00:00+08:00";
+                            VerticalLayout {
+                                spacing: UiConstants.space_4;
+                                HorizontalLayout {
+                                    spacing: UiConstants.space_8;
+                                    FluentButton {
+                                        horizontal-stretch: 1;
+                                        text: root.planned_selected ? root.date_text(root.planned_date) : "Select date";
+                                        icon: Icons.calendar;
+                                        show_icon: true;
+                                        danger: root.planned_error != "";
+                                        clicked => { planned_picker.show(); }
+                                    }
+                                    IconButton {
+                                        visible: root.planned_selected;
+                                        icon: Icons.dismiss;
+                                        tooltip: "Clear planned date";
+                                        clicked => { root.planned_selected = false; root.planned_error = ""; }
                                     }
                                 }
+                                FieldError { message: root.planned_error; }
+                            }
 
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: UiConstants.space_4;
-                                    FieldLabel { text: "Timezone"; }
+                            FieldLabel { text: "Due"; }
+                            VerticalLayout {
+                                spacing: UiConstants.space_4;
+                                HorizontalLayout {
+                                    spacing: UiConstants.space_8;
+                                    FluentButton {
+                                        width: 148px;
+                                        text: root.due_selected ? root.date_text(root.due_date) : "Select date";
+                                        icon: Icons.calendar;
+                                        show_icon: true;
+                                        danger: root.due_error != "";
+                                        clicked => { due_date_picker.show(); }
+                                    }
+                                    FluentButton {
+                                        width: 112px;
+                                        text: root.time_text(root.due_time);
+                                        icon: Icons.clock;
+                                        show_icon: true;
+                                        enabled: root.due_selected;
+                                        danger: root.due_error != "";
+                                        clicked => { due_time_picker.show(); }
+                                    }
                                     FluentTextField {
+                                        horizontal-stretch: 1;
                                         text <=> root.due_time_zone;
-                                        placeholder_text: "Asia/Shanghai";
+                                        placeholder_text: "Timezone, e.g. Asia/Shanghai";
+                                        error_text: root.due_time_zone_error;
+                                        edited(value) => { root.due_time_zone_error = ""; }
+                                    }
+                                    IconButton {
+                                        visible: root.due_selected;
+                                        icon: Icons.dismiss;
+                                        tooltip: "Clear due date and time";
+                                        clicked => { root.due_selected = false; root.due_error = ""; root.due_time_zone_error = ""; }
                                     }
                                 }
+                                FieldError { message: root.due_error; }
                             }
 
-                            HorizontalLayout {
-                                spacing: UiConstants.space_8;
-
-                                VerticalLayout {
-                                    horizontal-stretch: 2;
-                                    spacing: UiConstants.space_4;
-                                    FieldLabel { text: "Reminder date and time"; }
-                                    FluentTextField {
-                                        text <=> root.reminder_at;
-                                        placeholder_text: "2026-09-03T08:30:00+08:00";
+                            FieldLabel { text: "Reminder"; }
+                            VerticalLayout {
+                                spacing: UiConstants.space_4;
+                                HorizontalLayout {
+                                    spacing: UiConstants.space_8;
+                                    FluentButton {
+                                        width: 148px;
+                                        text: root.reminder_selected ? root.date_text(root.reminder_date) : "Select date";
+                                        icon: Icons.calendar;
+                                        show_icon: true;
+                                        danger: root.reminder_error != "";
+                                        clicked => { reminder_date_picker.show(); }
                                     }
-                                }
-
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: UiConstants.space_4;
-                                    FieldLabel { text: "Timezone"; }
+                                    FluentButton {
+                                        width: 112px;
+                                        text: root.time_text(root.reminder_time);
+                                        icon: Icons.clock;
+                                        show_icon: true;
+                                        enabled: root.reminder_selected;
+                                        danger: root.reminder_error != "";
+                                        clicked => { reminder_time_picker.show(); }
+                                    }
                                     FluentTextField {
+                                        horizontal-stretch: 1;
                                         text <=> root.reminder_time_zone;
-                                        placeholder_text: "Asia/Shanghai";
+                                        placeholder_text: "Timezone, e.g. Asia/Shanghai";
+                                        error_text: root.reminder_time_zone_error;
+                                        edited(value) => { root.reminder_time_zone_error = ""; }
+                                    }
+                                    IconButton {
+                                        visible: root.reminder_selected;
+                                        icon: Icons.dismiss;
+                                        tooltip: "Clear reminder date and time";
+                                        clicked => { root.reminder_selected = false; root.reminder_error = ""; root.reminder_time_zone_error = ""; }
                                     }
                                 }
+                                FieldError { message: root.reminder_error; }
                             }
                         }
                     }
@@ -274,6 +367,8 @@ export component TaskEditorWindow inherits Window {
                                     width: 150px;
                                     text <=> root.custom_interval_days;
                                     placeholder_text: "1–365";
+                                    error_text: root.recurrence_error;
+                                    edited(value) => { root.recurrence_error = ""; }
                                 }
                                 Text {
                                     text: "days between occurrences";
@@ -318,6 +413,9 @@ export component TaskEditorWindow inherits Window {
                         text: "Save";
                         primary: true;
                         clicked => {
+                            root.planned_on = root.planned_selected ? root.date_text(root.planned_date) : "";
+                            root.due_at = root.due_selected ? root.date_text(root.due_date) + "T" + root.time_text(root.due_time) + ":00" : "";
+                            root.reminder_at = root.reminder_selected ? root.date_text(root.reminder_date) + "T" + root.time_text(root.reminder_time) + ":00" : "";
                             root.submitted(
                                 root.task_id,
                                 root.title_text,
@@ -325,9 +423,9 @@ export component TaskEditorWindow inherits Window {
                                 root.destination,
                                 root.planned_on,
                                 root.due_at,
-                                root.due_time_zone,
+                                root.due_selected ? root.due_time_zone : "",
                                 root.reminder_at,
-                                root.reminder_time_zone,
+                                root.reminder_selected ? root.reminder_time_zone : "",
                                 root.recurrence,
                                 root.custom_interval_days
                             );
@@ -336,5 +434,49 @@ export component TaskEditorWindow inherits Window {
                 }
             }
         }
+    }
+
+    planned_picker := DatePickerPopup {
+        title: "Planned date";
+        date: root.planned_date;
+        accepted(value) => {
+            root.planned_date = value;
+            root.planned_selected = true;
+            root.planned_error = "";
+        }
+    }
+
+    due_date_picker := DatePickerPopup {
+        title: "Due date";
+        date: root.due_date;
+        accepted(value) => {
+            root.due_date = value;
+            root.due_selected = true;
+            root.due_error = "";
+        }
+    }
+
+    due_time_picker := TimePickerPopup {
+        title: "Due time";
+        use-24-hour-format: true;
+        time: root.due_time;
+        accepted(value) => { root.due_time = value; root.due_error = ""; }
+    }
+
+    reminder_date_picker := DatePickerPopup {
+        title: "Reminder date";
+        date: root.reminder_date;
+        accepted(value) => {
+            root.reminder_date = value;
+            root.reminder_selected = true;
+            root.reminder_error = "";
+        }
+    }
+
+    reminder_time_picker := TimePickerPopup {
+        title: "Reminder time";
+        use-24-hour-format: true;
+        time: root.reminder_time;
+        accepted(value) => { root.reminder_time = value; root.reminder_error = ""; }
     }
 }

@@ -6,9 +6,9 @@
 // 948589a255a4bd8a3ff9c3de49e2e13109378fcd. Font glyph icons and WSL-only
 // controls were replaced by semantic SVG images.
 
-import { Theme, Typography, Motion } from "../theme.slint";
+import { Elevation, Theme, Typography, Motion } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
-import { FluentIcon } from "icon.slint";
+import { FluentIcon, TooltipHost } from "icon.slint";
 import { LineEdit, TextEdit } from "std-widgets.slint";
 
 export component SidebarItem inherits Rectangle {
@@ -32,23 +32,11 @@ export component SidebarItem inherits Rectangle {
     accessible-checked: root.selected;
     accessible-action-default => { root.clicked(); }
 
-    Rectangle {
-        visible: root.collapsed && touch.has-hover;
+    TooltipHost {
         x: parent.width + 8px;
         y: (parent.height - self.height) / 2;
-        width: tooltip_label.preferred-width + 16px;
-        height: 28px;
-        background: #333333;
-        border-radius: 4px;
-        z: 100;
-
-        tooltip_label := Text {
-            text: root.text;
-            color: white;
-            font-size: 12px;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
+        text: root.text;
+        shown: root.collapsed && touch.has-hover;
     }
 
     HorizontalLayout {
@@ -133,20 +121,24 @@ export component FluentButton inherits Rectangle {
     in property <bool> accent: false;
     in property <bool> danger: false;
     in property <bool> enabled: true;
+    // Development-gallery overrides; false in product surfaces.
+    in property <bool> preview_hover: false;
+    in property <bool> preview_pressed: false;
+    in property <bool> preview_focus: false;
     callback clicked;
 
     min-width: max(72px, button_content.min-width);
     height: UiConstants.button_height;
     border-radius: UiConstants.control_radius;
-    border-width: button_focus.has-focus ? 2px : (root.primary ? 0px : 1px);
-    border-color: button_focus.has-focus ? Theme.focus_ring :
+    border-width: (button_focus.has-focus || root.preview_focus) ? 2px : (root.primary ? 0px : 1px);
+    border-color: (button_focus.has-focus || root.preview_focus) ? Theme.focus_ring :
                   root.danger ? Theme.danger :
                   root.accent ? Theme.accent : Theme.input_border;
     background: !root.enabled ? Theme.control_bg :
-                root.primary && root.danger ? (button_touch.pressed ? Theme.danger : (button_touch.has-hover ? Theme.danger.with-alpha(0.88) : Theme.danger)) :
-                root.primary ? (button_touch.pressed ? Theme.accent_pressed : (button_touch.has-hover ? Theme.accent_hover : Theme.accent)) :
-                button_touch.pressed ? Theme.selected_bg :
-                button_touch.has-hover ? (root.danger ? Theme.danger_bg : root.accent ? Theme.selected_bg : Theme.control_bg_hover) : Theme.control_bg;
+                root.primary && root.danger ? ((button_touch.pressed || root.preview_pressed) ? Theme.danger : ((button_touch.has-hover || root.preview_hover) ? Theme.danger.with-alpha(0.88) : Theme.danger)) :
+                root.primary ? ((button_touch.pressed || root.preview_pressed) ? Theme.accent_pressed : ((button_touch.has-hover || root.preview_hover) ? Theme.accent_hover : Theme.accent)) :
+                (button_touch.pressed || root.preview_pressed) ? Theme.selected_bg :
+                (button_touch.has-hover || root.preview_hover) ? (root.danger ? Theme.danger_bg : root.accent ? Theme.selected_bg : Theme.control_bg_hover) : Theme.control_bg;
     opacity: root.enabled ? 1 : 0.55;
     forward-focus: button_focus;
     accessible-role: button;
@@ -243,22 +235,54 @@ export component FluentTextField inherits Rectangle {
     in-out property <string> text;
     in property <string> placeholder_text;
     in property <bool> enabled: true;
+    in property <string> error_text;
+    in property <bool> preview_focus: false;
     callback accepted(string);
     callback edited(string);
 
     forward-focus: field_input;
-    height: UiConstants.input_height;
+    min-height: UiConstants.input_height;
+    preferred-height: root.error_text == "" ? UiConstants.input_height : UiConstants.input_height + UiConstants.space_4 + error_label.preferred-height;
     background: transparent;
 
     field_input := LineEdit {
         width: 100%;
-        height: 100%;
+        height: UiConstants.input_height;
         text <=> root.text;
         placeholder-text: root.placeholder_text;
         font-size: Typography.body;
         enabled: root.enabled;
         accepted => { root.accepted(self.text); }
         edited => { root.edited(self.text); }
+    }
+
+    if root.error_text != "": Rectangle {
+        width: 100%;
+        height: UiConstants.input_height;
+        border-width: 2px;
+        border-color: Theme.danger;
+        border-radius: UiConstants.control_radius;
+        background: transparent;
+    }
+
+
+    if root.error_text == "" && root.preview_focus: Rectangle {
+        width: 100%;
+        height: UiConstants.input_height;
+        border-width: 2px;
+        border-color: Theme.focus_ring;
+        border-radius: UiConstants.control_radius;
+        background: transparent;
+    }
+
+    error_label := Text {
+        visible: root.error_text != "";
+        y: UiConstants.input_height + UiConstants.space_4;
+        width: 100%;
+        text: root.error_text;
+        color: Theme.danger;
+        font-size: Typography.caption;
+        wrap: word-wrap;
     }
 }
 
@@ -288,17 +312,21 @@ export component SegmentButton inherits Rectangle {
     in property <string> text;
     in property <bool> selected: false;
     in property <bool> enabled: true;
+    // Development-gallery overrides; false in product surfaces.
+    in property <bool> preview_hover: false;
+    in property <bool> preview_pressed: false;
+    in property <bool> preview_focus: false;
     callback clicked;
 
     min-width: 54px;
     height: UiConstants.button_height;
     border-radius: UiConstants.control_radius;
-    border-width: segment_focus.has-focus ? 2px : 1px;
-    border-color: segment_focus.has-focus ? Theme.focus_ring : (root.selected ? Theme.accent : Theme.input_border);
+    border-width: (segment_focus.has-focus || root.preview_focus) ? 2px : 1px;
+    border-color: (segment_focus.has-focus || root.preview_focus) ? Theme.focus_ring : (root.selected ? Theme.accent : Theme.input_border);
     background: !root.enabled ? Theme.control_bg :
-                segment_touch.pressed ? Theme.selected_bg :
+                (segment_touch.pressed || root.preview_pressed) ? Theme.selected_bg :
                 root.selected ? Theme.selected_bg :
-                segment_touch.has-hover ? Theme.control_bg_hover : Theme.control_bg;
+                (segment_touch.has-hover || root.preview_hover) ? Theme.control_bg_hover : Theme.control_bg;
     opacity: root.enabled ? 1 : 0.5;
     forward-focus: segment_focus;
     accessible-role: button;
@@ -336,10 +364,69 @@ export component SegmentButton inherits Rectangle {
 }
 
 export component SurfaceCard inherits Rectangle {
-    background: Theme.card_bg;
-    border-width: 1px;
-    border-color: Theme.border_color;
+    in property <bool> interactive: false;
+    in property <bool> elevated: false;
+    in property <bool> selected: false;
+    in property <bool> enabled: true;
+    in property <bool> preview_hover: false;
+    in property <bool> preview_pressed: false;
+    in property <bool> preview_focus: false;
+    in property <string> accessible_name;
+    callback clicked;
+
+    background: root.selected ? Elevation.card_selected_surface :
+                root.interactive && (card_touch.pressed || root.preview_pressed) ? Elevation.card_pressed_surface :
+                root.interactive && (card_touch.has-hover || root.preview_hover) ? Elevation.card_hover_surface : Elevation.card_surface;
+    border-width: (card_focus.has-focus || root.preview_focus) ? 2px : 1px;
+    border-color: (card_focus.has-focus || root.preview_focus) ? Theme.focus_ring :
+                  root.selected ? Elevation.card_selected_border : Elevation.card_border;
     border-radius: UiConstants.content_radius;
+    drop-shadow-blur: root.elevated ? Elevation.card_blur : 0px;
+    drop-shadow-color: root.elevated ? Elevation.card_shadow : transparent;
+    opacity: root.enabled ? 1 : 0.55;
+    forward-focus: card_focus;
+    accessible-role: none;
+
+    interactive_accessibility := Rectangle {
+        visible: root.interactive;
+        accessible-role: button;
+        accessible-label: root.accessible_name;
+        accessible-enabled: root.enabled;
+        accessible-checkable: true;
+        accessible-checked: root.selected;
+        accessible-action-default => { if (root.enabled) { root.clicked(); } }
+    }
+
+    card_touch := TouchArea {
+        enabled: root.interactive && root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+
+    card_focus := FocusScope {
+        width: 0px;
+        enabled: root.interactive && root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+}
+
+export component TaskRowShell inherits Rectangle {
+    in property <length> row_height: 60px;
+    in property <bool> hovered: row_touch.has-hover;
+
+    height: root.row_height;
+    background: root.hovered ? Theme.card_hover : Theme.input_bg;
+    border-width: 1px;
+    border-color: Theme.input_border;
+    border-radius: UiConstants.control_radius;
+
+    row_touch := TouchArea { }
 }
 
 export enum BadgeKind { neutral, accent, success, warning, danger }

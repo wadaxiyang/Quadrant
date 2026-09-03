@@ -1,7 +1,9 @@
 //! Opens the development-only Fluent component gallery.
 
+use std::{fs::File, io::BufWriter, path::Path, time::Duration};
+
 use quadrant_ui::{DesignGalleryWindow, ThemeMode};
-use slint::{ComponentHandle, LogicalSize, SharedString};
+use slint::{ComponentHandle, LogicalSize, Rgba8Pixel, SharedPixelBuffer, SharedString};
 
 fn main() -> Result<(), slint::PlatformError> {
     let gallery = DesignGalleryWindow::new()?;
@@ -24,9 +26,48 @@ fn main() -> Result<(), slint::PlatformError> {
         gallery.set_gallery_theme(theme);
     }
 
+    if let Ok(snapshot_path) = std::env::var("QUADRANT_GALLERY_SNAPSHOT") {
+        gallery.show()?;
+        gallery.window().request_redraw();
+        let gallery_weak = gallery.as_weak();
+        slint::Timer::single_shot(Duration::from_millis(1200), move || {
+            let result = gallery_weak
+                .upgrade()
+                .ok_or_else(|| "gallery closed before snapshot".into())
+                .and_then(|gallery| gallery.window().take_snapshot())
+                .and_then(|pixels| {
+                    write_snapshot(Path::new(&snapshot_path), &pixels)
+                        .map_err(|error| error.to_string().into())
+                });
+            if let Err(error) = result {
+                eprintln!("failed to save Design Gallery snapshot: {error}");
+                std::process::exit(2);
+            }
+            drop(slint::quit_event_loop());
+        });
+        return slint::run_event_loop();
+    }
+
     gallery.run()
 }
 
 fn env_f32(name: &str) -> Option<f32> {
     std::env::var(name).ok()?.parse().ok()
+}
+
+fn write_snapshot(
+    path: &Path,
+    pixels: &SharedPixelBuffer<Rgba8Pixel>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let file = BufWriter::new(File::create(path)?);
+    let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    encoder
+        .write_header()?
+        .write_image_data(pixels.as_bytes())?;
+    Ok(())
 }

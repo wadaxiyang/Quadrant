@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { Theme, Typography, Motion } from "../theme.slint";
+import { Elevation, Theme, Typography, Motion } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { Icons } from "../icons.slint";
 import { FluentIcon, IconButton } from "icon.slint";
@@ -12,6 +12,7 @@ export component ToastHost inherits Rectangle {
     in property <bool> shown: false;
     in property <string> message;
     in property <ToastKind> kind: ToastKind.info;
+    in property <bool> auto_dismiss: true;
     callback dismissed;
 
     min-width: 280px;
@@ -26,8 +27,8 @@ export component ToastHost inherits Rectangle {
                   root.kind == ToastKind.success ? Theme.success : Theme.accent;
     border-radius: 6px;
     clip: true;
-    drop-shadow-blur: 12px;
-    drop-shadow-color: #00000044;
+    drop-shadow-blur: Elevation.popup_blur;
+    drop-shadow-color: Elevation.popup_shadow;
 
     animate height { duration: Motion.standard; easing: ease-out-quad; }
     animate opacity { duration: Motion.fast; }
@@ -39,6 +40,10 @@ export component ToastHost inherits Rectangle {
         background: root.kind == ToastKind.error ? Theme.danger :
                     root.kind == ToastKind.success ? Theme.success : Theme.accent;
     }
+
+    // Passive hover tracking keeps the toast readable without intercepting
+    // clicks from the dismiss button above it.
+    toast_touch := TouchArea { }
 
     toast_layout := HorizontalLayout {
         padding-left: UiConstants.space_16;
@@ -75,7 +80,7 @@ export component ToastHost inherits Rectangle {
     }
 
     Timer {
-        running: root.shown;
+        running: root.shown && root.auto_dismiss && !toast_touch.has-hover;
         interval: 4000ms;
         triggered => { root.dismissed(); }
     }

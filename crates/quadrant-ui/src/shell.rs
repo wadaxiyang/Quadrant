@@ -7,20 +7,22 @@ use std::{
     time::Duration,
 };
 
+use jiff::{Timestamp, civil::DateTime, tz::TimeZone};
 use quadrant_application::{
     ApplicationEvent, CompletedViewState, DesktopEvent, DesktopSettings, FocusMode, FocusSession,
     FocusStartRequest, FocusStatus, FocusViewState, MaintenanceState, NavigationRoute,
     PomodoroKind, PomodoroSettings, Quadrant, QuadrantsViewState, QuickAddSubmission,
-    RecurrenceChoice, ReorderDirection, ReviewRange, ReviewViewState, SystemTheme, TaskEditorState,
-    TaskEditorSubmission, TaskId, TaskPlacement, ThemeMode as ApplicationThemeMode, TodayViewState,
-    UiIntent, UpdateViewState, UtcTimestamp, WindowCloseBehavior, WindowMinimizeBehavior,
+    RecurrenceChoice, ReorderDirection, ReviewRange, ReviewViewState, SystemTheme, TaskEditorField,
+    TaskEditorState, TaskEditorSubmission, TaskId, TaskPlacement,
+    ThemeMode as ApplicationThemeMode, TodayViewState, UiIntent, UpdateViewState, UtcTimestamp,
+    WindowCloseBehavior, WindowMinimizeBehavior,
 };
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, TimerMode, VecModel};
 
 use crate::{
-    CompletedTaskRow, FocusTaskRow, MainWindow, QuickAddWindow, ReviewActivityRow,
-    ReviewQuadrantRow, ReviewRecentRow, TaskEditorWindow, TaskRow, ThemeMode as SlintThemeMode,
-    ToastKind, TodayTaskRow,
+    CompletedTaskRow, Date as SlintDate, FocusTaskRow, MainWindow, QuickAddWindow,
+    ReviewActivityRow, ReviewQuadrantRow, ReviewRecentRow, TaskEditorWindow, TaskRow,
+    ThemeMode as SlintThemeMode, Time as SlintTime, ToastKind, TodayTaskRow,
 };
 
 /// Initial state supplied by the composition root.
@@ -551,38 +553,33 @@ fn bind_task_editor(task_editor: &TaskEditorWindow, intent_handler: Rc<dyn Fn(Ui
               notes,
               destination,
               planned_on,
-              due_at,
+              due_local,
               due_time_zone,
-              reminder_at,
+              reminder_local,
               reminder_time_zone,
               recurrence,
               custom_interval_days| {
             let Some(window) = submit_weak.upgrade() else {
                 return;
             };
-            let task_id = TaskId::from_str(id.as_str());
-            let placement = placement_from_destination(destination);
-            let recurrence = recurrence_from_index(recurrence);
-            let (Ok(task_id), Some(placement), Some(recurrence)) = (task_id, placement, recurrence)
-            else {
-                window
-                    .set_error_message(SharedString::from("The editor state is no longer valid."));
-                return;
-            };
-            window.set_error_message(SharedString::default());
-            intent_handler(UiIntent::SubmitTaskEditor(TaskEditorSubmission {
-                task_id,
-                title: title.to_string(),
-                notes: notes.to_string(),
-                placement,
-                planned_on: planned_on.to_string(),
-                due_at: due_at.to_string(),
-                due_time_zone: due_time_zone.to_string(),
-                reminder_at: reminder_at.to_string(),
-                reminder_time_zone: reminder_time_zone.to_string(),
+            clear_task_editor_errors(&window);
+            let fields = TaskEditorUiSubmission {
+                id,
+                title,
+                notes,
+                destination,
+                planned_on,
+                due_local,
+                due_time_zone,
+                reminder_local,
+                reminder_time_zone,
                 recurrence,
-                custom_interval_days: custom_interval_days.to_string(),
-            }));
+                custom_interval_days,
+            };
+            match validate_task_editor_submission(&fields) {
+                Ok(submission) => intent_handler(UiIntent::SubmitTaskEditor(submission)),
+                Err((field, message)) => set_task_editor_field_error(&window, field, message),
+            }
         },
     );
 
@@ -593,6 +590,206 @@ fn bind_task_editor(task_editor: &TaskEditorWindow, intent_handler: Rc<dyn Fn(Ui
         }
         slint::CloseRequestResponse::KeepWindowShown
     });
+}
+
+struct TaskEditorUiSubmission {
+    id: SharedString,
+    title: SharedString,
+    notes: SharedString,
+    destination: i32,
+    planned_on: SharedString,
+    due_local: SharedString,
+    due_time_zone: SharedString,
+    reminder_local: SharedString,
+    reminder_time_zone: SharedString,
+    recurrence: i32,
+    custom_interval_days: SharedString,
+}
+
+type TaskEditorInputError = (TaskEditorField, &'static str);
+
+fn validate_task_editor_submission(
+    fields: &TaskEditorUiSubmission,
+) -> Result<TaskEditorSubmission, TaskEditorInputError> {
+    let task_id = TaskId::from_str(fields.id.as_str()).map_err(|_| {
+        (
+            TaskEditorField::General,
+            "The editor state is no longer valid.",
+        )
+    })?;
+    let placement = placement_from_destination(fields.destination).ok_or((
+        TaskEditorField::General,
+        "The editor state is no longer valid.",
+    ))?;
+    let recurrence = recurrence_from_index(fields.recurrence).ok_or((
+        TaskEditorField::General,
+        "The editor state is no longer valid.",
+    ))?;
+    let title = fields.title.to_string();
+    if title.trim().is_empty() {
+        return Err((TaskEditorField::Title, "Task title is required."));
+    }
+    if title.trim().chars().count() > 500 {
+        return Err((
+            TaskEditorField::Title,
+            "Task title cannot exceed 500 characters.",
+        ));
+    }
+    if recurrence == RecurrenceChoice::CustomDays
+        && fields
+            .custom_interval_days
+            .trim()
+            .parse::<u16>()
+            .ok()
+            .filter(|days| (1..=365).contains(days))
+            .is_none()
+    {
+        return Err((
+            TaskEditorField::Recurrence,
+            "Custom recurrence must be between 1 and 365 days.",
+        ));
+    }
+
+    let planned_on = planned_input(fields.planned_on.as_str())
+        .map_err(|message| (TaskEditorField::PlannedDate, message))?;
+    let due_at = scheduled_input(fields.due_local.as_str(), fields.due_time_zone.as_str())
+        .map_err(|(field, message)| (field.due_field(), message))?;
+    let reminder_at = scheduled_input(
+        fields.reminder_local.as_str(),
+        fields.reminder_time_zone.as_str(),
+    )
+    .map_err(|(field, message)| (field.reminder_field(), message))?;
+    if let (Ok(due), Ok(reminder)) = (
+        due_at.parse::<Timestamp>(),
+        reminder_at.parse::<Timestamp>(),
+    ) && reminder > due
+    {
+        return Err((
+            TaskEditorField::ReminderDateTime,
+            "Reminder cannot be after due time.",
+        ));
+    }
+
+    Ok(TaskEditorSubmission {
+        task_id,
+        title,
+        notes: fields.notes.to_string(),
+        placement,
+        planned_on,
+        due_at,
+        due_time_zone: fields.due_time_zone.trim().to_owned(),
+        reminder_at,
+        reminder_time_zone: fields.reminder_time_zone.trim().to_owned(),
+        recurrence,
+        custom_interval_days: fields.custom_interval_days.to_string(),
+    })
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ScheduleInputField {
+    DateTime,
+    TimeZone,
+}
+
+impl ScheduleInputField {
+    const fn due_field(self) -> TaskEditorField {
+        match self {
+            Self::DateTime => TaskEditorField::DueDateTime,
+            Self::TimeZone => TaskEditorField::DueTimeZone,
+        }
+    }
+
+    const fn reminder_field(self) -> TaskEditorField {
+        match self {
+            Self::DateTime => TaskEditorField::ReminderDateTime,
+            Self::TimeZone => TaskEditorField::ReminderTimeZone,
+        }
+    }
+}
+
+fn planned_input(value: &str) -> Result<String, &'static str> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Ok(String::new());
+    }
+    value
+        .parse::<jiff::civil::Date>()
+        .map(|value| value.to_string())
+        .map_err(|_| "Choose a valid planned date.")
+}
+
+fn scheduled_input(
+    local_date_time: &str,
+    time_zone: &str,
+) -> Result<String, (ScheduleInputField, &'static str)> {
+    let local_date_time = local_date_time.trim();
+    let time_zone = time_zone.trim();
+    if local_date_time.is_empty() && time_zone.is_empty() {
+        return Ok(String::new());
+    }
+    if local_date_time.is_empty() {
+        return Err((
+            ScheduleInputField::DateTime,
+            "Choose a valid local date and time.",
+        ));
+    }
+    if time_zone.is_empty() {
+        return Err((
+            ScheduleInputField::TimeZone,
+            "Enter an IANA timezone such as Asia/Shanghai.",
+        ));
+    }
+    let time_zone = TimeZone::get(time_zone).map_err(|_| {
+        (
+            ScheduleInputField::TimeZone,
+            "Enter a valid IANA timezone such as Asia/Shanghai.",
+        )
+    })?;
+    let date_time = local_date_time.parse::<DateTime>().map_err(|_| {
+        (
+            ScheduleInputField::DateTime,
+            "Choose a valid local date and time.",
+        )
+    })?;
+    time_zone
+        .to_ambiguous_timestamp(date_time)
+        .unambiguous()
+        .map(|timestamp| timestamp.to_string())
+        .map_err(|_| {
+            (
+                ScheduleInputField::DateTime,
+                "This local time is skipped or repeated by daylight saving time. Choose another time.",
+            )
+        })
+}
+
+fn clear_task_editor_errors(editor: &TaskEditorWindow) {
+    editor.set_error_message(SharedString::default());
+    editor.set_title_error(SharedString::default());
+    editor.set_planned_error(SharedString::default());
+    editor.set_due_error(SharedString::default());
+    editor.set_due_time_zone_error(SharedString::default());
+    editor.set_reminder_error(SharedString::default());
+    editor.set_reminder_time_zone_error(SharedString::default());
+    editor.set_recurrence_error(SharedString::default());
+}
+
+fn set_task_editor_field_error(
+    editor: &TaskEditorWindow,
+    field: TaskEditorField,
+    message: impl Into<SharedString>,
+) {
+    let message = message.into();
+    match field {
+        TaskEditorField::General => editor.set_error_message(message),
+        TaskEditorField::Title => editor.set_title_error(message),
+        TaskEditorField::PlannedDate => editor.set_planned_error(message),
+        TaskEditorField::DueDateTime => editor.set_due_error(message),
+        TaskEditorField::DueTimeZone => editor.set_due_time_zone_error(message),
+        TaskEditorField::ReminderDateTime => editor.set_reminder_error(message),
+        TaskEditorField::ReminderTimeZone => editor.set_reminder_time_zone_error(message),
+        TaskEditorField::Recurrence => editor.set_recurrence_error(message),
+    }
 }
 
 fn bind_quick_add(quick_add: &QuickAddWindow, intent_handler: Rc<dyn Fn(UiIntent)>) {
@@ -678,9 +875,9 @@ fn apply_application_event(
                 drop(editor.hide());
             }
         }
-        ApplicationEvent::TaskEditorValidationFailed(message) => {
+        ApplicationEvent::TaskEditorValidationFailed { field, message } => {
             if let Some(editor) = task_editor.upgrade() {
-                editor.set_error_message(SharedString::from(message));
+                set_task_editor_field_error(&editor, field, message);
             }
         }
         ApplicationEvent::DesktopSettingsChanged(settings) => {
@@ -1117,7 +1314,86 @@ fn apply_task_editor_state(editor: &TaskEditorWindow, state: &TaskEditorState) {
     editor.set_reminder_time_zone(SharedString::from(state.reminder_time_zone.as_str()));
     editor.set_recurrence(recurrence_index(state.recurrence));
     editor.set_custom_interval_days(SharedString::from(state.custom_interval_days.as_str()));
-    editor.set_error_message(SharedString::default());
+    let (default_date, default_time) = default_editor_date_time();
+    let planned_date = parse_editor_date(&state.planned_on).unwrap_or_else(|| default_date.clone());
+    editor.set_planned_selected(!state.planned_on.is_empty());
+    editor.set_planned_date(planned_date);
+
+    let (due_selected, due_date, due_time) =
+        parse_editor_schedule(&state.due_at, &state.due_time_zone).unwrap_or_else(|| {
+            (
+                !state.due_at.is_empty(),
+                default_date.clone(),
+                default_time.clone(),
+            )
+        });
+    editor.set_due_selected(due_selected);
+    editor.set_due_date(due_date);
+    editor.set_due_time(due_time);
+
+    let (reminder_selected, reminder_date, reminder_time) = parse_editor_schedule(
+        &state.reminder_at,
+        &state.reminder_time_zone,
+    )
+    .unwrap_or((!state.reminder_at.is_empty(), default_date, default_time));
+    editor.set_reminder_selected(reminder_selected);
+    editor.set_reminder_date(reminder_date);
+    editor.set_reminder_time(reminder_time);
+
+    if state.due_time_zone.is_empty() {
+        editor.set_due_time_zone(SharedString::from("UTC"));
+    }
+    if state.reminder_time_zone.is_empty() {
+        editor.set_reminder_time_zone(SharedString::from("UTC"));
+    }
+    clear_task_editor_errors(editor);
+}
+
+fn default_editor_date_time() -> (SlintDate, SlintTime) {
+    let now = Timestamp::now().to_zoned(TimeZone::UTC);
+    (
+        SlintDate {
+            year: i32::from(now.year()),
+            month: i32::from(now.month()),
+            day: i32::from(now.day()),
+        },
+        SlintTime {
+            hour: i32::from(now.hour()),
+            minute: i32::from(now.minute()),
+            second: 0,
+        },
+    )
+}
+
+fn parse_editor_date(value: &str) -> Option<SlintDate> {
+    let date = value.parse::<jiff::civil::Date>().ok()?;
+    Some(SlintDate {
+        year: i32::from(date.year()),
+        month: i32::from(date.month()),
+        day: i32::from(date.day()),
+    })
+}
+
+fn parse_editor_schedule(value: &str, time_zone: &str) -> Option<(bool, SlintDate, SlintTime)> {
+    if value.is_empty() {
+        return None;
+    }
+    let timestamp = value.parse::<Timestamp>().ok()?;
+    let time_zone = TimeZone::get(time_zone).ok()?;
+    let local = timestamp.to_zoned(time_zone);
+    Some((
+        true,
+        SlintDate {
+            year: i32::from(local.year()),
+            month: i32::from(local.month()),
+            day: i32::from(local.day()),
+        },
+        SlintTime {
+            hour: i32::from(local.hour()),
+            minute: i32::from(local.minute()),
+            second: i32::from(local.second()),
+        },
+    ))
 }
 
 fn apply_quadrants_state(main: &MainWindow, state: &QuadrantsViewState) {
@@ -1228,7 +1504,10 @@ fn move_window_by(window: &slint::Window, dx: f32, dy: f32) {
 
 #[cfg(test)]
 mod tests {
-    use super::{placement_from_destination, should_hide_at_startup, should_hide_to_tray};
+    use super::{
+        parse_editor_schedule, placement_from_destination, scheduled_input, should_hide_at_startup,
+        should_hide_to_tray,
+    };
     use quadrant_application::{Quadrant, TaskPlacement};
 
     #[test]
@@ -1247,5 +1526,26 @@ mod tests {
         assert!(!should_hide_to_tray(false, true));
         assert!(should_hide_at_startup(true, false, true));
         assert!(!should_hide_at_startup(false, true, true));
+    }
+
+    #[test]
+    fn editor_local_schedule_round_trips_through_utc() {
+        let timestamp =
+            scheduled_input("2026-09-03T09:15:00", "Asia/Shanghai").expect("valid local schedule");
+        assert_eq!(timestamp, "2026-09-03T01:15:00Z");
+
+        let (_, date, time) =
+            parse_editor_schedule(&timestamp, "Asia/Shanghai").expect("valid persisted schedule");
+        assert_eq!((date.year, date.month, date.day), (2026, 9, 3));
+        assert_eq!((time.hour, time.minute), (9, 15));
+    }
+
+    #[test]
+    fn editor_rejects_skipped_and_repeated_dst_times() {
+        let spring_gap = scheduled_input("2026-03-08T02:30:00", "America/New_York");
+        assert!(spring_gap.is_err());
+
+        let autumn_fold = scheduled_input("2026-11-01T01:30:00", "America/New_York");
+        assert!(autumn_fold.is_err());
     }
 }

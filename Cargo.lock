@@ -4101,6 +4101,8 @@ dependencies = [
 name = "quadrant-ui"
 version = "0.1.0"
 dependencies = [
+ "jiff",
+ "png",
  "quadrant-application",
  "quadrant-domain",
  "slint",

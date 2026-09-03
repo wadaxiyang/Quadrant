@@ -151,9 +151,10 @@ impl TaskApplication {
                 let update = match submission.into_update() {
                     Ok(update) => update,
                     Err(error) => {
-                        return vec![ApplicationEvent::TaskEditorValidationFailed(
-                            error.to_string(),
-                        )];
+                        return vec![ApplicationEvent::TaskEditorValidationFailed {
+                            field: error.field(),
+                            message: error.to_string(),
+                        }];
                     }
                 };
                 match self.tasks.update_task(task_id, update, self.clock.now()) {

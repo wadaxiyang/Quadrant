@@ -9,7 +9,7 @@ import { Theme, Motion, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { Icons } from "../icons.slint";
 import { SidebarItem } from "common.slint";
-import { FluentIcon } from "icon.slint";
+import { FluentIcon, TooltipHost } from "icon.slint";
 
 export component Sidebar inherits Rectangle {
     in-out property <bool> collapsed: false;
@@ -39,7 +39,14 @@ export component Sidebar inherits Rectangle {
         Rectangle {
             height: UiConstants.navigation_item_height;
             border-radius: 4px;
+            border-width: menu_focus.has-focus ? 2px : 0px;
+            border-color: Theme.focus_ring;
             background: menu_touch.has-hover ? Theme.hover_bg : transparent;
+            forward-focus: menu_focus;
+            accessible-role: button;
+            accessible-label: root.effective_collapsed ? "Expand navigation" : "Collapse navigation";
+            accessible-enabled: true;
+            accessible-action-default => { root.collapsed = !root.collapsed; }
 
             FluentIcon {
                 x: UiConstants.navigation_item_padding
@@ -51,14 +58,40 @@ export component Sidebar inherits Rectangle {
             }
 
             menu_touch := TouchArea {
+                mouse-cursor: pointer;
                 clicked => { root.collapsed = !root.collapsed; }
+            }
+
+            menu_focus := FocusScope {
+                width: 0px;
+                key-pressed(event) => {
+                    if (event.text == Key.Return || event.text == Key.Space) {
+                        root.collapsed = !root.collapsed;
+                        return accept;
+                    }
+                    return reject;
+                }
+            }
+
+            TooltipHost {
+                x: parent.width + UiConstants.space_8;
+                y: (parent.height - self.height) / 2;
+                text: root.effective_collapsed ? "Expand navigation" : "Collapse navigation";
+                shown: root.effective_collapsed && menu_touch.has-hover;
             }
         }
 
         Rectangle {
             height: UiConstants.navigation_item_height;
             border-radius: 4px;
+            border-width: quick_add_focus.has-focus ? 2px : 0px;
+            border-color: Theme.focus_ring;
             background: quick_add_touch.has-hover ? Theme.accent_hover : Theme.accent;
+            forward-focus: quick_add_focus;
+            accessible-role: button;
+            accessible-label: "Quick Add";
+            accessible-enabled: true;
+            accessible-action-default => { root.quick_add_clicked(); }
 
             HorizontalLayout {
                 padding-left: UiConstants.navigation_item_padding;
@@ -103,6 +136,24 @@ export component Sidebar inherits Rectangle {
             quick_add_touch := TouchArea {
                 mouse-cursor: pointer;
                 clicked => { root.quick_add_clicked(); }
+            }
+
+            quick_add_focus := FocusScope {
+                width: 0px;
+                key-pressed(event) => {
+                    if (event.text == Key.Return || event.text == Key.Space) {
+                        root.quick_add_clicked();
+                        return accept;
+                    }
+                    return reject;
+                }
+            }
+
+            TooltipHost {
+                x: parent.width + UiConstants.space_8;
+                y: (parent.height - self.height) / 2;
+                text: "Quick Add";
+                shown: root.effective_collapsed && quick_add_touch.has-hover;
             }
         }
 

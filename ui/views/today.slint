@@ -4,7 +4,7 @@
 import { ScrollView } from "std-widgets.slint";
 import { Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
-import { Badge, BadgeKind, SurfaceCard } from "../components/common.slint";
+import { Badge, BadgeKind, SurfaceCard, TaskRowShell } from "../components/common.slint";
 import { EmptyState, PageHeader, SectionHeader } from "../components/page_shell.slint";
 import { IconButton } from "../components/icon.slint";
 import { Icons } from "../icons.slint";
@@ -15,13 +15,14 @@ export struct TodayTaskRow {
     metadata: string,
 }
 
-component TodayTaskListRow inherits Rectangle {
+component TodayTaskListRow inherits TaskRowShell {
     in property <TodayTaskRow> task;
     callback edit_requested(string);
     callback complete_requested(string);
 
-    height: 60px;
+    row_height: 60px;
     background: transparent;
+    border-width: 0px;
 
     HorizontalLayout {
         padding-left: UiConstants.space_8;

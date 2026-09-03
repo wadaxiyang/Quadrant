@@ -11,10 +11,14 @@ build = "build.rs"
 [dependencies]
 quadrant-application.workspace = true
 quadrant-domain.workspace = true
+jiff.workspace = true
 slint.workspace = true
 
 [build-dependencies]
 slint-build.workspace = true
+
+[dev-dependencies]
+png = "0.18.1"
 
 [lints]
 workspace = true

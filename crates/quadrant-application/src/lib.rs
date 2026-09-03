@@ -474,6 +474,54 @@ pub enum TaskEditorValidationError {
     ReminderAfterDue,
 }
 
+/// Task editor field that should own a validation message.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TaskEditorField {
+    /// Validation is not attributable to a single editable field.
+    General,
+    /// Task title.
+    Title,
+    /// Planned calendar date.
+    PlannedDate,
+    /// Due calendar date or local time.
+    DueDateTime,
+    /// Due IANA timezone identifier.
+    DueTimeZone,
+    /// Reminder calendar date or local time.
+    ReminderDateTime,
+    /// Reminder IANA timezone identifier.
+    ReminderTimeZone,
+    /// Recurrence choice or custom interval.
+    Recurrence,
+}
+
+impl TaskEditorValidationError {
+    /// Returns the field that should present this error.
+    #[must_use]
+    pub fn field(&self) -> TaskEditorField {
+        match self {
+            Self::Domain(TaskDomainError::EmptyTitle | TaskDomainError::TitleTooLong) => {
+                TaskEditorField::Title
+            }
+            Self::Domain(TaskDomainError::ReminderAfterDue)
+            | Self::ReminderAfterDue
+            | Self::IncompleteSchedule("Reminder")
+            | Self::InvalidTimestamp("Reminder") => TaskEditorField::ReminderDateTime,
+            Self::Domain(_) => TaskEditorField::General,
+            Self::InvalidPlannedDate => TaskEditorField::PlannedDate,
+            Self::IncompleteSchedule("Due") | Self::InvalidTimestamp("Due") => {
+                TaskEditorField::DueDateTime
+            }
+            Self::InvalidTimeZone("Due") => TaskEditorField::DueTimeZone,
+            Self::InvalidTimeZone("Reminder") => TaskEditorField::ReminderTimeZone,
+            Self::IncompleteSchedule(_) | Self::InvalidTimestamp(_) | Self::InvalidTimeZone(_) => {
+                TaskEditorField::General
+            }
+            Self::InvalidCustomInterval => TaskEditorField::Recurrence,
+        }
+    }
+}
+
 impl fmt::Display for TaskEditorValidationError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -712,7 +760,12 @@ pub enum ApplicationEvent {
     /// Close the task editor after a successful save.
     TaskEditorSaved,
     /// Keep the editor open and show a field-validation message.
-    TaskEditorValidationFailed(String),
+    TaskEditorValidationFailed {
+        /// Field that should present the message.
+        field: TaskEditorField,
+        /// Stable, user-facing validation message.
+        message: String,
+    },
     /// Apply the persisted desktop lifecycle policy to the UI adapter.
     DesktopSettingsChanged(DesktopSettings),
     /// Show stable positive feedback.
@@ -742,9 +795,10 @@ pub struct UserFacingError {
 #[cfg(test)]
 mod tests {
     use super::{
-        NavigationRoute, QuadrantsViewState, RecurrenceChoice, RecurrencePattern,
-        TaskEditorSubmission, TaskId, TaskPlacement, ThemeMode,
+        NavigationRoute, QuadrantsViewState, RecurrenceChoice, RecurrencePattern, TaskEditorField,
+        TaskEditorSubmission, TaskEditorValidationError, TaskId, TaskPlacement, ThemeMode,
     };
+    use quadrant_domain::TaskDomainError;
 
     #[test]
     fn route_indices_round_trip() {
@@ -818,5 +872,25 @@ mod tests {
         let mut incomplete = base;
         incomplete.reminder_at.clear();
         assert!(incomplete.into_update().is_err());
+    }
+
+    #[test]
+    fn task_editor_validation_errors_identify_their_owning_fields() {
+        assert_eq!(
+            TaskEditorValidationError::Domain(TaskDomainError::EmptyTitle).field(),
+            TaskEditorField::Title
+        );
+        assert_eq!(
+            TaskEditorValidationError::InvalidTimeZone("Due").field(),
+            TaskEditorField::DueTimeZone
+        );
+        assert_eq!(
+            TaskEditorValidationError::ReminderAfterDue.field(),
+            TaskEditorField::ReminderDateTime
+        );
+        assert_eq!(
+            TaskEditorValidationError::InvalidCustomInterval.field(),
+            TaskEditorField::Recurrence
+        );
     }
 }

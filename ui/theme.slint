@@ -53,7 +53,6 @@ export global Theme {
     out property <color> control_bg_hover: dark_mode ? #35353a : #f7f7f7;
     out property <color> input_bg: dark_mode ? #252526 : #ffffff;
     out property <color> input_border: dark_mode ? #4b4b50 : #d3d3d3;
-    out property <color> overlay: #00000080;
     out property <color> danger: dark_mode ? #ff6b6b : #c42b1c;
     out property <color> danger_bg: dark_mode ? #5a1d1d : #fdf3f2;
     out property <color> success: dark_mode ? #4ade80 : #107c10;
@@ -73,4 +72,24 @@ export global Theme {
     out property <color> icon_color_orange: dark_mode ? #fb923c : #f97316;
     out property <color> icon_color_emerald: dark_mode ? #34d399 : #059669;
     out property <color> icon_color_slate: dark_mode ? #94a3b8 : #475569;
+}
+
+// Shared Fluent elevation levels own surface, overlay, border, and shadow
+// recipes so layered components do not invent partial local combinations.
+export global Elevation {
+    out property <color> card_surface: Theme.card_bg;
+    out property <color> card_border: Theme.border_color;
+    out property <color> card_hover_surface: Theme.card_hover;
+    out property <color> card_pressed_surface: Theme.selected_bg;
+    out property <color> card_selected_surface: Theme.selected_bg;
+    out property <color> card_selected_border: Theme.accent;
+    out property <length> card_blur: 4px;
+    out property <color> card_shadow: Theme.dark_mode ? #00000038 : #00000018;
+    out property <length> popup_blur: 12px;
+    out property <color> popup_shadow: #00000044;
+    out property <color> dialog_surface: Theme.card_bg;
+    out property <color> dialog_border: Theme.border_color;
+    out property <color> dialog_overlay: #00000080;
+    out property <length> dialog_blur: 20px;
+    out property <color> dialog_shadow: #00000055;
 }

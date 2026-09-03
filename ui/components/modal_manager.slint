@@ -6,7 +6,7 @@
 // src/ui/components/modal_manager.slint at 948589a255a4bd8a3ff9c3de49e2e13109378fcd.
 // WSL-specific dialogs and data were removed in favor of one reusable shell.
 
-import { Theme, Typography } from "../theme.slint";
+import { Elevation, Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { Icons } from "../icons.slint";
 import { FluentIcon } from "icon.slint";
@@ -49,7 +49,7 @@ export component ModalManager inherits Rectangle {
         if root.shown: Rectangle {
         width: 100%;
         height: 100%;
-        background: Theme.overlay;
+        background: Elevation.dialog_overlay;
         z: 500;
 
         TouchArea { }
@@ -59,8 +59,10 @@ export component ModalManager inherits Rectangle {
             y: (parent.height - self.height) / 2;
             width: Math.min(parent.width - 48px, 420px);
             height: max(176px, modal_layout.preferred-height);
-            drop-shadow-blur: 20px;
-            drop-shadow-color: #00000055;
+            background: Elevation.dialog_surface;
+            border-color: Elevation.dialog_border;
+            drop-shadow-blur: Elevation.dialog_blur;
+            drop-shadow-color: Elevation.dialog_shadow;
 
             modal_layout := VerticalLayout {
                 padding: UiConstants.space_24;
