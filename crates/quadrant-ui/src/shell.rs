@@ -205,6 +205,15 @@ fn initialize_theme(
     task_editor: &TaskEditorWindow,
     config: &UiShellConfig,
 ) {
+    #[cfg(target_os = "windows")]
+    let ui_font_family = SharedString::from("Segoe UI Variable Text");
+    #[cfg(not(target_os = "windows"))]
+    let ui_font_family = SharedString::default();
+
+    main_window.set_ui_font_family(ui_font_family.clone());
+    quick_add.set_ui_font_family(ui_font_family.clone());
+    task_editor.set_ui_font_family(ui_font_family);
+
     let mode = to_slint_theme_mode(config.theme_mode);
     let system_dark = config.system_theme == SystemTheme::Dark;
     main_window.invoke_apply_theme(mode, system_dark);

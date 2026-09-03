@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { ScrollView } from "std-widgets.slint";
-import { Theme } from "../theme.slint";
+import { Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { MetricCard, PageHeader } from "../components/page_shell.slint";
 import { SegmentButton, SurfaceCard } from "../components/common.slint";
@@ -32,7 +32,7 @@ component ActivityRow inherits Rectangle {
     height: 38px;
     HorizontalLayout {
         spacing: 8px;
-        Text { width: 76px; text: root.item.label; color: Theme.text_secondary; font-size: 10px; vertical-alignment: center; }
+        Text { width: 76px; text: root.item.label; color: Theme.text_secondary; font-size: Typography.caption; vertical-alignment: center; }
         VerticalLayout {
             horizontal-stretch: 1; spacing: 4px;
             Rectangle {
@@ -44,7 +44,7 @@ component ActivityRow inherits Rectangle {
                 Rectangle { width: parent.width * root.item.focus_seconds / root.focus_max; height: 100%; background: Theme.success; border-radius: 3px; }
             }
         }
-        Text { width: 70px; text: root.item.completed + " / " + root.item.focus_seconds / 60 + "m"; color: Theme.text_secondary; font-size: 9px; vertical-alignment: center; horizontal-alignment: right; }
+        Text { width: 70px; text: root.item.completed + " / " + root.item.focus_seconds / 60 + "m"; color: Theme.text_secondary; font-size: Typography.caption; vertical-alignment: center; horizontal-alignment: right; }
     }
 }
 
@@ -55,7 +55,7 @@ component QuadrantRow inherits Rectangle {
     height: 44px;
     HorizontalLayout {
         spacing: 8px;
-        Text { width: 54px; text: root.item.label; color: Theme.text_primary; font-size: 11px; font-weight: 600; vertical-alignment: center; }
+        Text { width: 54px; text: root.item.label; color: Theme.text_primary; font-size: Typography.caption; font-weight: Typography.semibold; vertical-alignment: center; }
         VerticalLayout {
             horizontal-stretch: 1; spacing: 4px;
             Rectangle { height: 8px; background: Theme.input_bg; border-radius: 3px;
@@ -65,7 +65,7 @@ component QuadrantRow inherits Rectangle {
                 Rectangle { width: parent.width * root.item.focus_seconds / root.focus_max; height: 100%; background: Theme.success; border-radius: 3px; }
             }
         }
-        Text { width: 82px; text: root.item.completed + " · " + root.item.focus_text; color: Theme.text_secondary; font-size: 9px; vertical-alignment: center; horizontal-alignment: right; }
+        Text { width: 82px; text: root.item.completed + " · " + root.item.focus_text; color: Theme.text_secondary; font-size: Typography.caption; vertical-alignment: center; horizontal-alignment: right; }
     }
 }
 
@@ -104,7 +104,7 @@ export component ReviewView inherits Rectangle {
                 SegmentButton { width: 76px; text: "90 days"; selected: root.selected_range == 2; clicked => { root.selected_range = 2; root.range_selected(2); } }
                 SegmentButton { width: 76px; text: "All time"; selected: root.selected_range == 3; clicked => { root.selected_range = 3; root.range_selected(3); } }
                 Rectangle { horizontal-stretch: 1; }
-                Text { text: root.state_summary; color: Theme.text_secondary; font-size: 10px; vertical-alignment: center; }
+                Text { text: root.state_summary; color: Theme.text_secondary; font-size: Typography.caption; vertical-alignment: center; }
             }
             HorizontalLayout {
                 spacing: 10px;
@@ -120,7 +120,7 @@ export component ReviewView inherits Rectangle {
                     VerticalLayout {
                         padding: 14px; spacing: 7px;
                         Text { text: "Activity"; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
-                        Text { text: "Blue: completions · Green: productive Focus"; color: Theme.text_secondary; font-size: 9px; }
+                        Text { text: "Blue: completions · Green: productive Focus"; color: Theme.text_secondary; font-size: Typography.caption; }
                         for item in root.activity: ActivityRow { item: item; completed_max: root.activity_completed_max; focus_max: root.activity_focus_max; }
                     }
                 }
@@ -129,7 +129,7 @@ export component ReviewView inherits Rectangle {
                     VerticalLayout {
                         padding: 14px; spacing: 7px;
                         Text { text: "By placement"; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
-                        Text { text: "Completed tasks · Focus time"; color: Theme.text_secondary; font-size: 9px; }
+                        Text { text: "Completed tasks · Focus time"; color: Theme.text_secondary; font-size: Typography.caption; }
                         for item in root.quadrants: QuadrantRow { item: item; completed_max: root.quadrant_completed_max; focus_max: root.quadrant_focus_max; }
                     }
                 }
@@ -141,12 +141,12 @@ export component ReviewView inherits Rectangle {
                     VerticalLayout {
                         padding: 14px; spacing: 7px;
                         Text { text: "Focus highlights"; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
-                        Text { text: "Longest session"; color: Theme.text_secondary; font-size: 10px; }
+                        Text { text: "Longest session"; color: Theme.text_secondary; font-size: Typography.caption; }
                         Text { text: root.longest_focus; color: Theme.text_primary; font-size: 15px; font-weight: 600; }
-                        Text { text: "Most focused task"; color: Theme.text_secondary; font-size: 10px; }
+                        Text { text: "Most focused task"; color: Theme.text_secondary; font-size: Typography.caption; }
                         Text { text: root.top_task; color: Theme.text_primary; font-size: 12px; font-weight: 600; overflow: elide; }
-                        Text { text: root.top_task_detail; color: Theme.text_secondary; font-size: 10px; }
-                        Text { text: root.top_quadrant; color: Theme.text_secondary; font-size: 10px; }
+                        Text { text: root.top_task_detail; color: Theme.text_secondary; font-size: Typography.caption; }
+                        Text { text: root.top_quadrant; color: Theme.text_secondary; font-size: Typography.caption; }
                     }
                 }
                 SurfaceCard {
@@ -154,11 +154,11 @@ export component ReviewView inherits Rectangle {
                     VerticalLayout {
                         padding: 14px; spacing: 7px;
                         Text { text: "Recent completions"; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
-                        if root.recent.length == 0: Text { text: "No active completion history yet."; color: Theme.text_secondary; font-size: 11px; }
+                        if root.recent.length == 0: Text { text: "No active completion history yet."; color: Theme.text_secondary; font-size: Typography.caption; }
                         for item in root.recent: HorizontalLayout {
                             height: 26px;
-                            Text { horizontal-stretch: 1; text: item.title; color: Theme.text_primary; font-size: 11px; overflow: elide; }
-                            Text { text: item.metadata; color: Theme.text_secondary; font-size: 9px; vertical-alignment: center; }
+                            Text { horizontal-stretch: 1; text: item.title; color: Theme.text_primary; font-size: Typography.caption; overflow: elide; }
+                            Text { text: item.metadata; color: Theme.text_secondary; font-size: Typography.caption; vertical-alignment: center; }
                         }
                     }
                 }

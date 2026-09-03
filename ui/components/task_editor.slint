@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { Theme, ThemeMode } from "../theme.slint";
+import { Theme, ThemeMode, Typography } from "../theme.slint";
+import { Palette } from "std-widgets.slint";
 import { FluentButton, FluentTextArea, FluentTextField, SegmentButton, SurfaceCard } from "common.slint";
 
 component FieldLabel inherits Text {
     color: Theme.text_secondary;
-    font-size: 11px;
-    font-weight: 500;
+    font-size: Typography.caption;
+    font-weight: Typography.semibold;
 }
 
 export component TaskEditorWindow inherits Window {
@@ -17,8 +18,12 @@ export component TaskEditorWindow inherits Window {
     min-width: 620px;
     min-height: 680px;
     background: Theme.background;
+    default-font-family: root.ui_font_family;
+    default-font-size: Typography.body;
+    default-font-weight: Typography.regular;
     forward-focus: title_field;
 
+    in-out property <string> ui_font_family <=> Theme.ui_font_family;
     in-out property <string> task_id;
     in-out property <string> title_text;
     in-out property <string> notes_text;
@@ -38,10 +43,14 @@ export component TaskEditorWindow inherits Window {
     public function apply_theme(mode: ThemeMode, system_dark: bool) {
         Theme.mode = mode;
         Theme.system_dark = system_dark;
+        Palette.color-scheme = mode == ThemeMode.system ? ColorScheme.unknown :
+                               mode == ThemeMode.light ? ColorScheme.light : ColorScheme.dark;
     }
 
     public function set_theme_mode(mode: ThemeMode) {
         Theme.mode = mode;
+        Palette.color-scheme = mode == ThemeMode.system ? ColorScheme.unknown :
+                               mode == ThemeMode.light ? ColorScheme.light : ColorScheme.dark;
     }
 
     capture_keys := FocusScope {
@@ -158,7 +167,7 @@ export component TaskEditorWindow inherits Window {
                     min-height: 18px;
                     text: root.error_message;
                     color: Theme.danger;
-                    font-size: 11px;
+                    font-size: Typography.caption;
                     wrap: word-wrap;
                 }
 

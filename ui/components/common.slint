@@ -6,17 +6,20 @@
 // 948589a255a4bd8a3ff9c3de49e2e13109378fcd. Font glyph icons and WSL-only
 // controls were replaced by semantic SVG images.
 
-import { Theme } from "../theme.slint";
+import { Theme, Typography, Motion } from "../theme.slint";
+import { UiConstants } from "../constants.slint";
+import { FluentIcon } from "icon.slint";
 
 export component SidebarItem inherits Rectangle {
     in property <image> icon;
+    in property <image> selected_icon: root.icon;
     in property <string> text;
-    in property <color> icon_color: Theme.icon_color_slate;
+    in property <color> icon_color: Theme.icon_neutral;
     in property <bool> selected: false;
     in property <bool> collapsed: false;
     callback clicked;
 
-    height: 36px;
+    height: UiConstants.navigation_item_height;
     border-radius: 4px;
     background: selected ? Theme.selected_bg : (touch.has-hover ? Theme.hover_bg : transparent);
 
@@ -46,16 +49,16 @@ export component SidebarItem inherits Rectangle {
         width: 100%;
 
         animate spacing {
-            duration: 200ms;
+            duration: Motion.slow;
             easing: ease-out-quad;
         }
 
-        Image {
+        FluentIcon {
             width: 20px;
             height: 20px;
-            source: root.icon;
-            colorize: (root.selected || touch.has-hover) ? Theme.accent : root.icon_color;
-            image-fit: contain;
+            size: 20px;
+            source: root.selected ? root.selected_icon : root.icon;
+            icon_color: (root.selected || touch.has-hover) ? Theme.accent : root.icon_color;
         }
 
         Rectangle {
@@ -63,21 +66,21 @@ export component SidebarItem inherits Rectangle {
             clip: true;
 
             animate width {
-                duration: 200ms;
+                duration: Motion.slow;
                 easing: ease-out-quad;
             }
 
             item_label := Text {
                 width: 100%;
                 text: root.text;
-                font-size: 14px;
-                font-weight: root.selected ? 600 : 400;
+                font-size: Typography.body;
+                font-weight: root.selected ? Typography.semibold : Typography.regular;
                 color: (root.selected || touch.has-hover) ? Theme.text_primary : Theme.text_secondary;
                 vertical-alignment: center;
                 horizontal-alignment: left;
                 overflow: elide;
                 opacity: root.collapsed && parent.width < 10px ? 0 : 1;
-                animate opacity { duration: 150ms; }
+                animate opacity { duration: Motion.standard; }
             }
         }
     }
@@ -104,8 +107,8 @@ export component FluentButton inherits Rectangle {
     in property <bool> enabled: true;
     callback clicked;
 
-    min-width: 88px;
-    height: 32px;
+    min-width: 0px;
+    height: UiConstants.button_height;
     border-radius: 4px;
     border-width: root.primary ? 0px : 1px;
     border-color: root.danger ? Theme.danger : Theme.input_border;
@@ -116,9 +119,9 @@ export component FluentButton inherits Rectangle {
 
     Text {
         text: root.text;
-        color: root.primary ? white : (root.danger ? Theme.danger : Theme.text_primary);
-        font-size: 13px;
-        font-weight: root.primary ? 600 : 400;
+        color: root.primary ? Theme.accent_foreground : (root.danger ? Theme.danger : Theme.text_primary);
+        font-size: Typography.body;
+        font-weight: root.primary ? Typography.semibold : Typography.regular;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
@@ -131,7 +134,9 @@ export component FluentButton inherits Rectangle {
 }
 
 export component WindowControlButton inherits Rectangle {
+    in property <image> icon;
     in property <string> symbol;
+    in property <string> label;
     in property <bool> close_button: false;
     callback clicked;
 
@@ -139,13 +144,16 @@ export component WindowControlButton inherits Rectangle {
     height: 100%;
     background: control_touch.has-hover ? (root.close_button ? #e81123 : Theme.hover_bg) : transparent;
 
-    Text {
-        text: root.symbol;
-        color: control_touch.has-hover && root.close_button ? white : Theme.text_primary;
-        font-size: root.close_button ? 18px : 14px;
-        font-weight: 400;
-        horizontal-alignment: center;
-        vertical-alignment: center;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+
+    FluentIcon {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        source: root.icon;
+        size: 16px;
+        icon_color: control_touch.has-hover && root.close_button ? white : Theme.icon_neutral;
     }
 
     control_touch := TouchArea {
@@ -162,7 +170,7 @@ export component FluentTextField inherits Rectangle {
     callback edited(string);
 
     forward-focus: field_input;
-    height: 38px;
+    height: UiConstants.input_height;
     background: Theme.input_bg;
     border-width: 1px;
     border-color: field_input.has-focus ? Theme.accent : Theme.input_border;
@@ -174,7 +182,7 @@ export component FluentTextField inherits Rectangle {
         width: parent.width - 24px;
         text <=> root.text;
         color: Theme.text_primary;
-        font-size: 14px;
+        font-size: Typography.body;
         vertical-alignment: center;
         single-line: true;
         enabled: root.enabled;
@@ -188,7 +196,7 @@ export component FluentTextField inherits Rectangle {
         width: parent.width - 24px;
         text: root.placeholder_text;
         color: Theme.text_secondary;
-        font-size: 14px;
+        font-size: Typography.body;
         vertical-alignment: center;
     }
 }
@@ -214,7 +222,7 @@ export component FluentTextArea inherits Rectangle {
         height: parent.height - 16px;
         text <=> root.text;
         color: Theme.text_primary;
-        font-size: 13px;
+        font-size: Typography.body;
         vertical-alignment: top;
         single-line: false;
         enabled: root.enabled;
@@ -228,7 +236,7 @@ export component FluentTextArea inherits Rectangle {
         width: parent.width - 24px;
         text: root.placeholder_text;
         color: Theme.text_secondary;
-        font-size: 13px;
+        font-size: Typography.body;
     }
 }
 
@@ -239,7 +247,7 @@ export component SegmentButton inherits Rectangle {
     callback clicked;
 
     min-width: 54px;
-    height: 30px;
+    height: UiConstants.button_height;
     border-radius: 4px;
     border-width: 1px;
     border-color: root.selected ? Theme.accent : Theme.input_border;
@@ -249,8 +257,8 @@ export component SegmentButton inherits Rectangle {
     Text {
         text: root.text;
         color: root.selected ? Theme.accent : Theme.text_primary;
-        font-size: 12px;
-        font-weight: root.selected ? 600 : 400;
+        font-size: Typography.body;
+        font-weight: root.selected ? Typography.semibold : Typography.regular;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
@@ -266,5 +274,5 @@ export component SurfaceCard inherits Rectangle {
     background: Theme.card_bg;
     border-width: 1px;
     border-color: Theme.border_color;
-    border-radius: 6px;
+    border-radius: UiConstants.content_radius;
 }

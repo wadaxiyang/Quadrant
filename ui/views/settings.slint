@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { ScrollView } from "std-widgets.slint";
-import { Theme, ThemeMode } from "../theme.slint";
+import { Theme, ThemeMode, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { PageHeader } from "../components/page_shell.slint";
 import { FluentButton, SegmentButton, SurfaceCard } from "../components/common.slint";
@@ -22,7 +22,7 @@ component BooleanSettingRow inherits Rectangle {
             vertical-stretch: 1;
             spacing: 2px;
             Text { text: root.title; color: Theme.text_primary; font-size: 13px; font-weight: 600; }
-            Text { text: root.description; color: Theme.text_secondary; font-size: 11px; wrap: word-wrap; }
+            Text { text: root.description; color: Theme.text_secondary; font-size: Typography.caption; wrap: word-wrap; }
         }
         HorizontalLayout {
             width: 132px;
@@ -82,7 +82,7 @@ export component SettingsView inherits Rectangle {
                     padding: 16px;
                     spacing: 10px;
                     Text { text: "Appearance"; color: Theme.text_primary; font-size: 15px; font-weight: 600; }
-                    Text { text: "System follows the normalized platform theme source."; color: Theme.text_secondary; font-size: 11px; }
+                    Text { text: "System follows the normalized platform theme source."; color: Theme.text_secondary; font-size: Typography.caption; }
                     HorizontalLayout {
                         spacing: 8px;
                         SegmentButton { width: 104px; text: "System"; selected: root.theme_mode == ThemeMode.system; clicked => { root.theme_selected(ThemeMode.system); } }
@@ -103,7 +103,7 @@ export component SettingsView inherits Rectangle {
                             + "  •  Notifications: " + (root.native_notifications_available ? "ready" : "unavailable")
                             + "  •  Single instance: " + (root.single_instance_available ? "ready" : "unavailable");
                         color: Theme.text_secondary;
-                        font-size: 11px;
+                        font-size: Typography.caption;
                         wrap: word-wrap;
                     }
                     BooleanSettingRow {
@@ -155,11 +155,11 @@ export component SettingsView inherits Rectangle {
                     padding: 16px;
                     spacing: 8px;
                     Text { text: "Backup and restore"; color: Theme.text_primary; font-size: 15px; font-weight: 600; }
-                    Text { text: root.latest_backup; color: Theme.text_secondary; font-size: 11px; overflow: elide; }
+                    Text { text: root.latest_backup; color: Theme.text_secondary; font-size: Typography.caption; overflow: elide; }
                     Text {
                         text: root.restore_pending ? "A validated restore will be applied after restart." : root.backup_directory;
                         color: root.restore_pending ? Theme.danger : Theme.text_secondary;
-                        font-size: 10px;
+                        font-size: Typography.caption;
                         overflow: elide;
                     }
                     HorizontalLayout {
@@ -186,8 +186,8 @@ export component SettingsView inherits Rectangle {
                         horizontal-stretch: 1;
                         spacing: 6px;
                         Text { text: "Updates · version " + root.application_version; color: Theme.text_primary; font-size: 15px; font-weight: 600; }
-                        Text { text: root.update_description; color: Theme.text_secondary; font-size: 11px; wrap: word-wrap; }
-                        Text { text: "Quadrant never replaces its running executable in-process."; color: Theme.text_secondary; font-size: 10px; }
+                        Text { text: root.update_description; color: Theme.text_secondary; font-size: Typography.caption; wrap: word-wrap; }
+                        Text { text: "Quadrant never replaces its running executable in-process."; color: Theme.text_secondary; font-size: Typography.caption; }
                     }
                     FluentButton {
                         width: 118px;

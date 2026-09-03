@@ -6,34 +6,23 @@
 // 948589a255a4bd8a3ff9c3de49e2e13109378fcd. Product-specific mail/pin actions
 // and Segoe icon glyphs were removed; theme selection is tri-state.
 
-import { Theme, ThemeMode } from "../theme.slint";
+import { Theme, ThemeMode, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { WindowControlButton } from "common.slint";
+import { FluentIcon, IconButton } from "icon.slint";
+import { Icons } from "../icons.slint";
 
-component ThemeModeControl inherits Rectangle {
+component ThemeModeControl inherits IconButton {
     in property <ThemeMode> mode: ThemeMode.system;
     callback selected(ThemeMode);
 
-    width: 92px;
-    height: 28px;
-    border-radius: 4px;
-    background: theme_touch.has-hover ? Theme.hover_bg : transparent;
-
-    Text {
-        text: root.mode == ThemeMode.system ? "Theme: System" :
-              root.mode == ThemeMode.light ? "Theme: Light" : "Theme: Dark";
-        color: theme_touch.has-hover ? Theme.accent : Theme.text_secondary;
-        font-size: 11px;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-    }
-
-    theme_touch := TouchArea {
-        mouse-cursor: pointer;
-        clicked => {
-            root.selected(root.mode == ThemeMode.system ? ThemeMode.light :
-                          root.mode == ThemeMode.light ? ThemeMode.dark : ThemeMode.system);
-        }
+    icon: root.mode == ThemeMode.system ? Icons.theme_system :
+          root.mode == ThemeMode.light ? Icons.theme_light : Icons.theme_dark;
+    tooltip: root.mode == ThemeMode.system ? "Theme: System" :
+             root.mode == ThemeMode.light ? "Theme: Light" : "Theme: Dark";
+    clicked => {
+        root.selected(root.mode == ThemeMode.system ? ThemeMode.light :
+                      root.mode == ThemeMode.light ? ThemeMode.dark : ThemeMode.system);
     }
 }
 
@@ -54,71 +43,76 @@ export component TitleBar inherits Rectangle {
     height: UiConstants.title_bar_height;
     background: transparent;
 
-    title_touch := TouchArea {
-        width: parent.width - 230px;
-        height: parent.height;
-        pointer-event(event) => {
-            if (event.button == PointerEventButton.left && event.kind == PointerEventKind.down) {
-                root.drag_x = self.mouse-x / 1px;
-                root.drag_y = self.mouse-y / 1px;
-            }
-        }
-        moved => {
-            if (self.pressed) {
-                root.drag_delta((self.mouse-x / 1px) - root.drag_x,
-                                (self.mouse-y / 1px) - root.drag_y);
-            }
-        }
-        double-clicked => { root.maximize(); }
-    }
-
     HorizontalLayout {
-        x: 16px;
-        width: parent.width - 250px;
-        height: 100%;
-        spacing: 8px;
-        alignment: start;
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.height;
+        padding-left: UiConstants.space_12;
+        spacing: UiConstants.space_8;
+
+        Rectangle {
+            width: 16px;
+            height: UiConstants.title_bar_height;
+            background: transparent;
+
+            FluentIcon {
+                y: (parent.height - self.height) / 2;
+                source: Icons.quadrants_filled;
+                size: 16px;
+                icon_color: Theme.accent;
+            }
+        }
 
         Text {
             text: root.title;
             color: Theme.text_primary;
-            font-size: 13px;
-            font-weight: 600;
+            font-size: Typography.body;
+            font-weight: Typography.semibold;
             vertical-alignment: center;
         }
 
-        Text {
-            text: "v" + root.version;
-            color: Theme.text_secondary;
-            font-size: 11px;
-            vertical-alignment: center;
-        }
-    }
+        Rectangle {
+            horizontal-stretch: 1;
+            height: 100%;
 
-    HorizontalLayout {
-        x: parent.width - self.width;
-        height: 100%;
-        spacing: 0px;
-        alignment: end;
+            title_touch := TouchArea {
+                pointer-event(event) => {
+                    if (event.button == PointerEventButton.left && event.kind == PointerEventKind.down) {
+                        root.drag_x = self.mouse-x / 1px;
+                        root.drag_y = self.mouse-y / 1px;
+                    }
+                }
+                moved => {
+                    if (self.pressed) {
+                        root.drag_delta((self.mouse-x / 1px) - root.drag_x,
+                                        (self.mouse-y / 1px) - root.drag_y);
+                    }
+                }
+                double-clicked => { root.maximize(); }
+            }
+        }
 
         ThemeModeControl {
-            y: (parent.height - self.height) / 2;
             mode: root.theme_mode;
             selected(mode) => { root.theme_selected(mode); }
         }
 
         WindowControlButton {
-            symbol: "—";
+            icon: Icons.minimize;
+            label: "Minimize";
             clicked => { root.minimize(); }
         }
 
         WindowControlButton {
-            symbol: root.is_maximized ? "❐" : "□";
+            icon: root.is_maximized ? Icons.restore_window : Icons.maximize;
+            label: root.is_maximized ? "Restore window" : "Maximize";
             clicked => { root.maximize(); }
         }
 
         WindowControlButton {
-            symbol: "×";
+            icon: Icons.dismiss;
+            label: "Close";
             close_button: true;
             clicked => { root.close(); }
         }

@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { ScrollView } from "std-widgets.slint";
-import { Theme } from "../theme.slint";
+import { Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { PageHeader } from "../components/page_shell.slint";
 import { FluentButton, SegmentButton, SurfaceCard } from "../components/common.slint";
+import { IconButton } from "../components/icon.slint";
+import { Icons } from "../icons.slint";
 
 export struct TaskRow {
     id: string,
@@ -37,14 +39,14 @@ component TaskCard inherits Rectangle {
                 text: root.task.title;
                 color: Theme.text_primary;
                 font-size: 12px;
-                font-weight: 500;
+                font-weight: 600;
                 overflow: elide;
                 horizontal-stretch: 1;
             }
-            FluentButton { min-width: 28px; text: "Up"; clicked => { root.reorder_requested(root.task.id, -1); } }
-            FluentButton { min-width: 28px; text: "Dn"; clicked => { root.reorder_requested(root.task.id, 1); } }
-            FluentButton { min-width: 32px; text: "Edit"; clicked => { root.edit_requested(root.task.id); } }
-            FluentButton { min-width: 24px; text: "×"; danger: true; clicked => { root.delete_requested(root.task.id); } }
+            IconButton { icon: Icons.chevron_up; tooltip: "Move task up"; clicked => { root.reorder_requested(root.task.id, -1); } }
+            IconButton { icon: Icons.chevron_down; tooltip: "Move task down"; clicked => { root.reorder_requested(root.task.id, 1); } }
+            IconButton { icon: Icons.edit; tooltip: "Edit task"; clicked => { root.edit_requested(root.task.id); } }
+            IconButton { icon: Icons.delete; tooltip: "Delete task"; danger: true; clicked => { root.delete_requested(root.task.id); } }
         }
 
         HorizontalLayout {
@@ -96,7 +98,7 @@ component TaskColumn inherits SurfaceCard {
         Text {
             text: root.subtitle;
             color: Theme.text_secondary;
-            font-size: 10px;
+            font-size: Typography.caption;
         }
 
         ScrollView {
@@ -115,7 +117,7 @@ component TaskColumn inherits SurfaceCard {
                 if root.tasks.length == 0: Text {
                     text: "No active tasks";
                     color: Theme.text_secondary;
-                    font-size: 11px;
+                    font-size: Typography.caption;
                     horizontal-alignment: center;
                 }
             }
@@ -172,7 +174,7 @@ export component QuadrantsView inherits Rectangle {
                 HorizontalLayout {
                     spacing: 12px;
                     TaskColumn {
-                        code: "Q1"; title: "Important + Urgent"; subtitle: "Do now"; accent: #d13438;
+                        code: "Q1"; title: "Important + Urgent"; subtitle: "Do now"; accent: Theme.q1_accent;
                         destination: 1; tasks: root.q1_tasks;
                         move_requested(id, destination) => { root.move_requested(id, destination); }
                         edit_requested(id) => { root.edit_requested(id); }
@@ -181,7 +183,7 @@ export component QuadrantsView inherits Rectangle {
                         delete_requested(id) => { root.delete_requested(id); }
                     }
                     TaskColumn {
-                        code: "Q2"; title: "Important + Not urgent"; subtitle: "Plan deliberately"; accent: #107c10;
+                        code: "Q2"; title: "Important + Not urgent"; subtitle: "Plan deliberately"; accent: Theme.q2_accent;
                         destination: 2; tasks: root.q2_tasks;
                         move_requested(id, destination) => { root.move_requested(id, destination); }
                         edit_requested(id) => { root.edit_requested(id); }
@@ -194,7 +196,7 @@ export component QuadrantsView inherits Rectangle {
                 HorizontalLayout {
                     spacing: 12px;
                     TaskColumn {
-                        code: "Q3"; title: "Not important + Urgent"; subtitle: "Delegate or contain"; accent: #ca5010;
+                        code: "Q3"; title: "Not important + Urgent"; subtitle: "Delegate or contain"; accent: Theme.q3_accent;
                         destination: 3; tasks: root.q3_tasks;
                         move_requested(id, destination) => { root.move_requested(id, destination); }
                         edit_requested(id) => { root.edit_requested(id); }
@@ -203,7 +205,7 @@ export component QuadrantsView inherits Rectangle {
                         delete_requested(id) => { root.delete_requested(id); }
                     }
                     TaskColumn {
-                        code: "Q4"; title: "Not important + Not urgent"; subtitle: "Reduce or remove"; accent: #5c2d91;
+                        code: "Q4"; title: "Not important + Not urgent"; subtitle: "Reduce or remove"; accent: Theme.q4_accent;
                         destination: 4; tasks: root.q4_tasks;
                         move_requested(id, destination) => { root.move_requested(id, destination); }
                         edit_requested(id) => { root.edit_requested(id); }

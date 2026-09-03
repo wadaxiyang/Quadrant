@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { ScrollView } from "std-widgets.slint";
-import { Theme } from "../theme.slint";
+import { Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { PageHeader } from "../components/page_shell.slint";
 import { FluentButton, FluentTextField, SegmentButton, SurfaceCard } from "../components/common.slint";
@@ -19,7 +19,7 @@ component SettingToggle inherits Rectangle {
     callback changed(bool);
     height: 32px;
     HorizontalLayout {
-        Text { text: root.label; color: Theme.text_secondary; font-size: 11px; vertical-alignment: center; }
+        Text { text: root.label; color: Theme.text_secondary; font-size: Typography.caption; vertical-alignment: center; }
         Rectangle { horizontal-stretch: 1; }
         SegmentButton { width: 42px; text: "Off"; selected: !root.value; clicked => { root.changed(false); } }
         SegmentButton { width: 42px; text: "On"; selected: root.value; clicked => { root.changed(true); } }
@@ -80,7 +80,7 @@ export component FocusView inherits Rectangle {
                             SegmentButton { width: 82px; text: "Short break"; selected: root.selected_kind == 1; enabled: root.idle; clicked => { root.selected_kind = 1; root.selected_task_id = ""; } }
                             SegmentButton { width: 82px; text: "Long break"; selected: root.selected_kind == 2; enabled: root.idle; clicked => { root.selected_kind = 2; root.selected_task_id = ""; } }
                         }
-                        Text { text: root.timer_text; color: Theme.text_primary; font-size: 62px; font-weight: 300; horizontal-alignment: center; }
+                        Text { text: root.timer_text; color: Theme.text_primary; font-size: Typography.timer; font-weight: Typography.regular; horizontal-alignment: center; }
                         Text { text: root.session_label; color: Theme.text_secondary; font-size: 12px; horizontal-alignment: center; }
                         Rectangle {
                             width: 78%; height: 5px; background: Theme.input_bg; border-radius: 2.5px;
@@ -94,7 +94,7 @@ export component FocusView inherits Rectangle {
                             if !root.idle: FluentButton { width: 96px; text: "Finish"; primary: root.session_status == 0; clicked => { root.finish_requested(); } }
                             if !root.idle: FluentButton { width: 96px; text: "Cancel"; danger: true; clicked => { root.cancel_requested(); } }
                         }
-                        Text { text: root.today_summary; color: Theme.accent; font-size: 11px; horizontal-alignment: center; }
+                        Text { text: root.today_summary; color: Theme.text_secondary; font-size: Typography.caption; horizontal-alignment: center; }
                     }
                 }
 
@@ -106,7 +106,7 @@ export component FocusView inherits Rectangle {
                         VerticalLayout {
                             padding: 14px; spacing: 7px;
                             Text { text: "Associate a task"; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
-                            Text { text: root.productive_phase ? "Optional; stored as a history snapshot." : "Breaks are intentionally task-free."; color: Theme.text_secondary; font-size: 10px; }
+                            Text { text: root.productive_phase ? "Optional; stored as a history snapshot." : "Breaks are intentionally task-free."; color: Theme.text_secondary; font-size: Typography.caption; }
                             SegmentButton { text: "No task"; selected: root.selected_task_id == ""; enabled: root.idle && root.productive_phase; clicked => { root.selected_task_id = ""; } }
                             Rectangle {
                                 vertical-stretch: 1; clip: true;
@@ -138,7 +138,7 @@ export component FocusView inherits Rectangle {
                                 FluentTextField { horizontal-stretch: 1; text <=> root.long_break_minutes; placeholder_text: "Long"; enabled: root.idle; }
                                 FluentTextField { horizontal-stretch: 1; text <=> root.long_break_interval; placeholder_text: "Every"; enabled: root.idle; }
                             }
-                            Text { text: "Minutes: focus / short / long · long break every N focus sessions"; color: Theme.text_secondary; font-size: 9px; wrap: word-wrap; }
+                            Text { text: "Minutes: focus / short / long · long break every N focus sessions"; color: Theme.text_secondary; font-size: Typography.caption; wrap: word-wrap; }
                             SettingToggle { label: "Auto-start break"; value: root.auto_start_break; changed(value) => { root.auto_start_break = value; } }
                             SettingToggle { label: "Auto-start focus"; value: root.auto_start_focus; changed(value) => { root.auto_start_focus = value; } }
                             FluentButton {

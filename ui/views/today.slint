@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { ScrollView } from "std-widgets.slint";
-import { Theme } from "../theme.slint";
+import { Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { FluentButton, SurfaceCard } from "../components/common.slint";
 import { EmptyState, PageHeader } from "../components/page_shell.slint";
@@ -34,13 +34,13 @@ component TodayTaskCard inherits Rectangle {
                 text: root.task.title;
                 color: Theme.text_primary;
                 font-size: 13px;
-                font-weight: 500;
+                font-weight: Typography.semibold;
                 overflow: elide;
             }
             Text {
                 text: root.task.metadata;
                 color: Theme.text_secondary;
-                font-size: 10px;
+                font-size: Typography.caption;
                 overflow: elide;
             }
         }
@@ -66,9 +66,9 @@ component TodaySection inherits SurfaceCard {
         HorizontalLayout {
             Text { text: root.title; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
             Rectangle { horizontal-stretch: 1; }
-            Text { text: root.tasks.length + " tasks"; color: Theme.text_secondary; font-size: 11px; }
+            Text { text: root.tasks.length + " tasks"; color: Theme.text_secondary; font-size: Typography.caption; }
         }
-        Text { text: root.subtitle; color: Theme.text_secondary; font-size: 10px; }
+        Text { text: root.subtitle; color: Theme.text_secondary; font-size: Typography.caption; }
         for task in root.tasks: TodayTaskCard {
             task: task;
             edit_requested(id) => { root.edit_requested(id); }
@@ -103,14 +103,14 @@ export component TodayView inherits Rectangle {
                     padding: 14px;
                     spacing: 18px;
                     VerticalLayout {
-                        Text { text: "TASKS"; color: Theme.text_secondary; font-size: 10px; font-weight: 600; }
+                        Text { text: "Tasks"; color: Theme.text_secondary; font-size: Typography.caption; font-weight: Typography.semibold; }
                         Text { text: root.unique_task_count; color: Theme.text_primary; font-size: 20px; font-weight: 600; }
                     }
                     Rectangle { width: 1px; background: Theme.border_color; }
                     Text {
                         text: "Each task appears once: overdue, planned today, due today, then needs rescheduling.";
                         color: Theme.text_secondary;
-                        font-size: 11px;
+                        font-size: Typography.caption;
                         vertical-alignment: center;
                         wrap: word-wrap;
                     }

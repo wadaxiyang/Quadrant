@@ -1,0 +1,195 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Palette, ScrollView, Switch } from "std-widgets.slint";
+import { Theme, ThemeMode, Typography } from "../theme.slint";
+import { UiConstants } from "../constants.slint";
+import { Icons } from "../icons.slint";
+import { FluentButton, FluentTextArea, FluentTextField, SegmentButton, SurfaceCard } from "../components/common.slint";
+import { FluentIcon, IconButton } from "../components/icon.slint";
+import { ToastHost, ToastKind } from "../components/toast.slint";
+
+component GalleryLabel inherits Text {
+    color: Theme.text_secondary;
+    font-size: Typography.caption;
+    font-weight: Typography.semibold;
+}
+
+export component DesignGalleryWindow inherits Window {
+    title: "Quadrant Design Gallery";
+    preferred-width: 1040px;
+    preferred-height: 800px;
+    min-width: 760px;
+    min-height: 520px;
+    background: Theme.background;
+    default-font-family: root.ui_font_family;
+    default-font-size: Typography.body;
+    default-font-weight: Typography.regular;
+
+    in-out property <string> ui_font_family <=> Theme.ui_font_family;
+    in-out property <string> sample_text;
+    in-out property <bool> sample_switch: true;
+    in-out property <ThemeMode> gallery_theme: ThemeMode.light;
+
+    ScrollView {
+        width: 100%;
+        height: 100%;
+        viewport-width: self.width;
+
+        VerticalLayout {
+            padding: UiConstants.page_padding_wide;
+            spacing: UiConstants.space_20;
+
+            Text {
+                text: "Quadrant Fluent design gallery";
+                color: Theme.text_primary;
+                font-size: Typography.title;
+                font-weight: Typography.semibold;
+            }
+            Text {
+                text: "Shared tokens and reusable component states. Development-only; not part of release navigation.";
+                color: Theme.text_secondary;
+                font-size: Typography.body;
+            }
+            HorizontalLayout {
+                spacing: UiConstants.space_4;
+                SegmentButton {
+                    text: "System";
+                    selected: root.gallery_theme == ThemeMode.system;
+                    clicked => {
+                        root.gallery_theme = ThemeMode.system;
+                        Theme.mode = ThemeMode.system;
+                        Palette.color-scheme = ColorScheme.unknown;
+                    }
+                }
+                SegmentButton {
+                    text: "Light";
+                    selected: root.gallery_theme == ThemeMode.light;
+                    clicked => {
+                        root.gallery_theme = ThemeMode.light;
+                        Theme.mode = ThemeMode.light;
+                        Palette.color-scheme = ColorScheme.light;
+                    }
+                }
+                SegmentButton {
+                    text: "Dark";
+                    selected: root.gallery_theme == ThemeMode.dark;
+                    clicked => {
+                        root.gallery_theme = ThemeMode.dark;
+                        Theme.mode = ThemeMode.dark;
+                        Palette.color-scheme = ColorScheme.dark;
+                    }
+                }
+                Rectangle { horizontal-stretch: 1; }
+            }
+
+            SurfaceCard {
+                height: 112px;
+                HorizontalLayout {
+                    padding: UiConstants.space_16;
+                    spacing: UiConstants.space_12;
+                    alignment: center;
+                    GalleryLabel { text: "Buttons"; width: 92px; }
+                    FluentButton { width: 112px; text: "Secondary"; }
+                    FluentButton { width: 96px; text: "Primary"; primary: true; }
+                    FluentButton { width: 96px; text: "Danger"; danger: true; }
+                    FluentButton { width: 96px; text: "Disabled"; enabled: false; }
+                }
+            }
+
+            SurfaceCard {
+                height: 112px;
+                HorizontalLayout {
+                    padding: UiConstants.space_16;
+                    spacing: UiConstants.space_12;
+                    alignment: center;
+                    GalleryLabel { text: "Icons"; width: 92px; }
+                    IconButton { icon: Icons.add; tooltip: "Add task"; }
+                    IconButton { icon: Icons.edit; tooltip: "Edit task"; }
+                    IconButton { icon: Icons.delete; tooltip: "Delete task"; danger: true; }
+                    IconButton { icon: Icons.dismiss; tooltip: "Dismiss"; enabled: false; }
+                    Rectangle { width: UiConstants.space_12; }
+                    FluentIcon { source: Icons.quadrants_regular; size: 20px; }
+                    FluentIcon { source: Icons.quadrants_filled; size: 20px; icon_color: Theme.accent; }
+                    FluentIcon { source: Icons.status_info; size: 24px; icon_color: Theme.accent; }
+                    FluentIcon { source: Icons.status_success; size: 24px; icon_color: Theme.success; }
+                    FluentIcon { source: Icons.status_warning; size: 24px; icon_color: Theme.warning; }
+                    FluentIcon { source: Icons.status_error; size: 24px; icon_color: Theme.danger; }
+                }
+            }
+
+            SurfaceCard {
+                height: 176px;
+                HorizontalLayout {
+                    padding: UiConstants.space_16;
+                    spacing: UiConstants.space_16;
+                    GalleryLabel { text: "Inputs"; width: 92px; }
+                    VerticalLayout {
+                        spacing: UiConstants.space_8;
+                        FluentTextField { text <=> root.sample_text; placeholder_text: "Task title"; }
+                        FluentTextArea { height: 80px; text: root.sample_text; placeholder_text: "Notes"; }
+                    }
+                    VerticalLayout {
+                        spacing: UiConstants.space_12;
+                        HorizontalLayout {
+                            spacing: UiConstants.space_4;
+                            SegmentButton { text: "Inbox"; selected: true; }
+                            SegmentButton { text: "Q1"; }
+                            SegmentButton { text: "Q2"; enabled: false; }
+                        }
+                        Switch { text: "Enabled setting"; checked <=> root.sample_switch; }
+                        Switch { text: "Disabled setting"; enabled: false; }
+                    }
+                }
+            }
+
+            SurfaceCard {
+                height: 212px;
+                VerticalLayout {
+                    padding: UiConstants.space_16;
+                    spacing: UiConstants.space_12;
+                    GalleryLabel { text: "Toast states"; }
+                    Rectangle {
+                        height: 56px;
+                        ToastHost {
+                            width: min(parent.width, 420px);
+                            shown: true;
+                            message: "Information uses the shared SVG and type scale.";
+                            kind: ToastKind.info;
+                        }
+                    }
+                    Rectangle {
+                        height: 56px;
+                        ToastHost {
+                            width: min(parent.width, 420px);
+                            shown: true;
+                            message: "The task was completed successfully.";
+                            kind: ToastKind.success;
+                        }
+                    }
+                    Rectangle {
+                        height: 56px;
+                        ToastHost {
+                            width: min(parent.width, 420px);
+                            shown: true;
+                            message: "Something needs attention before continuing.";
+                            kind: ToastKind.error;
+                        }
+                    }
+                }
+            }
+
+            SurfaceCard {
+                height: 156px;
+                VerticalLayout {
+                    padding: UiConstants.space_16;
+                    spacing: UiConstants.space_8;
+                    GalleryLabel { text: "Typography"; }
+                    Text { text: "Page title — 28 / Semibold"; color: Theme.text_primary; font-size: Typography.title; font-weight: Typography.semibold; }
+                    Text { text: "Body — 14 / Regular"; color: Theme.text_primary; font-size: Typography.body; }
+                    Text { text: "Caption — 12 / Regular"; color: Theme.text_tertiary; font-size: Typography.caption; }
+                }
+            }
+        }
+    }
+}

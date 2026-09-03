@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { Theme, ThemeMode } from "theme.slint";
+import { Typography } from "theme.slint";
+import { Palette } from "std-widgets.slint";
 import { UiConstants } from "constants.slint";
 import { Sidebar } from "components/sidebar.slint";
 import { TitleBar } from "components/title_bar.slint";
@@ -17,6 +19,7 @@ import { AboutView } from "views/about.slint";
 
 export { QuickAddWindow } from "components/quick_add.slint";
 export { TaskEditorWindow } from "components/task_editor.slint";
+export { DesignGalleryWindow } from "dev/design_gallery.slint";
 
 export component MainWindow inherits Window {
     title: "Quadrant";
@@ -27,7 +30,11 @@ export component MainWindow inherits Window {
     no-frame: true;
     resize-border-width: 6px;
     background: Theme.background;
+    default-font-family: root.ui_font_family;
+    default-font-size: Typography.body;
+    default-font-weight: Typography.regular;
 
+    in-out property <string> ui_font_family <=> Theme.ui_font_family;
     in-out property <int> current_route: 0;
     in-out property <bool> toast_visible: false;
     in-out property <string> toast_message;
@@ -136,6 +143,8 @@ export component MainWindow inherits Window {
     public function apply_theme(mode: ThemeMode, system_dark: bool) {
         Theme.mode = mode;
         Theme.system_dark = system_dark;
+        Palette.color-scheme = mode == ThemeMode.system ? ColorScheme.unknown :
+                               mode == ThemeMode.light ? ColorScheme.light : ColorScheme.dark;
     }
 
     Rectangle {
@@ -147,10 +156,10 @@ export component MainWindow inherits Window {
         border-color: Theme.main_color;
         clip: true;
 
-        VerticalLayout {
-            spacing: 0px;
-
-            TitleBar {
+        TitleBar {
+                x: 0px;
+                y: 0px;
+                width: parent.width;
                 title: "Quadrant";
                 version: root.application_version;
                 is_maximized: root.maximized;
@@ -160,12 +169,18 @@ export component MainWindow inherits Window {
                 maximize => { root.window_maximize(); }
                 theme_selected(mode) => {
                     Theme.mode = mode;
+                    Palette.color-scheme = mode == ThemeMode.system ? ColorScheme.unknown :
+                                           mode == ThemeMode.light ? ColorScheme.light : ColorScheme.dark;
                     root.theme_selected(mode);
                 }
                 drag_delta(dx, dy) => { root.window_drag_delta(dx, dy); }
             }
 
             HorizontalLayout {
+                x: 0px;
+                y: UiConstants.title_bar_height;
+                width: parent.width;
+                height: parent.height - UiConstants.title_bar_height;
                 spacing: 0px;
 
                 Sidebar {
@@ -291,6 +306,8 @@ export component MainWindow inherits Window {
                         can_open_releases: root.can_open_releases;
                         theme_selected(mode) => {
                             Theme.mode = mode;
+                            Palette.color-scheme = mode == ThemeMode.system ? ColorScheme.unknown :
+                                                   mode == ThemeMode.light ? ColorScheme.light : ColorScheme.dark;
                             root.theme_selected(mode);
                         }
                         desktop_settings_changed(launch, start_hidden, close_to_tray, minimize_to_tray) => {
@@ -323,7 +340,6 @@ export component MainWindow inherits Window {
                     }
                 }
             }
-        }
     }
 
     ToastHost {

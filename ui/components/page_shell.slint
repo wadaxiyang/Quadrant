@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { Theme } from "../theme.slint";
+import { Theme, Typography } from "../theme.slint";
 import { FluentButton, SurfaceCard } from "common.slint";
 
 export component PageHeader inherits Rectangle {
@@ -11,7 +11,7 @@ export component PageHeader inherits Rectangle {
     in property <string> action_text;
     callback action_clicked;
 
-    height: 64px;
+    min-height: 72px;
 
     VerticalLayout {
         spacing: 4px;
@@ -20,14 +20,14 @@ export component PageHeader inherits Rectangle {
         Text {
             text: root.title;
             color: Theme.text_primary;
-            font-size: 26px;
-            font-weight: 600;
+            font-size: Typography.title;
+            font-weight: Typography.semibold;
         }
 
         Text {
             text: root.subtitle;
             color: Theme.text_secondary;
-            font-size: 13px;
+            font-size: Typography.body;
         }
     }
 
@@ -54,15 +54,15 @@ export component EmptyState inherits SurfaceCard {
         Text {
             text: root.title;
             color: Theme.text_primary;
-            font-size: 18px;
-            font-weight: 600;
+            font-size: Typography.body_large;
+            font-weight: Typography.semibold;
             horizontal-alignment: center;
         }
 
         Text {
             text: root.message;
             color: Theme.text_secondary;
-            font-size: 13px;
+            font-size: Typography.body;
             horizontal-alignment: center;
             wrap: word-wrap;
         }
@@ -70,7 +70,7 @@ export component EmptyState inherits SurfaceCard {
         Text {
             text: root.milestone;
             color: Theme.accent;
-            font-size: 11px;
+            font-size: Typography.caption;
             horizontal-alignment: center;
         }
     }
@@ -97,14 +97,14 @@ export component MetricCard inherits SurfaceCard {
         Text {
             text: root.value;
             color: Theme.text_primary;
-            font-size: 24px;
-            font-weight: 600;
+            font-size: Typography.title;
+            font-weight: Typography.semibold;
         }
 
         Text {
             text: root.hint;
             color: Theme.text_secondary;
-            font-size: 11px;
+            font-size: Typography.caption;
         }
     }
 }

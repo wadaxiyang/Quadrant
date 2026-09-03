@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { ScrollView } from "std-widgets.slint";
-import { Theme } from "../theme.slint";
+import { Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { PageHeader, EmptyState } from "../components/page_shell.slint";
 import { FluentButton, SurfaceCard } from "../components/common.slint";
@@ -23,7 +23,7 @@ component CompletedTaskCard inherits SurfaceCard {
         VerticalLayout {
             horizontal-stretch: 1; spacing: 4px;
             Text { text: root.task.title; color: Theme.text_primary; font-size: 13px; font-weight: 600; overflow: elide; }
-            Text { text: root.task.metadata; color: Theme.text_secondary; font-size: 10px; overflow: elide; }
+            Text { text: root.task.metadata; color: Theme.text_secondary; font-size: Typography.caption; overflow: elide; }
         }
         FluentButton { width: 78px; text: "Restore"; primary: true; clicked => { root.reopen_requested(root.task.id); } }
         FluentButton { width: 92px; text: "Delete"; danger: true; clicked => { root.delete_requested(root.task.id); } }
@@ -60,7 +60,7 @@ export component CompletedView inherits Rectangle {
             if root.tasks.length > 0 && !root.has_more: Text {
                 text: "End of completed history";
                 color: Theme.text_secondary;
-                font-size: 10px;
+                font-size: Typography.caption;
                 horizontal-alignment: center;
             }
         }

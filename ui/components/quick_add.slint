@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { Theme, ThemeMode } from "../theme.slint";
+import { Theme, ThemeMode, Typography } from "../theme.slint";
+import { Palette } from "std-widgets.slint";
 import { FluentButton, FluentTextField, SegmentButton, SurfaceCard } from "common.slint";
 
 export component QuickAddWindow inherits Window {
@@ -9,8 +10,12 @@ export component QuickAddWindow inherits Window {
     width: 560px;
     height: 280px;
     background: Theme.background;
+    default-font-family: root.ui_font_family;
+    default-font-size: Typography.body;
+    default-font-weight: Typography.regular;
     forward-focus: title_field;
 
+    in-out property <string> ui_font_family <=> Theme.ui_font_family;
     in-out property <string> title_text;
     in-out property <int> destination: 0;
     in-out property <string> error_message;
@@ -21,10 +26,14 @@ export component QuickAddWindow inherits Window {
     public function apply_theme(mode: ThemeMode, system_dark: bool) {
         Theme.mode = mode;
         Theme.system_dark = system_dark;
+        Palette.color-scheme = mode == ThemeMode.system ? ColorScheme.unknown :
+                               mode == ThemeMode.light ? ColorScheme.light : ColorScheme.dark;
     }
 
     public function set_theme_mode(mode: ThemeMode) {
         Theme.mode = mode;
+        Palette.color-scheme = mode == ThemeMode.system ? ColorScheme.unknown :
+                               mode == ThemeMode.light ? ColorScheme.light : ColorScheme.dark;
     }
 
     capture_keys := FocusScope {
@@ -116,7 +125,7 @@ export component QuickAddWindow inherits Window {
                     text: root.error_message != "" ? root.error_message :
                           "Enter to capture · Esc to cancel · Ctrl+1…4 to classify";
                     color: root.error_message != "" ? Theme.danger : Theme.text_secondary;
-                    font-size: 11px;
+                    font-size: Typography.caption;
                 }
 
                 HorizontalLayout {

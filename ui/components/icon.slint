@@ -1,0 +1,95 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme, Typography } from "../theme.slint";
+import { UiConstants } from "../constants.slint";
+
+export component FluentIcon inherits Rectangle {
+    in property <image> source;
+    in property <length> size: 16px;
+    in property <brush> icon_color: Theme.icon_neutral;
+    in property <length> optical_offset_x: 0px;
+    in property <length> optical_offset_y: 0px;
+
+    width: root.size;
+    height: root.size;
+    background: transparent;
+    accessible-role: none;
+
+    Image {
+        x: root.optical_offset_x;
+        y: root.optical_offset_y;
+        width: root.size;
+        height: root.size;
+        source: root.source;
+        colorize: root.icon_color;
+        image-fit: contain;
+        accessible-role: none;
+    }
+}
+
+export component IconButton inherits Rectangle {
+    in property <image> icon;
+    in property <string> tooltip;
+    in property <bool> danger: false;
+    in property <bool> enabled: true;
+    callback clicked;
+
+    width: UiConstants.icon_button_size;
+    height: UiConstants.icon_button_size;
+    border-radius: UiConstants.control_radius;
+    border-width: keyboard_focus.has-focus ? 2px : 0px;
+    border-color: Theme.focus_ring;
+    background: !root.enabled ? transparent :
+                button_touch.pressed ? (root.danger ? Theme.danger_bg : Theme.selected_bg) :
+                button_touch.has-hover ? (root.danger ? Theme.danger_bg : Theme.control_bg_hover) : transparent;
+    opacity: root.enabled ? 1 : 0.45;
+    forward-focus: keyboard_focus;
+    accessible-role: button;
+    accessible-label: root.tooltip;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if (root.enabled) { root.clicked(); } }
+
+    FluentIcon {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        source: root.icon;
+        icon_color: root.danger ? Theme.danger :
+                    button_touch.has-hover ? Theme.text_primary : Theme.icon_neutral;
+    }
+
+    keyboard_focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    button_touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+
+    if root.tooltip != "" && button_touch.has-hover: Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: parent.height + UiConstants.space_4;
+        width: tooltip_label.preferred-width + UiConstants.space_16;
+        height: 28px;
+        background: Theme.dark_mode ? #f2f2f2 : #2b2b2b;
+        border-radius: UiConstants.control_radius;
+        z: 500;
+
+        tooltip_label := Text {
+            text: root.tooltip;
+            color: Theme.dark_mode ? #202020 : #ffffff;
+            font-size: Typography.caption;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}

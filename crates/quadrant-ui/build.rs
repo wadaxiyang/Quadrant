@@ -1,5 +1,7 @@
 //! Builds the root Slint component graph.
 
 fn main() {
-    slint_build::compile("../../ui/app.slint").expect("failed to compile the Quadrant Slint UI");
+    let config = slint_build::CompilerConfiguration::new().with_style("fluent".into());
+    slint_build::compile_with_config("../../ui/app.slint", config)
+        .expect("failed to compile the Quadrant Slint UI");
 }

@@ -7,9 +7,28 @@
 
 export enum ThemeMode { system, light, dark }
 
+export global Typography {
+    out property <length> caption: 12px;
+    out property <length> body: 14px;
+    out property <length> body_large: 18px;
+    out property <length> subtitle: 20px;
+    out property <length> title: 28px;
+    out property <length> timer: 56px;
+
+    out property <int> regular: 400;
+    out property <int> semibold: 600;
+}
+
+export global Motion {
+    out property <duration> fast: 100ms;
+    out property <duration> standard: 160ms;
+    out property <duration> slow: 200ms;
+}
+
 export global Theme {
     in-out property <ThemeMode> mode: ThemeMode.system;
     in-out property <bool> system_dark: false;
+    in-out property <string> ui_font_family: "";
     out property <bool> dark_mode: mode == ThemeMode.dark || (mode == ThemeMode.system && system_dark);
     out property <color> background: dark_mode ? #202020 : #f3f3f3;
     out property <color> content_bg: dark_mode ? #1e1e1e : #ffffff;
@@ -18,17 +37,32 @@ export global Theme {
     out property <color> card_bg_muted: dark_mode ? #27272a : #fafafa;
     out property <color> text_primary: dark_mode ? #eeeeee : #1a1a1a;
     out property <color> text_secondary: dark_mode ? #bbbbbb : #666666;
+    out property <color> text_tertiary: dark_mode ? #9d9d9d : #707070;
     out property <color> border_color: dark_mode ? #3e3e42 : #e6e8eb;
+    out property <color> divider: dark_mode ? #38383c : #e8e8e8;
     out property <color> main_color: dark_mode ? #55555a : #c6c6c6;
     out property <color> hover_bg: dark_mode ? #2a2d2e : #eaeaea;
     out property <color> selected_bg: dark_mode ? #37373d : #e6e6e6;
-    out property <color> accent: #0067c0;
-    out property <color> accent_hover: dark_mode ? #1683d8 : #005a9e;
+    out property <color> card_hover: dark_mode ? #323237 : #f7f7f7;
+    out property <color> accent: dark_mode ? #60cdff : #005fb8;
+    out property <color> accent_foreground: dark_mode ? #000000 : #ffffff;
+    out property <color> accent_hover: dark_mode ? #4cc2ff : #005a9e;
+    out property <color> accent_pressed: dark_mode ? #47b1df : #004578;
+    out property <color> focus_ring: dark_mode ? #60cdff : #005fb8;
+    out property <color> control_bg: dark_mode ? #2d2d30 : #ffffff;
+    out property <color> control_bg_hover: dark_mode ? #35353a : #f7f7f7;
     out property <color> input_bg: dark_mode ? #252526 : #ffffff;
     out property <color> input_border: dark_mode ? #4b4b50 : #d3d3d3;
     out property <color> overlay: #00000080;
     out property <color> danger: dark_mode ? #ff6b6b : #c42b1c;
+    out property <color> danger_bg: dark_mode ? #5a1d1d : #fdf3f2;
     out property <color> success: dark_mode ? #4ade80 : #107c10;
+    out property <color> warning: dark_mode ? #f5c242 : #9d5d00;
+    out property <color> icon_neutral: dark_mode ? #c7c7c7 : #5f5f5f;
+    out property <color> q1_accent: dark_mode ? #ff8a7a : #c42b1c;
+    out property <color> q2_accent: dark_mode ? #7db6f4 : #0067c0;
+    out property <color> q3_accent: dark_mode ? #f5c56b : #a15c00;
+    out property <color> q4_accent: dark_mode ? #8fd6a6 : #107c10;
     out property <color> scrollbar_bg: dark_mode ? #2a2d2e : #f0f0f0;
     out property <color> scrollbar_thumb: dark_mode ? #5d5d5d : #c1c1c1;
     out property <color> scrollbar_thumb_hover: dark_mode ? #6d6d6d : #a8a8a8;
