@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Semantic, platform-neutral icon IDs. Assets are Microsoft Fluent UI System
-// Icons (MIT), pinned and documented in docs/09_SOURCE_MAP.md.
+// Semantic, platform-neutral icon IDs. The application mark is original
+// Quadrant artwork; UI glyphs are pinned Microsoft Fluent UI System Icons.
 
 export global Icons {
+    out property <image> app_mark: @image-url("../assets/branding/quadrant-mark.svg");
+
     // Navigation uses native 20px Regular/Filled variants so the renderer never
     // has to downscale a 24px canvas into a 20px slot.
     out property <image> menu: @image-url("../assets/icons/navigation-20-regular.svg");

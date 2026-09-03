@@ -19,12 +19,14 @@ fi
 rm -rf -- "$bundle"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
 cp "$repository/target/release/quadrant-app" "$bundle/Contents/MacOS/"
+cp "$repository/assets/branding/Quadrant.icns" "$bundle/Contents/Resources/"
 cp "$repository/LICENSE" "$bundle/Contents/Resources/"
 cp "$repository/packaging/THIRD-PARTY-NOTICES.txt" "$bundle/Contents/Resources/"
 cp "$repository/packaging/DEPENDENCY-LICENSES.txt" "$bundle/Contents/Resources/"
 sed "s/@VERSION@/$version/g" "$repository/packaging/macos/Info.plist.in" > "$bundle/Contents/Info.plist"
 
-archive="$target_root/Quadrant-$version-macos-universal-unsigned.tar.gz"
+architecture=$(uname -m)
+archive="$target_root/Quadrant-$version-macos-$architecture-unsigned.tar.gz"
 tar -C "$target_root" -czf "$archive" Quadrant.app
 shasum -a 256 "$archive" > "$archive.sha256"
 printf '%s\n%s\n' "$archive" "$archive.sha256"

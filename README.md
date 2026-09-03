@@ -1,4 +1,8 @@
-# Quadrant
+<p align="center">
+  <img src="assets/branding/quadrant-mark.svg" width="96" height="96" alt="Quadrant app icon">
+</p>
+
+<h1 align="center">Quadrant</h1>
 
 Quadrant is a local-first, cross-platform four-quadrant task manager built with Rust and Slint.
 

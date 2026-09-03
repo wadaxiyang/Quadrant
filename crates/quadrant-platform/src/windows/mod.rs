@@ -196,25 +196,9 @@ fn install_menu_handler(sink: DesktopEventSink, quick_add: MenuId, show: MenuId,
 }
 
 fn quadrant_icon() -> Result<Icon, PlatformIntegrationError> {
-    const SIZE: usize = 32;
-    const SIZE_U32: u32 = 32;
-    let mut rgba = vec![0_u8; SIZE * SIZE * 4];
-    for y in 3..29 {
-        for x in 3..29 {
-            let color = match (x < 16, y < 16) {
-                (true, true) => [209, 52, 56, 255],
-                (false, true) => [16, 124, 16, 255],
-                (true, false) => [202, 80, 16, 255],
-                (false, false) => [118, 67, 169, 255],
-            };
-            if x == 15 || x == 16 || y == 15 || y == 16 {
-                continue;
-            }
-            let offset = (y * SIZE + x) * 4;
-            rgba[offset..offset + 4].copy_from_slice(&color);
-        }
-    }
-    Icon::from_rgba(rgba, SIZE_U32, SIZE_U32).map_err(PlatformIntegrationError::new)
+    const SIZE: u32 = 32;
+    let rgba = include_bytes!("../../../../assets/branding/quadrant-32.rgba").to_vec();
+    Icon::from_rgba(rgba, SIZE, SIZE).map_err(PlatformIntegrationError::new)
 }
 
 fn run_message_loop() {

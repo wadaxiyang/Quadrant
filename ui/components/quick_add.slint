@@ -3,11 +3,13 @@
 
 import { Theme, ThemeMode, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
+import { Icons } from "../icons.slint";
 import { Palette } from "std-widgets.slint";
 import { FluentButton, FluentTextField, SegmentButton } from "common.slint";
 
 export component QuickAddWindow inherits Window {
     title: "Quick Add — Quadrant";
+    icon: Icons.app_mark;
     preferred-width: 520px;
     preferred-height: 252px;
     min-width: 440px;

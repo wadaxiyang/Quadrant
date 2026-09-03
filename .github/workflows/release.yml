@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  verify-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Match tag to Cargo version
+        shell: bash
+        run: |
+          version=$(awk -F'"' '/^version = "/ { print $2; exit }' Cargo.toml)
+          test "v$version" = "$GITHUB_REF_NAME"
+
+  windows:
+    needs: verify-version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build Windows portable release
+        shell: pwsh
+        run: ./packaging/windows/package.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            target/package/windows/*.zip
+            target/package/windows/*.sha256
+          if-no-files-found: error
+
+  linux:
+    needs: verify-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Linux UI dependencies
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          libfontconfig1-dev libx11-xcb-dev xinput libxcursor-dev
+          libxkbcommon-x11-dev libx11-dev
+      - name: Build Linux release
+        run: bash packaging/linux/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            target/package/linux/*.tar.gz
+            target/package/linux/*.sha256
+          if-no-files-found: error
+
+  macos:
+    needs: verify-version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build unsigned macOS app bundle
+        run: bash packaging/macos/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: |
+            target/package/macos/*.tar.gz
+            target/package/macos/*.sha256
+          if-no-files-found: error
+
+  publish:
+    needs: [windows, linux, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" artifacts/*
+          --verify-tag --generate-notes --title "Quadrant $GITHUB_REF_NAME"

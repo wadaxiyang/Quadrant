@@ -5,6 +5,7 @@ import { Theme, ThemeMode } from "theme.slint";
 import { Typography } from "theme.slint";
 import { Palette } from "std-widgets.slint";
 import { UiConstants } from "constants.slint";
+import { Icons } from "icons.slint";
 import { Sidebar } from "components/sidebar.slint";
 import { TitleBar } from "components/title_bar.slint";
 import { ModalKind, ModalManager } from "components/modal_manager.slint";
@@ -23,6 +24,7 @@ export { DesignGalleryWindow } from "dev/design_gallery.slint";
 
 export component MainWindow inherits Window {
     title: "Quadrant";
+    icon: Icons.app_mark;
     preferred-width: 1100px;
     preferred-height: 720px;
     min-width: 760px;

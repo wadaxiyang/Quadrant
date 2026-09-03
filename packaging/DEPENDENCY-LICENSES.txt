@@ -617,6 +617,7 @@ windows-threading 0.2.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windo
 windows-version 0.1.7 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs
 winit 0.30.13 | Apache-2.0 | https://github.com/rust-windowing/winit
 winnow 1.0.4 | MIT | https://github.com/winnow-rs/winnow
+winresource 0.1.31 | MIT | https://github.com/BenjaminRi/winresource
 wit-bindgen 0.57.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/bytecodealliance/wit-bindgen
 write-fonts 0.48.1 | MIT OR Apache-2.0 | https://github.com/googlefonts/fontations
 writeable 0.6.4 | Unicode-3.0 | https://github.com/unicode-org/icu4x

@@ -56,11 +56,13 @@ export component TitleBar inherits Rectangle {
             height: UiConstants.title_bar_height;
             background: transparent;
 
-            FluentIcon {
+            Image {
                 y: (parent.height - self.height) / 2;
-                source: Icons.quadrants_filled;
-                size: 16px;
-                icon_color: Theme.accent;
+                source: Icons.app_mark;
+                width: 16px;
+                height: 16px;
+                image-fit: contain;
+                accessible-role: none;
             }
         }
 

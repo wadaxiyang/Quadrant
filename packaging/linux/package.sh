@@ -20,6 +20,11 @@ rm -rf -- "$staging"
 mkdir -p "$staging/bin" "$staging/share/applications" "$staging/share/licenses/quadrant"
 cp "$repository/target/release/quadrant-app" "$staging/bin/"
 cp "$repository/packaging/linux/quadrant.desktop" "$staging/share/applications/"
+for size in 16 20 24 32 40 48 64 128 256 512; do
+    icon_dir="$staging/share/icons/hicolor/${size}x${size}/apps"
+    mkdir -p "$icon_dir"
+    cp "$repository/assets/branding/quadrant-$size.png" "$icon_dir/quadrant.png"
+done
 cp "$repository/LICENSE" "$staging/share/licenses/quadrant/"
 cp "$repository/packaging/THIRD-PARTY-NOTICES.txt" "$staging/share/licenses/quadrant/"
 cp "$repository/packaging/DEPENDENCY-LICENSES.txt" "$staging/share/licenses/quadrant/"

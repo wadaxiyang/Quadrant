@@ -8,6 +8,7 @@
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
     <key>CFBundleName</key><string>Quadrant</string>
     <key>CFBundleDisplayName</key><string>Quadrant</string>
+    <key>CFBundleIconFile</key><string>Quadrant.icns</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>@VERSION@</string>
     <key>CFBundleVersion</key><string>@VERSION@</string>

@@ -12,19 +12,14 @@ import { Icons } from "../icons.slint";
 component AppMark inherits Rectangle {
     width: 48px;
     height: 48px;
-    border-radius: 10px;
-    background: Theme.accent;
+    background: transparent;
     accessible-role: image;
     accessible-label: "Quadrant app mark";
 
-    GridLayout {
-        padding: 9px;
-        spacing: 4px;
-
-        Rectangle { row: 0; col: 0; border-radius: 3px; background: white; }
-        Rectangle { row: 0; col: 1; border-radius: 3px; background: white.with-alpha(0.78); }
-        Rectangle { row: 1; col: 0; border-radius: 3px; background: white.with-alpha(0.78); }
-        Rectangle { row: 1; col: 1; border-radius: 3px; background: white; }
+    Image {
+        source: Icons.app_mark;
+        image-fit: contain;
+        accessible-role: none;
     }
 }
 
