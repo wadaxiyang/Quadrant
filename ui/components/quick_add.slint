@@ -2,13 +2,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { Theme, ThemeMode, Typography } from "../theme.slint";
+import { UiConstants } from "../constants.slint";
 import { Palette } from "std-widgets.slint";
-import { FluentButton, FluentTextField, SegmentButton, SurfaceCard } from "common.slint";
+import { FluentButton, FluentTextField, SegmentButton } from "common.slint";
 
 export component QuickAddWindow inherits Window {
     title: "Quick Add — Quadrant";
-    width: 560px;
-    height: 280px;
+    preferred-width: 520px;
+    preferred-height: 252px;
+    min-width: 440px;
+    min-height: 252px;
     background: Theme.background;
     default-font-family: root.ui_font_family;
     default-font-size: Typography.body;
@@ -63,87 +66,61 @@ export component QuickAddWindow inherits Window {
             return reject;
         }
 
-        SurfaceCard {
-            x: 12px;
-            y: 12px;
-            width: parent.width - 24px;
-            height: parent.height - 24px;
+        quick_add_layout := VerticalLayout {
+            padding: UiConstants.space_24;
+            spacing: UiConstants.space_12;
 
-            VerticalLayout {
-                padding: 20px;
-                spacing: 12px;
+            Text {
+                text: "Quick Add";
+                color: Theme.text_primary;
+                font-size: Typography.subtitle;
+                font-weight: Typography.semibold;
+            }
 
-                Text {
-                    text: "Quick Add";
-                    color: Theme.text_primary;
-                    font-size: 20px;
-                    font-weight: 600;
-                }
-
-                title_field := FluentTextField {
-                    text <=> root.title_text;
-                    placeholder_text: "What needs your attention?";
-                    accepted(value) => { root.submitted(value, root.destination); }
-                    edited(value) => {
-                        if (value != "") {
-                            root.error_message = "";
-                        }
+            title_field := FluentTextField {
+                text <=> root.title_text;
+                placeholder_text: "What needs your attention?";
+                accepted(value) => { root.submitted(value, root.destination); }
+                edited(value) => {
+                    if (value != "") {
+                        root.error_message = "";
                     }
                 }
+            }
 
-                HorizontalLayout {
-                    spacing: 6px;
+            HorizontalLayout {
+                spacing: UiConstants.space_6;
 
-                    SegmentButton {
-                        text: "Inbox";
-                        selected: root.destination == 0;
-                        clicked => { root.destination = 0; }
-                    }
-                    SegmentButton {
-                        text: "Q1";
-                        selected: root.destination == 1;
-                        clicked => { root.destination = 1; }
-                    }
-                    SegmentButton {
-                        text: "Q2";
-                        selected: root.destination == 2;
-                        clicked => { root.destination = 2; }
-                    }
-                    SegmentButton {
-                        text: "Q3";
-                        selected: root.destination == 3;
-                        clicked => { root.destination = 3; }
-                    }
-                    SegmentButton {
-                        text: "Q4";
-                        selected: root.destination == 4;
-                        clicked => { root.destination = 4; }
-                    }
+                SegmentButton { horizontal-stretch: 2; text: "Inbox"; selected: root.destination == 0; clicked => { root.destination = 0; } }
+                SegmentButton { horizontal-stretch: 1; text: "Q1"; selected: root.destination == 1; clicked => { root.destination = 1; } }
+                SegmentButton { horizontal-stretch: 1; text: "Q2"; selected: root.destination == 2; clicked => { root.destination = 2; } }
+                SegmentButton { horizontal-stretch: 1; text: "Q3"; selected: root.destination == 3; clicked => { root.destination = 3; } }
+                SegmentButton { horizontal-stretch: 1; text: "Q4"; selected: root.destination == 4; clicked => { root.destination = 4; } }
+            }
+
+            Text {
+                min-height: 18px;
+                text: root.error_message != "" ? root.error_message :
+                      "Enter to capture · Esc to cancel · Ctrl+1…4 to classify";
+                color: root.error_message != "" ? Theme.danger : Theme.text_secondary;
+                font-size: Typography.caption;
+                wrap: word-wrap;
+            }
+
+            HorizontalLayout {
+                spacing: UiConstants.space_8;
+
+                Rectangle { horizontal-stretch: 1; }
+
+                FluentButton {
+                    text: "Cancel";
+                    clicked => { root.cancelled(); }
                 }
 
-                Text {
-                    text: root.error_message != "" ? root.error_message :
-                          "Enter to capture · Esc to cancel · Ctrl+1…4 to classify";
-                    color: root.error_message != "" ? Theme.danger : Theme.text_secondary;
-                    font-size: Typography.caption;
-                }
-
-                HorizontalLayout {
-                    alignment: end;
-                    spacing: 8px;
-
-                    FluentButton {
-                        width: 88px;
-                        text: "Cancel";
-                        clicked => { root.cancelled(); }
-                    }
-
-                    FluentButton {
-                        width: 104px;
-                        text: "Add task";
-                        primary: true;
-                        clicked => { root.submitted(root.title_text, root.destination); }
-                    }
+                FluentButton {
+                    text: "Add task";
+                    primary: true;
+                    clicked => { root.submitted(root.title_text, root.destination); }
                 }
             }
         }

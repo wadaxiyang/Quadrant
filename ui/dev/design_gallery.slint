@@ -7,6 +7,7 @@ import { UiConstants } from "../constants.slint";
 import { Icons } from "../icons.slint";
 import { Badge, BadgeKind, FluentButton, FluentTextArea, FluentTextField, SegmentButton, SettingRow, SurfaceCard } from "../components/common.slint";
 import { FluentIcon, IconButton } from "../components/icon.slint";
+import { ModalKind, ModalManager } from "../components/modal_manager.slint";
 import { SectionHeader } from "../components/page_shell.slint";
 import { ToastHost, ToastKind } from "../components/toast.slint";
 
@@ -31,6 +32,14 @@ export component DesignGalleryWindow inherits Window {
     in-out property <string> sample_text;
     in-out property <bool> sample_switch: true;
     in-out property <ThemeMode> gallery_theme: ThemeMode.light;
+    in-out property <bool> sample_modal_visible: false;
+    in-out property <int> sample_modal_kind: 0;
+
+    changed gallery_theme => {
+        Theme.mode = root.gallery_theme;
+        Palette.color-scheme = root.gallery_theme == ThemeMode.system ? ColorScheme.unknown :
+                               root.gallery_theme == ThemeMode.light ? ColorScheme.light : ColorScheme.dark;
+    }
 
     ScrollView {
         width: 100%;
@@ -182,8 +191,10 @@ export component DesignGalleryWindow inherits Window {
             }
 
             SurfaceCard {
-                height: 212px;
-                VerticalLayout {
+                preferred-height: toast_gallery_layout.preferred-height;
+                vertical-stretch: 0;
+
+                toast_gallery_layout := VerticalLayout {
                     padding: UiConstants.space_16;
                     spacing: UiConstants.space_12;
                     GalleryLabel { text: "Toast states"; }
@@ -218,6 +229,31 @@ export component DesignGalleryWindow inherits Window {
             }
 
             SurfaceCard {
+                preferred-height: modal_gallery_layout.preferred-height;
+                vertical-stretch: 0;
+
+                modal_gallery_layout := VerticalLayout {
+                    padding: UiConstants.space_16;
+                    spacing: UiConstants.space_12;
+
+                    SectionHeader {
+                        title: "Modal states";
+                        description: "Interactive info, warning, and destructive confirmation coverage.";
+                        badge_text: "Enter / Esc";
+                        badge_kind: BadgeKind.accent;
+                    }
+
+                    HorizontalLayout {
+                        spacing: UiConstants.space_8;
+                        FluentButton { text: "Show info"; clicked => { root.sample_modal_kind = 0; root.sample_modal_visible = true; } }
+                        FluentButton { text: "Show warning"; clicked => { root.sample_modal_kind = 1; root.sample_modal_visible = true; } }
+                        FluentButton { text: "Show danger"; danger: true; clicked => { root.sample_modal_kind = 2; root.sample_modal_visible = true; } }
+                        Rectangle { horizontal-stretch: 1; }
+                    }
+                }
+            }
+
+            SurfaceCard {
                 height: 156px;
                 VerticalLayout {
                     padding: UiConstants.space_16;
@@ -229,5 +265,25 @@ export component DesignGalleryWindow inherits Window {
                 }
             }
         }
+    }
+
+    ModalManager {
+        width: 100%;
+        height: 100%;
+        shown: root.sample_modal_visible;
+        title: root.sample_modal_kind == 2 ? "Delete this task?" :
+               root.sample_modal_kind == 1 ? "Review this change" : "Information";
+        message: root.sample_modal_kind == 2 ? "This action permanently removes the task. Completion snapshots remain available in Review." :
+                 root.sample_modal_kind == 1 ? "The validated backup will be staged and applied after Quadrant restarts." :
+                 "Modal content grows with wrapped text and keeps its primary action keyboard accessible.";
+        primary_text: root.sample_modal_kind == 2 ? "Delete" :
+                      root.sample_modal_kind == 1 ? "Continue" : "Close";
+        secondary_text: "Cancel";
+        show_secondary: root.sample_modal_kind != 0;
+        kind: root.sample_modal_kind == 2 ? ModalKind.danger :
+              root.sample_modal_kind == 1 ? ModalKind.warning : ModalKind.info;
+        danger_primary: root.sample_modal_kind == 2;
+        accepted => { root.sample_modal_visible = false; }
+        dismissed => { root.sample_modal_visible = false; }
     }
 }
