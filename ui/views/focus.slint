@@ -13,6 +13,336 @@ export struct FocusTaskRow {
     metadata: string,
 }
 
+component FocusTaskChoice inherits Rectangle {
+    in property <string> title;
+    in property <string> metadata;
+    in property <bool> selected: false;
+    in property <bool> enabled: true;
+    callback clicked;
+
+    height: 42px;
+    border-radius: UiConstants.control_radius;
+    border-width: choice_focus.has-focus ? 2px : 0px;
+    border-color: Theme.focus_ring;
+    background: !root.enabled ? transparent :
+                root.selected ? Theme.selected_bg :
+                choice_touch.has-hover ? Theme.control_bg_hover : transparent;
+    opacity: root.enabled ? 1 : 0.55;
+    forward-focus: choice_focus;
+    accessible-role: button;
+    accessible-label: root.title;
+    accessible-description: root.metadata;
+    accessible-enabled: root.enabled;
+    accessible-checkable: true;
+    accessible-checked: root.selected;
+    accessible-action-default => { if (root.enabled) { root.clicked(); } }
+
+    Rectangle {
+        visible: root.selected;
+        x: 0;
+        y: 8px;
+        width: 3px;
+        height: parent.height - 16px;
+        border-radius: 1.5px;
+        background: Theme.accent;
+    }
+
+    VerticalLayout {
+        padding-left: UiConstants.space_12;
+        padding-right: UiConstants.space_8;
+        padding-top: UiConstants.space_4;
+        padding-bottom: UiConstants.space_4;
+        spacing: 1px;
+
+        Text {
+            text: root.title;
+            color: root.selected ? Theme.accent : Theme.text_primary;
+            font-size: Typography.body;
+            font-weight: root.selected ? Typography.semibold : Typography.regular;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
+        Text {
+            visible: root.metadata != "";
+            text: root.metadata;
+            color: Theme.text_secondary;
+            font-size: Typography.caption;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+
+    choice_focus := FocusScope {
+        width: 0px;
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    choice_touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+component FocusTimerCard inherits SurfaceCard {
+    in-out property <int> selected_mode: 1;
+    in-out property <int> selected_kind: 0;
+    in-out property <string> selected_task_id;
+    in property <int> session_status: -1;
+    in property <string> timer_text: "25:00";
+    in property <float> timer_progress: 0;
+    in property <string> session_label: "Ready to focus";
+    in property <string> today_summary;
+    in property <bool> compact: false;
+    callback start_requested(int, int, string);
+    callback pause_requested;
+    callback resume_requested;
+    callback finish_requested;
+    callback cancel_requested;
+
+    property <bool> idle: root.session_status < 0;
+    property <bool> productive_phase: root.selected_mode == 0 || root.selected_kind == 0;
+
+    horizontal-stretch: 1;
+    min-height: root.compact ? 390px : 430px;
+
+    VerticalLayout {
+        padding: root.compact ? UiConstants.space_16 : UiConstants.space_24;
+        spacing: UiConstants.space_16;
+        alignment: center;
+
+        HorizontalLayout {
+            alignment: center;
+            spacing: UiConstants.space_8;
+            SegmentButton { width: 112px; text: "Stopwatch"; selected: root.selected_mode == 0; enabled: root.idle; clicked => { root.selected_mode = 0; } }
+            SegmentButton { width: 112px; text: "Pomodoro"; selected: root.selected_mode == 1; enabled: root.idle; clicked => { root.selected_mode = 1; } }
+        }
+
+        if root.selected_mode == 1: HorizontalLayout {
+            alignment: center;
+            spacing: UiConstants.space_6;
+            SegmentButton { width: 82px; text: "Focus"; selected: root.selected_kind == 0; enabled: root.idle; clicked => { root.selected_kind = 0; } }
+            SegmentButton { width: 82px; text: "Short break"; selected: root.selected_kind == 1; enabled: root.idle; clicked => { root.selected_kind = 1; root.selected_task_id = ""; } }
+            SegmentButton { width: 82px; text: "Long break"; selected: root.selected_kind == 2; enabled: root.idle; clicked => { root.selected_kind = 2; root.selected_task_id = ""; } }
+        }
+
+        HorizontalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: 260px;
+                height: 72px;
+
+                Text {
+                    text: root.timer_text;
+                    color: Theme.text_primary;
+                    font-size: Typography.timer;
+                    font-weight: Typography.regular;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        Text {
+            text: root.session_label;
+            color: Theme.text_secondary;
+            font-size: Typography.body;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: root.compact ? 90% : 78%;
+                height: 4px;
+                background: Theme.divider;
+                border-radius: 2px;
+
+                Rectangle {
+                    width: parent.width * root.timer_progress;
+                    height: 100%;
+                    background: Theme.accent;
+                    border-radius: 2px;
+                }
+            }
+        }
+
+        HorizontalLayout {
+            alignment: center;
+            spacing: UiConstants.space_8;
+            if root.idle: FluentButton { width: 112px; text: "Start"; primary: true; clicked => { root.start_requested(root.selected_mode, root.selected_kind, root.productive_phase ? root.selected_task_id : ""); } }
+            if root.session_status == 0: FluentButton { width: 96px; text: "Pause"; clicked => { root.pause_requested(); } }
+            if root.session_status == 1: FluentButton { width: 96px; text: "Resume"; primary: true; clicked => { root.resume_requested(); } }
+            if !root.idle: FluentButton { width: 96px; text: "Finish"; primary: root.session_status == 0; clicked => { root.finish_requested(); } }
+            if !root.idle: FluentButton { width: 96px; text: "Cancel"; danger: true; clicked => { root.cancel_requested(); } }
+        }
+
+        Text {
+            text: root.today_summary;
+            color: Theme.text_secondary;
+            font-size: Typography.caption;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+    }
+}
+
+component FocusSettingsPanel inherits VerticalLayout {
+    in property <[FocusTaskRow]> tasks;
+    in-out property <string> selected_task_id;
+    in-out property <string> focus_minutes: "25";
+    in-out property <string> short_break_minutes: "5";
+    in-out property <string> long_break_minutes: "15";
+    in-out property <string> long_break_interval: "4";
+    in-out property <bool> auto_start_break: false;
+    in-out property <bool> auto_start_focus: false;
+    in property <bool> idle: true;
+    in property <bool> productive_phase: true;
+    callback settings_changed(string, string, string, string, bool, bool);
+
+    spacing: UiConstants.space_12;
+
+    SurfaceCard {
+        preferred-height: associate_layout.preferred-height;
+        vertical-stretch: 0;
+
+        associate_layout := VerticalLayout {
+            padding: UiConstants.space_16;
+            spacing: UiConstants.space_8;
+
+            SectionHeader {
+                title: "Associate a task";
+                description: root.productive_phase ? "Optional; stored as a history snapshot." : "Breaks are intentionally task-free.";
+            }
+
+            Rectangle {
+                height: min((root.tasks.length + 1) * 43px, 172px);
+                border-width: 1px;
+                border-color: Theme.input_border;
+                border-radius: UiConstants.control_radius;
+                clip: true;
+
+                ScrollView {
+                    width: 100%;
+                    height: 100%;
+
+                    VerticalLayout {
+                        FocusTaskChoice {
+                            title: "No task";
+                            metadata: "Keep this session unassociated";
+                            selected: root.selected_task_id == "";
+                            enabled: root.idle && root.productive_phase;
+                            clicked => { root.selected_task_id = ""; }
+                        }
+
+                        for task[index] in root.tasks: VerticalLayout {
+                            Rectangle { height: 1px; background: Theme.divider; }
+                            FocusTaskChoice {
+                                title: task.title;
+                                metadata: task.metadata;
+                                selected: root.selected_task_id == task.id;
+                                enabled: root.idle && root.productive_phase;
+                                clicked => { root.selected_task_id = task.id; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    SurfaceCard {
+        preferred-height: pomodoro_layout.preferred-height;
+        vertical-stretch: 0;
+
+        pomodoro_layout := VerticalLayout {
+            padding: UiConstants.space_16;
+            spacing: UiConstants.space_8;
+
+            SectionHeader {
+                title: "Pomodoro settings";
+                description: "Durations are stored in minutes; the interval counts completed focus sessions.";
+            }
+
+            GridLayout {
+                spacing: UiConstants.space_8;
+
+                VerticalLayout {
+                    row: 0; col: 0;
+                    horizontal-stretch: 1;
+                    spacing: UiConstants.space_4;
+                    Text { text: "Focus"; color: Theme.text_secondary; font-size: Typography.caption; }
+                    FluentTextField { text <=> root.focus_minutes; placeholder_text: "25"; enabled: root.idle; }
+                }
+                VerticalLayout {
+                    row: 0; col: 1;
+                    horizontal-stretch: 1;
+                    spacing: UiConstants.space_4;
+                    Text { text: "Short break"; color: Theme.text_secondary; font-size: Typography.caption; }
+                    FluentTextField { text <=> root.short_break_minutes; placeholder_text: "5"; enabled: root.idle; }
+                }
+                VerticalLayout {
+                    row: 1; col: 0;
+                    horizontal-stretch: 1;
+                    spacing: UiConstants.space_4;
+                    Text { text: "Long break"; color: Theme.text_secondary; font-size: Typography.caption; }
+                    FluentTextField { text <=> root.long_break_minutes; placeholder_text: "15"; enabled: root.idle; }
+                }
+                VerticalLayout {
+                    row: 1; col: 1;
+                    horizontal-stretch: 1;
+                    spacing: UiConstants.space_4;
+                    Text { text: "Long break every"; color: Theme.text_secondary; font-size: Typography.caption; }
+                    FluentTextField { text <=> root.long_break_interval; placeholder_text: "4"; enabled: root.idle; }
+                }
+            }
+
+            SettingRow {
+                title: "Auto-start break";
+                description: "Begin the next break when a focus interval completes.";
+                enabled: root.idle;
+                Switch {
+                    text: "";
+                    accessible-label: "Auto-start break";
+                    enabled: root.idle;
+                    checked <=> root.auto_start_break;
+                }
+            }
+
+            SettingRow {
+                title: "Auto-start focus";
+                description: "Begin the next focus interval when a break completes.";
+                enabled: root.idle;
+                Switch {
+                    text: "";
+                    accessible-label: "Auto-start focus";
+                    enabled: root.idle;
+                    checked <=> root.auto_start_focus;
+                }
+            }
+
+            FluentButton {
+                text: "Save settings";
+                enabled: root.idle;
+                clicked => { root.settings_changed(root.focus_minutes, root.short_break_minutes, root.long_break_minutes, root.long_break_interval, root.auto_start_break, root.auto_start_focus); }
+            }
+        }
+    }
+
+    Rectangle { vertical-stretch: 1; }
+}
+
 export component FocusView inherits Rectangle {
     in property <[FocusTaskRow]> tasks;
     in-out property <string> selected_task_id;
@@ -38,152 +368,100 @@ export component FocusView inherits Rectangle {
 
     property <bool> idle: root.session_status < 0;
     property <bool> productive_phase: root.selected_mode == 0 || root.selected_kind == 0;
+    property <bool> compact: root.width < UiConstants.compact_breakpoint;
+    property <bool> wide: root.width >= UiConstants.focus_wide_breakpoint;
+    property <length> responsive_padding: root.compact ? UiConstants.page_padding_compact :
+                                                   root.wide ? UiConstants.page_padding_wide : UiConstants.page_padding_medium;
 
     ScrollView {
         width: 100%;
         height: 100%;
-        VerticalLayout {
-            padding: UiConstants.page_padding;
-            spacing: 14px;
-            PageHeader { title: "Focus"; subtitle: "Stopwatch and Pomodoro backed by persisted time anchors."; }
 
-            HorizontalLayout {
-                spacing: 14px;
-                SurfaceCard {
-                    horizontal-stretch: 1;
-                    min-height: 430px;
-                    VerticalLayout {
-                        padding: 24px;
-                        spacing: 14px;
-                        alignment: center;
-                        HorizontalLayout {
-                            alignment: center; spacing: 8px;
-                            SegmentButton { width: 112px; text: "Stopwatch"; selected: root.selected_mode == 0; enabled: root.idle; clicked => { root.selected_mode = 0; } }
-                            SegmentButton { width: 112px; text: "Pomodoro"; selected: root.selected_mode == 1; enabled: root.idle; clicked => { root.selected_mode = 1; } }
-                        }
-                        if root.selected_mode == 1: HorizontalLayout {
-                            alignment: center; spacing: 6px;
-                            SegmentButton { width: 82px; text: "Focus"; selected: root.selected_kind == 0; enabled: root.idle; clicked => { root.selected_kind = 0; } }
-                            SegmentButton { width: 82px; text: "Short break"; selected: root.selected_kind == 1; enabled: root.idle; clicked => { root.selected_kind = 1; root.selected_task_id = ""; } }
-                            SegmentButton { width: 82px; text: "Long break"; selected: root.selected_kind == 2; enabled: root.idle; clicked => { root.selected_kind = 2; root.selected_task_id = ""; } }
-                        }
-                        Text { text: root.timer_text; color: Theme.text_primary; font-size: Typography.timer; font-weight: Typography.regular; horizontal-alignment: center; }
-                        Text { text: root.session_label; color: Theme.text_secondary; font-size: 12px; horizontal-alignment: center; }
-                        Rectangle {
-                            width: 78%; height: 5px; background: Theme.input_bg; border-radius: 2.5px;
-                            Rectangle { width: parent.width * root.timer_progress; height: 100%; background: Theme.accent; border-radius: 2.5px; }
-                        }
-                        HorizontalLayout {
-                            alignment: center; spacing: 8px;
-                            if root.idle: FluentButton { width: 112px; text: "Start"; primary: true; clicked => { root.start_requested(root.selected_mode, root.selected_kind, root.productive_phase ? root.selected_task_id : ""); } }
-                            if root.session_status == 0: FluentButton { width: 96px; text: "Pause"; clicked => { root.pause_requested(); } }
-                            if root.session_status == 1: FluentButton { width: 96px; text: "Resume"; primary: true; clicked => { root.resume_requested(); } }
-                            if !root.idle: FluentButton { width: 96px; text: "Finish"; primary: root.session_status == 0; clicked => { root.finish_requested(); } }
-                            if !root.idle: FluentButton { width: 96px; text: "Cancel"; danger: true; clicked => { root.cancel_requested(); } }
-                        }
-                        Text { text: root.today_summary; color: Theme.text_secondary; font-size: Typography.caption; horizontal-alignment: center; }
-                    }
+        VerticalLayout {
+            padding: root.responsive_padding;
+            spacing: UiConstants.space_16;
+
+            PageHeader {
+                title: "Focus";
+                subtitle: "Stopwatch and Pomodoro backed by persisted time anchors.";
+            }
+
+            if root.wide: HorizontalLayout {
+                spacing: UiConstants.space_16;
+
+                FocusTimerCard {
+                    selected_mode <=> root.selected_mode;
+                    selected_kind <=> root.selected_kind;
+                    selected_task_id <=> root.selected_task_id;
+                    session_status: root.session_status;
+                    timer_text: root.timer_text;
+                    timer_progress: root.timer_progress;
+                    session_label: root.session_label;
+                    today_summary: root.today_summary;
+                    compact: false;
+                    start_requested(mode, kind, task_id) => { root.start_requested(mode, kind, task_id); }
+                    pause_requested => { root.pause_requested(); }
+                    resume_requested => { root.resume_requested(); }
+                    finish_requested => { root.finish_requested(); }
+                    cancel_requested => { root.cancel_requested(); }
                 }
 
-                VerticalLayout {
-                    width: 310px;
-                    spacing: 12px;
-                    SurfaceCard {
-                        preferred-height: associate_layout.preferred-height;
-                        associate_layout := VerticalLayout {
-                            padding: 14px; spacing: 7px;
-                            SectionHeader {
-                                title: "Associate a task";
-                                description: root.productive_phase ? "Optional; stored as a history snapshot." : "Breaks are intentionally task-free.";
-                            }
-                            SegmentButton { text: "No task"; selected: root.selected_task_id == ""; enabled: root.idle && root.productive_phase; clicked => { root.selected_task_id = ""; } }
-                            Rectangle {
-                                preferred-height: min(root.tasks.length * 37px, 148px);
-                                clip: true;
-                                ScrollView {
-                                    width: 100%; height: 100%;
-                                    VerticalLayout {
-                                        spacing: 5px;
-                                        for task in root.tasks: SegmentButton {
-                                            text: task.metadata + "  " + task.title;
-                                            selected: root.selected_task_id == task.id;
-                                            enabled: root.idle && root.productive_phase;
-                                            clicked => { root.selected_task_id = task.id; }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    SurfaceCard {
-                        preferred-height: pomodoro_layout.preferred-height;
-                        pomodoro_layout := VerticalLayout {
-                            padding: 14px; spacing: 8px;
-                            SectionHeader {
-                                title: "Pomodoro settings";
-                                description: "Durations are stored in minutes; the interval counts completed focus sessions.";
-                            }
-                            HorizontalLayout {
-                                spacing: 8px;
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 4px;
-                                    Text { text: "Focus"; color: Theme.text_secondary; font-size: Typography.caption; }
-                                    FluentTextField { text <=> root.focus_minutes; placeholder_text: "25"; enabled: root.idle; }
-                                }
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 4px;
-                                    Text { text: "Short break"; color: Theme.text_secondary; font-size: Typography.caption; }
-                                    FluentTextField { text <=> root.short_break_minutes; placeholder_text: "5"; enabled: root.idle; }
-                                }
-                            }
-                            HorizontalLayout {
-                                spacing: 8px;
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 4px;
-                                    Text { text: "Long break"; color: Theme.text_secondary; font-size: Typography.caption; }
-                                    FluentTextField { text <=> root.long_break_minutes; placeholder_text: "15"; enabled: root.idle; }
-                                }
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 4px;
-                                    Text { text: "Long break every"; color: Theme.text_secondary; font-size: Typography.caption; }
-                                    FluentTextField { text <=> root.long_break_interval; placeholder_text: "4"; enabled: root.idle; }
-                                }
-                            }
-                            SettingRow {
-                                title: "Auto-start break";
-                                description: "Begin the next break when a focus interval completes.";
-                                enabled: root.idle;
-                                Switch {
-                                    text: "";
-                                    accessible-label: "Auto-start break";
-                                    enabled: root.idle;
-                                    checked <=> root.auto_start_break;
-                                }
-                            }
-                            SettingRow {
-                                title: "Auto-start focus";
-                                description: "Begin the next focus interval when a break completes.";
-                                enabled: root.idle;
-                                Switch {
-                                    text: "";
-                                    accessible-label: "Auto-start focus";
-                                    enabled: root.idle;
-                                    checked <=> root.auto_start_focus;
-                                }
-                            }
-                            FluentButton {
-                                text: "Save settings"; enabled: root.idle;
-                                clicked => { root.settings_changed(root.focus_minutes, root.short_break_minutes, root.long_break_minutes, root.long_break_interval, root.auto_start_break, root.auto_start_focus); }
-                            }
-                        }
+                FocusSettingsPanel {
+                    width: 320px;
+                    tasks: root.tasks;
+                    selected_task_id <=> root.selected_task_id;
+                    focus_minutes <=> root.focus_minutes;
+                    short_break_minutes <=> root.short_break_minutes;
+                    long_break_minutes <=> root.long_break_minutes;
+                    long_break_interval <=> root.long_break_interval;
+                    auto_start_break <=> root.auto_start_break;
+                    auto_start_focus <=> root.auto_start_focus;
+                    idle: root.idle;
+                    productive_phase: root.productive_phase;
+                    settings_changed(focus, short_break, long_break, interval, auto_break, auto_focus) => {
+                        root.settings_changed(focus, short_break, long_break, interval, auto_break, auto_focus);
                     }
                 }
             }
+
+            if !root.wide: VerticalLayout {
+                spacing: UiConstants.space_16;
+
+                FocusTimerCard {
+                    selected_mode <=> root.selected_mode;
+                    selected_kind <=> root.selected_kind;
+                    selected_task_id <=> root.selected_task_id;
+                    session_status: root.session_status;
+                    timer_text: root.timer_text;
+                    timer_progress: root.timer_progress;
+                    session_label: root.session_label;
+                    today_summary: root.today_summary;
+                    compact: root.compact;
+                    start_requested(mode, kind, task_id) => { root.start_requested(mode, kind, task_id); }
+                    pause_requested => { root.pause_requested(); }
+                    resume_requested => { root.resume_requested(); }
+                    finish_requested => { root.finish_requested(); }
+                    cancel_requested => { root.cancel_requested(); }
+                }
+
+                FocusSettingsPanel {
+                    tasks: root.tasks;
+                    selected_task_id <=> root.selected_task_id;
+                    focus_minutes <=> root.focus_minutes;
+                    short_break_minutes <=> root.short_break_minutes;
+                    long_break_minutes <=> root.long_break_minutes;
+                    long_break_interval <=> root.long_break_interval;
+                    auto_start_break <=> root.auto_start_break;
+                    auto_start_focus <=> root.auto_start_focus;
+                    idle: root.idle;
+                    productive_phase: root.productive_phase;
+                    settings_changed(focus, short_break, long_break, interval, auto_break, auto_focus) => {
+                        root.settings_changed(focus, short_break, long_break, interval, auto_break, auto_focus);
+                    }
+                }
+            }
+
+            Rectangle { height: UiConstants.space_8; }
         }
     }
 }

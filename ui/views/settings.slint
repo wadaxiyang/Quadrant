@@ -31,194 +31,248 @@ export component SettingsView inherits Rectangle {
     callback restore_latest_requested;
     callback open_releases_requested;
 
+    property <bool> compact: root.width < UiConstants.compact_breakpoint;
+    property <bool> wide: root.width >= UiConstants.wide_breakpoint;
+    property <length> responsive_padding: root.compact ? UiConstants.page_padding_compact :
+                                                   root.wide ? UiConstants.page_padding_wide : UiConstants.page_padding_medium;
+    property <length> content_width: min(root.width - 2 * root.responsive_padding, 900px);
+
     ScrollView {
         width: 100%;
         height: 100%;
 
         VerticalLayout {
-            padding: UiConstants.page_padding;
-            spacing: UiConstants.space_16;
+            padding-top: root.responsive_padding;
+            padding-bottom: root.responsive_padding;
 
-            PageHeader {
-                title: "Settings";
-                subtitle: "Persistent preferences, backups, and platform capabilities.";
-            }
+            HorizontalLayout {
+                Rectangle { horizontal-stretch: 1; }
 
-            SurfaceCard {
-                preferred-height: appearance_layout.preferred-height;
+                settings_content := VerticalLayout {
+                    width: root.content_width;
+                    spacing: UiConstants.space_16;
 
-                appearance_layout := VerticalLayout {
-                    padding: UiConstants.space_16;
-                    spacing: UiConstants.space_12;
-
-                    SectionHeader {
-                        title: "Appearance";
-                        description: "System follows the normalized platform theme source.";
+                    PageHeader {
+                        title: "Settings";
+                        subtitle: "Persistent preferences, backups, and platform capabilities.";
                     }
 
-                    HorizontalLayout {
-                        spacing: UiConstants.space_8;
-                        SegmentButton { width: 104px; text: "System"; selected: root.theme_mode == ThemeMode.system; clicked => { root.theme_selected(ThemeMode.system); } }
-                        SegmentButton { width: 104px; text: "Light"; selected: root.theme_mode == ThemeMode.light; clicked => { root.theme_selected(ThemeMode.light); } }
-                        SegmentButton { width: 104px; text: "Dark"; selected: root.theme_mode == ThemeMode.dark; clicked => { root.theme_selected(ThemeMode.dark); } }
-                        Rectangle { horizontal-stretch: 1; }
+                    SurfaceCard {
+                        preferred-height: appearance_layout.preferred-height;
+                        vertical-stretch: 0;
+
+                        appearance_layout := VerticalLayout {
+                            padding: UiConstants.space_16;
+                            spacing: UiConstants.space_12;
+
+                            SectionHeader {
+                                title: "Appearance";
+                                description: "System follows the normalized platform theme source.";
+                            }
+
+                            HorizontalLayout {
+                                spacing: UiConstants.space_8;
+                                SegmentButton { width: 104px; text: "System"; selected: root.theme_mode == ThemeMode.system; clicked => { root.theme_selected(ThemeMode.system); } }
+                                SegmentButton { width: 104px; text: "Light"; selected: root.theme_mode == ThemeMode.light; clicked => { root.theme_selected(ThemeMode.light); } }
+                                SegmentButton { width: 104px; text: "Dark"; selected: root.theme_mode == ThemeMode.dark; clicked => { root.theme_selected(ThemeMode.dark); } }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                        }
                     }
+
+                    SurfaceCard {
+                        preferred-height: desktop_layout.preferred-height;
+                        vertical-stretch: 0;
+
+                        desktop_layout := VerticalLayout {
+                            padding: UiConstants.space_16;
+                            spacing: UiConstants.space_4;
+
+                            SectionHeader {
+                                title: "Desktop integration";
+                                description: "Platform capabilities and window behavior.";
+                            }
+
+                            if !root.compact: HorizontalLayout {
+                                spacing: UiConstants.space_8;
+                                Badge { text: "Quick Add " + (root.global_hotkey_available ? "ready" : "unavailable"); kind: root.global_hotkey_available ? BadgeKind.success : BadgeKind.neutral; }
+                                Badge { text: "Notifications " + (root.native_notifications_available ? "ready" : "unavailable"); kind: root.native_notifications_available ? BadgeKind.success : BadgeKind.neutral; }
+                                Badge { text: "Single instance " + (root.single_instance_available ? "ready" : "unavailable"); kind: root.single_instance_available ? BadgeKind.success : BadgeKind.neutral; }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+
+                            if root.compact: VerticalLayout {
+                                spacing: UiConstants.space_6;
+                                Badge { text: "Quick Add " + (root.global_hotkey_available ? "ready" : "unavailable"); kind: root.global_hotkey_available ? BadgeKind.success : BadgeKind.neutral; }
+                                Badge { text: "Notifications " + (root.native_notifications_available ? "ready" : "unavailable"); kind: root.native_notifications_available ? BadgeKind.success : BadgeKind.neutral; }
+                                Badge { text: "Single instance " + (root.single_instance_available ? "ready" : "unavailable"); kind: root.single_instance_available ? BadgeKind.success : BadgeKind.neutral; }
+                            }
+
+                            SettingRow {
+                                title: "Launch at startup";
+                                description: root.autostart_supported ? "Start Quadrant after login." : "Unavailable on this platform.";
+                                enabled: root.autostart_supported;
+                                Switch {
+                                    text: "";
+                                    accessible-label: "Launch at startup";
+                                    enabled: root.autostart_supported;
+                                    checked <=> root.launch_at_startup;
+                                    toggled => { root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray); }
+                                }
+                            }
+
+                            Rectangle { height: 1px; background: Theme.divider; }
+
+                            SettingRow {
+                                title: "Start in background";
+                                description: root.tray_supported ? "Do not show the main window at process startup." : "Requires a working tray icon.";
+                                enabled: root.tray_supported;
+                                Switch {
+                                    text: "";
+                                    accessible-label: "Start in background";
+                                    enabled: root.tray_supported;
+                                    checked <=> root.start_hidden;
+                                    toggled => { root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray); }
+                                }
+                            }
+
+                            Rectangle { height: 1px; background: Theme.divider; }
+
+                            SettingRow {
+                                title: "Close to tray";
+                                description: root.tray_supported ? "Close hides the window; Exit remains available in the tray." : "Requires a working tray icon.";
+                                enabled: root.tray_supported;
+                                Switch {
+                                    text: "";
+                                    accessible-label: "Close to tray";
+                                    enabled: root.tray_supported;
+                                    checked <=> root.close_to_tray;
+                                    toggled => { root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray); }
+                                }
+                            }
+
+                            Rectangle { height: 1px; background: Theme.divider; }
+
+                            SettingRow {
+                                title: "Minimize to tray";
+                                description: root.tray_supported ? "Minimize hides the window instead of using the taskbar." : "Requires a working tray icon.";
+                                enabled: root.tray_supported;
+                                Switch {
+                                    text: "";
+                                    accessible-label: "Minimize to tray";
+                                    enabled: root.tray_supported;
+                                    checked <=> root.minimize_to_tray;
+                                    toggled => { root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray); }
+                                }
+                            }
+                        }
+                    }
+
+                    SurfaceCard {
+                        preferred-height: backup_layout.preferred-height;
+                        vertical-stretch: 0;
+
+                        backup_layout := VerticalLayout {
+                            padding: UiConstants.space_16;
+                            spacing: UiConstants.space_10;
+
+                            SectionHeader {
+                                title: "Backup and restore";
+                                description: "Create a validated local snapshot or stage the latest snapshot for restart.";
+                            }
+
+                            VerticalLayout {
+                                spacing: UiConstants.space_4;
+                                Text { text: "Latest backup"; color: Theme.text_primary; font-size: Typography.caption; font-weight: Typography.semibold; }
+                                Text { text: root.latest_backup; color: Theme.text_secondary; font-size: Typography.caption; overflow: elide; }
+                            }
+
+                            VerticalLayout {
+                                spacing: UiConstants.space_4;
+                                Text { text: "Backup directory"; color: Theme.text_primary; font-size: Typography.caption; font-weight: Typography.semibold; }
+                                Text { text: root.backup_directory; color: Theme.text_secondary; font-size: Typography.caption; overflow: elide; }
+                            }
+
+                            if root.restore_pending: Rectangle {
+                                min-height: 48px;
+                                background: Theme.warning.with-alpha(0.10);
+                                border-width: 1px;
+                                border-color: Theme.warning;
+                                border-radius: UiConstants.control_radius;
+
+                                HorizontalLayout {
+                                    padding-left: UiConstants.space_12;
+                                    padding-right: UiConstants.space_12;
+                                    spacing: UiConstants.space_8;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Badge { text: "Restart required"; kind: BadgeKind.warning; }
+                                    }
+
+                                    Text {
+                                        horizontal-stretch: 1;
+                                        text: "The validated restore will be applied after restart.";
+                                        color: Theme.text_primary;
+                                        font-size: Typography.caption;
+                                        wrap: word-wrap;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            if !root.compact: HorizontalLayout {
+                                spacing: UiConstants.space_8;
+                                FluentButton { text: "Create backup"; primary: true; clicked => { root.create_backup_requested(); } }
+                                FluentButton { text: "Open folder"; clicked => { root.open_backup_directory_requested(); } }
+                                FluentButton {
+                                    text: "Restore latest";
+                                    danger: true;
+                                    enabled: root.latest_backup != "No backup created yet" && !root.restore_pending;
+                                    clicked => { root.restore_latest_requested(); }
+                                }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+
+                            if root.compact: VerticalLayout {
+                                spacing: UiConstants.space_8;
+                                FluentButton { text: "Create backup"; primary: true; clicked => { root.create_backup_requested(); } }
+                                FluentButton { text: "Open folder"; clicked => { root.open_backup_directory_requested(); } }
+                                FluentButton {
+                                    text: "Restore latest";
+                                    danger: true;
+                                    enabled: root.latest_backup != "No backup created yet" && !root.restore_pending;
+                                    clicked => { root.restore_latest_requested(); }
+                                }
+                            }
+                        }
+                    }
+
+                    SurfaceCard {
+                        preferred-height: updates_layout.preferred-height;
+                        vertical-stretch: 0;
+
+                        updates_layout := VerticalLayout {
+                            padding-left: UiConstants.space_16;
+                            padding-right: UiConstants.space_16;
+
+                            SettingRow {
+                                title: "Version " + root.application_version;
+                                description: root.update_description;
+                                FluentButton {
+                                    text: "Open releases";
+                                    enabled: root.can_open_releases;
+                                    clicked => { root.open_releases_requested(); }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle { height: UiConstants.space_8; }
                 }
+
+                Rectangle { horizontal-stretch: 1; }
             }
-
-            SurfaceCard {
-                preferred-height: desktop_layout.preferred-height;
-
-                desktop_layout := VerticalLayout {
-                    padding: UiConstants.space_16;
-                    spacing: UiConstants.space_4;
-
-                    SectionHeader {
-                        title: "Desktop integration";
-                        description: "Platform capabilities and window behavior.";
-                    }
-
-                    HorizontalLayout {
-                        spacing: UiConstants.space_8;
-                        Badge { text: "Quick Add " + (root.global_hotkey_available ? "ready" : "unavailable"); kind: root.global_hotkey_available ? BadgeKind.success : BadgeKind.neutral; }
-                        Badge { text: "Notifications " + (root.native_notifications_available ? "ready" : "unavailable"); kind: root.native_notifications_available ? BadgeKind.success : BadgeKind.neutral; }
-                        Badge { text: "Single instance " + (root.single_instance_available ? "ready" : "unavailable"); kind: root.single_instance_available ? BadgeKind.success : BadgeKind.neutral; }
-                        Rectangle { horizontal-stretch: 1; }
-                    }
-
-                    SettingRow {
-                        title: "Launch at startup";
-                        description: root.autostart_supported ? "Start Quadrant after login." : "Unavailable on this platform.";
-                        enabled: root.autostart_supported;
-                        Switch {
-                            text: "";
-                            accessible-label: "Launch at startup";
-                            enabled: root.autostart_supported;
-                            checked <=> root.launch_at_startup;
-                            toggled => { root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray); }
-                        }
-                    }
-
-                    Rectangle { height: 1px; background: Theme.divider; }
-
-                    SettingRow {
-                        title: "Start in background";
-                        description: root.tray_supported ? "Do not show the main window at process startup." : "Requires a working tray icon.";
-                        enabled: root.tray_supported;
-                        Switch {
-                            text: "";
-                            accessible-label: "Start in background";
-                            enabled: root.tray_supported;
-                            checked <=> root.start_hidden;
-                            toggled => { root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray); }
-                        }
-                    }
-
-                    Rectangle { height: 1px; background: Theme.divider; }
-
-                    SettingRow {
-                        title: "Close to tray";
-                        description: root.tray_supported ? "Close hides the window; Exit remains available in the tray." : "Requires a working tray icon.";
-                        enabled: root.tray_supported;
-                        Switch {
-                            text: "";
-                            accessible-label: "Close to tray";
-                            enabled: root.tray_supported;
-                            checked <=> root.close_to_tray;
-                            toggled => { root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray); }
-                        }
-                    }
-
-                    Rectangle { height: 1px; background: Theme.divider; }
-
-                    SettingRow {
-                        title: "Minimize to tray";
-                        description: root.tray_supported ? "Minimize hides the window instead of using the taskbar." : "Requires a working tray icon.";
-                        enabled: root.tray_supported;
-                        Switch {
-                            text: "";
-                            accessible-label: "Minimize to tray";
-                            enabled: root.tray_supported;
-                            checked <=> root.minimize_to_tray;
-                            toggled => { root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray); }
-                        }
-                    }
-                }
-            }
-
-            SurfaceCard {
-                preferred-height: backup_layout.preferred-height;
-
-                backup_layout := VerticalLayout {
-                    padding: UiConstants.space_16;
-                    spacing: UiConstants.space_10;
-
-                    SectionHeader {
-                        title: "Backup and restore";
-                        description: "Create a validated local snapshot or stage the latest snapshot for restart.";
-                    }
-
-                    VerticalLayout {
-                        spacing: UiConstants.space_4;
-                        Text { text: "Latest backup"; color: Theme.text_primary; font-size: Typography.caption; font-weight: Typography.semibold; }
-                        Text { text: root.latest_backup; color: Theme.text_secondary; font-size: Typography.caption; overflow: elide; }
-                    }
-
-                    VerticalLayout {
-                        spacing: UiConstants.space_4;
-                        Text { text: "Backup directory"; color: Theme.text_primary; font-size: Typography.caption; font-weight: Typography.semibold; }
-                        Text { text: root.backup_directory; color: Theme.text_secondary; font-size: Typography.caption; overflow: elide; }
-                    }
-
-                    if root.restore_pending: Rectangle {
-                        min-height: 40px;
-                        background: Theme.warning.with-alpha(0.10);
-                        border-width: 1px;
-                        border-color: Theme.warning;
-                        border-radius: UiConstants.control_radius;
-                        HorizontalLayout {
-                            padding-left: UiConstants.space_12;
-                            padding-right: UiConstants.space_12;
-                            spacing: UiConstants.space_8;
-                            alignment: center;
-                            Badge { text: "Restart required"; kind: BadgeKind.warning; }
-                            Text { text: "The validated restore will be applied after restart."; color: Theme.text_primary; font-size: Typography.caption; wrap: word-wrap; }
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: UiConstants.space_8;
-                        FluentButton { text: "Create backup"; primary: true; clicked => { root.create_backup_requested(); } }
-                        FluentButton { text: "Open folder"; clicked => { root.open_backup_directory_requested(); } }
-                        FluentButton {
-                            text: "Restore latest";
-                            danger: true;
-                            enabled: root.latest_backup != "No backup created yet" && !root.restore_pending;
-                            clicked => { root.restore_latest_requested(); }
-                        }
-                        Rectangle { horizontal-stretch: 1; }
-                    }
-                }
-            }
-
-            SurfaceCard {
-                preferred-height: updates_layout.preferred-height;
-                updates_layout := VerticalLayout {
-                    padding-left: UiConstants.space_16;
-                    padding-right: UiConstants.space_16;
-                    SettingRow {
-                        title: "Updates · version " + root.application_version;
-                        description: root.update_description;
-                        FluentButton {
-                            text: "Open releases";
-                            enabled: root.can_open_releases;
-                            clicked => { root.open_releases_requested(); }
-                        }
-                    }
-                }
-            }
-
-            Rectangle { height: UiConstants.space_8; }
         }
     }
 }

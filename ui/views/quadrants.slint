@@ -5,7 +5,7 @@ import { ScrollView } from "std-widgets.slint";
 import { Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { PageHeader } from "../components/page_shell.slint";
-import { FluentButton, SegmentButton, SurfaceCard } from "../components/common.slint";
+import { Badge, FluentButton, SegmentButton, SurfaceCard } from "../components/common.slint";
 import { IconButton } from "../components/icon.slint";
 import { Icons } from "../icons.slint";
 
@@ -23,41 +23,98 @@ component TaskCard inherits Rectangle {
     callback complete_requested(string);
     callback delete_requested(string);
 
-    height: 88px;
-    background: Theme.input_bg;
+    height: 64px;
+    background: card_touch.has-hover ? Theme.card_hover : Theme.input_bg;
     border-width: 1px;
     border-color: Theme.input_border;
-    border-radius: 5px;
+    border-radius: UiConstants.control_radius;
 
-    VerticalLayout {
-        padding: 8px;
-        spacing: 6px;
+    card_touch := TouchArea { }
 
-        HorizontalLayout {
-            spacing: 4px;
-            Text {
-                text: root.task.title;
-                color: Theme.text_primary;
-                font-size: 12px;
-                font-weight: 600;
-                overflow: elide;
-                horizontal-stretch: 1;
-            }
-            IconButton { icon: Icons.chevron_up; tooltip: "Move task up"; clicked => { root.reorder_requested(root.task.id, -1); } }
-            IconButton { icon: Icons.chevron_down; tooltip: "Move task down"; clicked => { root.reorder_requested(root.task.id, 1); } }
-            IconButton { icon: Icons.edit; tooltip: "Edit task"; clicked => { root.edit_requested(root.task.id); } }
-            IconButton { icon: Icons.delete; tooltip: "Delete task"; danger: true; clicked => { root.delete_requested(root.task.id); } }
+    HorizontalLayout {
+        padding-left: UiConstants.space_8;
+        padding-right: UiConstants.space_8;
+        spacing: UiConstants.space_6;
+        alignment: center;
+
+        IconButton {
+            icon: Icons.complete;
+            tooltip: "Complete task";
+            clicked => { root.complete_requested(root.task.id); }
         }
 
-        HorizontalLayout {
-            spacing: 3px;
-            SegmentButton { min-width: 24px; text: "I"; selected: root.destination == 0; clicked => { root.move_requested(root.task.id, 0); } }
-            SegmentButton { min-width: 24px; text: "1"; selected: root.destination == 1; clicked => { root.move_requested(root.task.id, 1); } }
-            SegmentButton { min-width: 24px; text: "2"; selected: root.destination == 2; clicked => { root.move_requested(root.task.id, 2); } }
-            SegmentButton { min-width: 24px; text: "3"; selected: root.destination == 3; clicked => { root.move_requested(root.task.id, 3); } }
-            SegmentButton { min-width: 24px; text: "4"; selected: root.destination == 4; clicked => { root.move_requested(root.task.id, 4); } }
-            Rectangle { horizontal-stretch: 1; }
-            FluentButton { min-width: 44px; text: "Done"; primary: true; clicked => { root.complete_requested(root.task.id); } }
+        Text {
+            horizontal-stretch: 1;
+            text: root.task.title;
+            color: Theme.text_primary;
+            font-size: Typography.body;
+            font-weight: Typography.semibold;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+
+        IconButton {
+            icon: Icons.edit;
+            tooltip: "Edit task";
+            clicked => { root.edit_requested(root.task.id); }
+        }
+
+        FluentButton {
+            min-width: 68px;
+            text: "Move";
+            clicked => { move_popup.show(); }
+        }
+
+        IconButton {
+            icon: Icons.more_horizontal;
+            tooltip: "More task actions";
+            clicked => { more_popup.show(); }
+        }
+    }
+
+    move_popup := PopupWindow {
+        x: root.width - self.width - 40px;
+        y: root.height - UiConstants.space_4;
+        width: 172px;
+        height: 196px;
+        close-policy: close-on-click-outside;
+
+        SurfaceCard {
+            drop-shadow-blur: 12px;
+            drop-shadow-color: #00000044;
+
+            VerticalLayout {
+                padding: UiConstants.space_8;
+                spacing: UiConstants.space_4;
+
+                SegmentButton { text: "Inbox"; selected: root.destination == 0; clicked => { root.move_requested(root.task.id, 0); move_popup.close(); } }
+                SegmentButton { text: "Q1 · Important + Urgent"; selected: root.destination == 1; clicked => { root.move_requested(root.task.id, 1); move_popup.close(); } }
+                SegmentButton { text: "Q2 · Important"; selected: root.destination == 2; clicked => { root.move_requested(root.task.id, 2); move_popup.close(); } }
+                SegmentButton { text: "Q3 · Urgent"; selected: root.destination == 3; clicked => { root.move_requested(root.task.id, 3); move_popup.close(); } }
+                SegmentButton { text: "Q4 · Neither"; selected: root.destination == 4; clicked => { root.move_requested(root.task.id, 4); move_popup.close(); } }
+            }
+        }
+    }
+
+    more_popup := PopupWindow {
+        x: root.width - self.width;
+        y: root.height - UiConstants.space_4;
+        width: 148px;
+        height: 124px;
+        close-policy: close-on-click-outside;
+
+        SurfaceCard {
+            drop-shadow-blur: 12px;
+            drop-shadow-color: #00000044;
+
+            VerticalLayout {
+                padding: UiConstants.space_8;
+                spacing: UiConstants.space_4;
+
+                FluentButton { text: "Move up"; icon: Icons.chevron_up; show_icon: true; clicked => { root.reorder_requested(root.task.id, -1); more_popup.close(); } }
+                FluentButton { text: "Move down"; icon: Icons.chevron_down; show_icon: true; clicked => { root.reorder_requested(root.task.id, 1); more_popup.close(); } }
+                FluentButton { text: "Delete"; icon: Icons.delete; show_icon: true; danger: true; clicked => { root.delete_requested(root.task.id); more_popup.close(); } }
+            }
         }
     }
 }
@@ -69,11 +126,15 @@ component TaskColumn inherits SurfaceCard {
     in property <color> accent;
     in property <int> destination;
     in property <[TaskRow]> tasks;
+    in property <bool> content_sized: false;
     callback move_requested(string, int);
     callback edit_requested(string);
     callback reorder_requested(string, int);
     callback complete_requested(string);
     callback delete_requested(string);
+
+    min-height: 160px;
+    preferred-height: root.content_sized ? column_content.preferred-height : 360px;
 
     Rectangle {
         x: 0px;
@@ -84,41 +145,86 @@ component TaskColumn inherits SurfaceCard {
         border-radius: 2px;
     }
 
-    VerticalLayout {
-        padding: 12px;
-        spacing: 7px;
+    column_content := VerticalLayout {
+        padding: UiConstants.space_12;
+        spacing: UiConstants.space_8;
 
-        Text {
-            text: root.code == "" ? root.title : root.code + "  " + root.title;
-            color: Theme.text_primary;
-            font-size: 14px;
-            font-weight: 600;
-        }
+        HorizontalLayout {
+            spacing: UiConstants.space_8;
 
-        Text {
-            text: root.subtitle;
-            color: Theme.text_secondary;
-            font-size: Typography.caption;
-        }
+            if root.code != "": Rectangle {
+                width: code_label.preferred-width + UiConstants.space_16;
+                height: 24px;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: root.accent;
+                background: root.accent.with-alpha(0.10);
 
-        ScrollView {
-            vertical-stretch: 1;
-            VerticalLayout {
-                spacing: 6px;
-                for task in root.tasks: TaskCard {
-                    task: task;
-                    destination: root.destination;
-                    move_requested(id, destination) => { root.move_requested(id, destination); }
-                    edit_requested(id) => { root.edit_requested(id); }
-                    reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
-                    complete_requested(id) => { root.complete_requested(id); }
-                    delete_requested(id) => { root.delete_requested(id); }
+                code_label := Text {
+                    text: root.code;
+                    color: root.accent;
+                    font-size: Typography.caption;
+                    font-weight: Typography.semibold;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
                 }
-                if root.tasks.length == 0: Text {
-                    text: "No active tasks";
+            }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: UiConstants.space_2;
+
+                Text {
+                    text: root.title;
+                    color: Theme.text_primary;
+                    font-size: Typography.body;
+                    font-weight: Typography.semibold;
+                    overflow: elide;
+                }
+
+                Text {
+                    text: root.subtitle;
                     color: Theme.text_secondary;
                     font-size: Typography.caption;
-                    horizontal-alignment: center;
+                    overflow: elide;
+                }
+            }
+
+            Badge {
+                text: root.tasks.length + (root.tasks.length == 1 ? " task" : " tasks");
+            }
+        }
+
+        Rectangle {
+            vertical-stretch: root.content_sized ? 0 : 1;
+            preferred-height: root.tasks.length == 0 ? 36px : root.tasks.length * 72px;
+            clip: true;
+
+            ScrollView {
+                width: 100%;
+                height: 100%;
+
+                VerticalLayout {
+                    spacing: UiConstants.space_8;
+
+                    for task in root.tasks: TaskCard {
+                        task: task;
+                        destination: root.destination;
+                        move_requested(id, destination) => { root.move_requested(id, destination); }
+                        edit_requested(id) => { root.edit_requested(id); }
+                        reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
+                        complete_requested(id) => { root.complete_requested(id); }
+                        delete_requested(id) => { root.delete_requested(id); }
+                    }
+
+                    if root.tasks.length == 0: Text {
+                        height: 36px;
+                        text: "No active tasks";
+                        color: Theme.text_tertiary;
+                        font-size: Typography.caption;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
                 }
             }
         }
@@ -137,43 +243,112 @@ export component QuadrantsView inherits Rectangle {
     callback complete_requested(string);
     callback delete_requested(string);
 
+    property <bool> compact: root.width < UiConstants.compact_breakpoint;
+    property <bool> wide: root.width >= UiConstants.wide_breakpoint;
+    property <length> responsive_padding: root.compact ? UiConstants.page_padding_compact :
+                                                   root.wide ? UiConstants.page_padding_wide : UiConstants.page_padding_medium;
+
     background: transparent;
 
-    VerticalLayout {
-        padding: UiConstants.page_padding;
-        spacing: 16px;
+    ScrollView {
+        width: 100%;
+        height: 100%;
 
-        PageHeader {
-            title: "Quadrants";
-            subtitle: "Capture in Inbox, then classify by importance and urgency.";
-        }
+        VerticalLayout {
+            padding: root.responsive_padding;
+            spacing: UiConstants.space_16;
 
-        HorizontalLayout {
-            spacing: 16px;
-            vertical-stretch: 1;
-
-            TaskColumn {
-                width: 250px;
-                code: "";
-                title: "Inbox";
-                subtitle: "Unclassified captures";
-                accent: Theme.accent;
-                destination: 0;
-                tasks: root.inbox_tasks;
-                move_requested(id, destination) => { root.move_requested(id, destination); }
-                edit_requested(id) => { root.edit_requested(id); }
-                reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
-                complete_requested(id) => { root.complete_requested(id); }
-                delete_requested(id) => { root.delete_requested(id); }
+            PageHeader {
+                title: "Quadrants";
+                subtitle: "Capture in Inbox, then classify by importance and urgency.";
             }
 
-            VerticalLayout {
-                spacing: 12px;
-                horizontal-stretch: 1;
+            if root.wide: Rectangle {
+                height: max(520px, root.height - 2 * root.responsive_padding - 88px);
 
                 HorizontalLayout {
-                    spacing: 12px;
+                    spacing: UiConstants.space_16;
+
                     TaskColumn {
+                        width: 280px;
+                        code: ""; title: "Inbox"; subtitle: "Unclassified captures"; accent: Theme.accent;
+                        destination: 0; tasks: root.inbox_tasks;
+                        move_requested(id, destination) => { root.move_requested(id, destination); }
+                        edit_requested(id) => { root.edit_requested(id); }
+                        reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
+                        complete_requested(id) => { root.complete_requested(id); }
+                        delete_requested(id) => { root.delete_requested(id); }
+                    }
+
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: UiConstants.space_12;
+
+                        HorizontalLayout {
+                            spacing: UiConstants.space_12;
+                            TaskColumn {
+                                code: "Q1"; title: "Important + Urgent"; subtitle: "Do now"; accent: Theme.q1_accent;
+                                destination: 1; tasks: root.q1_tasks;
+                                move_requested(id, destination) => { root.move_requested(id, destination); }
+                                edit_requested(id) => { root.edit_requested(id); }
+                                reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
+                                complete_requested(id) => { root.complete_requested(id); }
+                                delete_requested(id) => { root.delete_requested(id); }
+                            }
+                            TaskColumn {
+                                code: "Q2"; title: "Important + Not urgent"; subtitle: "Plan deliberately"; accent: Theme.q2_accent;
+                                destination: 2; tasks: root.q2_tasks;
+                                move_requested(id, destination) => { root.move_requested(id, destination); }
+                                edit_requested(id) => { root.edit_requested(id); }
+                                reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
+                                complete_requested(id) => { root.complete_requested(id); }
+                                delete_requested(id) => { root.delete_requested(id); }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            spacing: UiConstants.space_12;
+                            TaskColumn {
+                                code: "Q3"; title: "Not important + Urgent"; subtitle: "Delegate or contain"; accent: Theme.q3_accent;
+                                destination: 3; tasks: root.q3_tasks;
+                                move_requested(id, destination) => { root.move_requested(id, destination); }
+                                edit_requested(id) => { root.edit_requested(id); }
+                                reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
+                                complete_requested(id) => { root.complete_requested(id); }
+                                delete_requested(id) => { root.delete_requested(id); }
+                            }
+                            TaskColumn {
+                                code: "Q4"; title: "Not important + Not urgent"; subtitle: "Reduce or remove"; accent: Theme.q4_accent;
+                                destination: 4; tasks: root.q4_tasks;
+                                move_requested(id, destination) => { root.move_requested(id, destination); }
+                                edit_requested(id) => { root.edit_requested(id); }
+                                reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
+                                complete_requested(id) => { root.complete_requested(id); }
+                                delete_requested(id) => { root.delete_requested(id); }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !root.wide && !root.compact: VerticalLayout {
+                spacing: UiConstants.space_12;
+
+                TaskColumn {
+                    content_sized: true;
+                    code: ""; title: "Inbox"; subtitle: "Unclassified captures"; accent: Theme.accent;
+                    destination: 0; tasks: root.inbox_tasks;
+                    move_requested(id, destination) => { root.move_requested(id, destination); }
+                    edit_requested(id) => { root.edit_requested(id); }
+                    reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
+                    complete_requested(id) => { root.complete_requested(id); }
+                    delete_requested(id) => { root.delete_requested(id); }
+                }
+
+                HorizontalLayout {
+                    spacing: UiConstants.space_12;
+                    TaskColumn {
+                        content_sized: true;
                         code: "Q1"; title: "Important + Urgent"; subtitle: "Do now"; accent: Theme.q1_accent;
                         destination: 1; tasks: root.q1_tasks;
                         move_requested(id, destination) => { root.move_requested(id, destination); }
@@ -183,6 +358,7 @@ export component QuadrantsView inherits Rectangle {
                         delete_requested(id) => { root.delete_requested(id); }
                     }
                     TaskColumn {
+                        content_sized: true;
                         code: "Q2"; title: "Important + Not urgent"; subtitle: "Plan deliberately"; accent: Theme.q2_accent;
                         destination: 2; tasks: root.q2_tasks;
                         move_requested(id, destination) => { root.move_requested(id, destination); }
@@ -194,8 +370,9 @@ export component QuadrantsView inherits Rectangle {
                 }
 
                 HorizontalLayout {
-                    spacing: 12px;
+                    spacing: UiConstants.space_12;
                     TaskColumn {
+                        content_sized: true;
                         code: "Q3"; title: "Not important + Urgent"; subtitle: "Delegate or contain"; accent: Theme.q3_accent;
                         destination: 3; tasks: root.q3_tasks;
                         move_requested(id, destination) => { root.move_requested(id, destination); }
@@ -205,6 +382,7 @@ export component QuadrantsView inherits Rectangle {
                         delete_requested(id) => { root.delete_requested(id); }
                     }
                     TaskColumn {
+                        content_sized: true;
                         code: "Q4"; title: "Not important + Not urgent"; subtitle: "Reduce or remove"; accent: Theme.q4_accent;
                         destination: 4; tasks: root.q4_tasks;
                         move_requested(id, destination) => { root.move_requested(id, destination); }
@@ -215,6 +393,48 @@ export component QuadrantsView inherits Rectangle {
                     }
                 }
             }
+
+            if root.compact: VerticalLayout {
+                spacing: UiConstants.space_12;
+
+                TaskColumn {
+                    content_sized: true; code: ""; title: "Inbox"; subtitle: "Unclassified captures"; accent: Theme.accent;
+                    destination: 0; tasks: root.inbox_tasks;
+                    move_requested(id, destination) => { root.move_requested(id, destination); } edit_requested(id) => { root.edit_requested(id); }
+                    reorder_requested(id, direction) => { root.reorder_requested(id, direction); } complete_requested(id) => { root.complete_requested(id); }
+                    delete_requested(id) => { root.delete_requested(id); }
+                }
+                TaskColumn {
+                    content_sized: true; code: "Q1"; title: "Important + Urgent"; subtitle: "Do now"; accent: Theme.q1_accent;
+                    destination: 1; tasks: root.q1_tasks;
+                    move_requested(id, destination) => { root.move_requested(id, destination); } edit_requested(id) => { root.edit_requested(id); }
+                    reorder_requested(id, direction) => { root.reorder_requested(id, direction); } complete_requested(id) => { root.complete_requested(id); }
+                    delete_requested(id) => { root.delete_requested(id); }
+                }
+                TaskColumn {
+                    content_sized: true; code: "Q2"; title: "Important + Not urgent"; subtitle: "Plan deliberately"; accent: Theme.q2_accent;
+                    destination: 2; tasks: root.q2_tasks;
+                    move_requested(id, destination) => { root.move_requested(id, destination); } edit_requested(id) => { root.edit_requested(id); }
+                    reorder_requested(id, direction) => { root.reorder_requested(id, direction); } complete_requested(id) => { root.complete_requested(id); }
+                    delete_requested(id) => { root.delete_requested(id); }
+                }
+                TaskColumn {
+                    content_sized: true; code: "Q3"; title: "Not important + Urgent"; subtitle: "Delegate or contain"; accent: Theme.q3_accent;
+                    destination: 3; tasks: root.q3_tasks;
+                    move_requested(id, destination) => { root.move_requested(id, destination); } edit_requested(id) => { root.edit_requested(id); }
+                    reorder_requested(id, direction) => { root.reorder_requested(id, direction); } complete_requested(id) => { root.complete_requested(id); }
+                    delete_requested(id) => { root.delete_requested(id); }
+                }
+                TaskColumn {
+                    content_sized: true; code: "Q4"; title: "Not important + Not urgent"; subtitle: "Reduce or remove"; accent: Theme.q4_accent;
+                    destination: 4; tasks: root.q4_tasks;
+                    move_requested(id, destination) => { root.move_requested(id, destination); } edit_requested(id) => { root.edit_requested(id); }
+                    reorder_requested(id, direction) => { root.reorder_requested(id, direction); } complete_requested(id) => { root.complete_requested(id); }
+                    delete_requested(id) => { root.delete_requested(id); }
+                }
+            }
+
+            Rectangle { height: UiConstants.space_8; }
         }
     }
 }

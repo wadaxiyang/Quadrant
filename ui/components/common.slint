@@ -130,6 +130,7 @@ export component FluentButton inherits Rectangle {
     in property <image> icon;
     in property <bool> show_icon: false;
     in property <bool> primary: false;
+    in property <bool> accent: false;
     in property <bool> danger: false;
     in property <bool> enabled: true;
     callback clicked;
@@ -138,12 +139,14 @@ export component FluentButton inherits Rectangle {
     height: UiConstants.button_height;
     border-radius: UiConstants.control_radius;
     border-width: button_focus.has-focus ? 2px : (root.primary ? 0px : 1px);
-    border-color: button_focus.has-focus ? Theme.focus_ring : (root.danger ? Theme.danger : Theme.input_border);
+    border-color: button_focus.has-focus ? Theme.focus_ring :
+                  root.danger ? Theme.danger :
+                  root.accent ? Theme.accent : Theme.input_border;
     background: !root.enabled ? Theme.control_bg :
                 root.primary && root.danger ? (button_touch.pressed ? Theme.danger : (button_touch.has-hover ? Theme.danger.with-alpha(0.88) : Theme.danger)) :
                 root.primary ? (button_touch.pressed ? Theme.accent_pressed : (button_touch.has-hover ? Theme.accent_hover : Theme.accent)) :
                 button_touch.pressed ? Theme.selected_bg :
-                button_touch.has-hover ? (root.danger ? Theme.danger_bg : Theme.control_bg_hover) : Theme.control_bg;
+                button_touch.has-hover ? (root.danger ? Theme.danger_bg : root.accent ? Theme.selected_bg : Theme.control_bg_hover) : Theme.control_bg;
     opacity: root.enabled ? 1 : 0.55;
     forward-focus: button_focus;
     accessible-role: button;
@@ -160,12 +163,14 @@ export component FluentButton inherits Rectangle {
         if root.show_icon: FluentIcon {
             source: root.icon;
             size: 16px;
-            icon_color: root.primary ? white : (root.danger ? Theme.danger : Theme.icon_neutral);
+            icon_color: root.primary ? white : (root.danger ? Theme.danger : root.accent ? Theme.accent : Theme.icon_neutral);
         }
 
         Text {
             text: root.text;
-            color: root.primary ? (root.danger ? white : Theme.accent_foreground) : (root.danger ? Theme.danger : Theme.text_primary);
+            color: root.primary ? (root.danger ? white : Theme.accent_foreground) :
+                   root.danger ? Theme.danger :
+                   root.accent ? Theme.accent : Theme.text_primary;
             font-size: Typography.body;
             font-weight: root.primary ? Typography.semibold : Typography.regular;
             horizontal-alignment: center;

@@ -16,6 +16,7 @@ export component PageHeader inherits Rectangle {
 
     min-height: 72px;
     preferred-height: max(root.min-height, header_layout.preferred-height);
+    vertical-stretch: 0;
 
     header_layout := HorizontalLayout {
         spacing: UiConstants.space_16;
@@ -60,6 +61,7 @@ export component EmptyState inherits SurfaceCard {
 
     min-height: 144px;
     preferred-height: max(root.min-height, empty_layout.preferred-height);
+    vertical-stretch: 0;
 
     empty_layout := VerticalLayout {
         padding: UiConstants.space_28;

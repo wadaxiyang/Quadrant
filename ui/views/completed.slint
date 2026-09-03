@@ -4,8 +4,10 @@
 import { ScrollView } from "std-widgets.slint";
 import { Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
-import { PageHeader, EmptyState } from "../components/page_shell.slint";
+import { EmptyState, PageHeader } from "../components/page_shell.slint";
 import { FluentButton, SurfaceCard } from "../components/common.slint";
+import { IconButton } from "../components/icon.slint";
+import { Icons } from "../icons.slint";
 
 export struct CompletedTaskRow {
     id: string,
@@ -13,20 +15,58 @@ export struct CompletedTaskRow {
     metadata: string,
 }
 
-component CompletedTaskCard inherits SurfaceCard {
+component CompletedTaskListRow inherits Rectangle {
     in property <CompletedTaskRow> task;
     callback reopen_requested(string);
     callback delete_requested(string);
-    height: 68px;
+
+    height: 64px;
+
     HorizontalLayout {
-        padding: 10px; spacing: 8px;
+        padding-left: UiConstants.space_12;
+        padding-right: UiConstants.space_8;
+        spacing: UiConstants.space_8;
+
         VerticalLayout {
-            horizontal-stretch: 1; spacing: 4px;
-            Text { text: root.task.title; color: Theme.text_primary; font-size: 13px; font-weight: 600; overflow: elide; }
-            Text { text: root.task.metadata; color: Theme.text_secondary; font-size: Typography.caption; overflow: elide; }
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: UiConstants.space_4;
+
+            Text {
+                text: root.task.title;
+                color: Theme.text_primary;
+                font-size: Typography.body;
+                font-weight: Typography.semibold;
+                overflow: elide;
+            }
+
+            Text {
+                text: root.task.metadata;
+                color: Theme.text_secondary;
+                font-size: Typography.caption;
+                overflow: elide;
+            }
         }
-        FluentButton { width: 78px; text: "Restore"; primary: true; clicked => { root.reopen_requested(root.task.id); } }
-        FluentButton { width: 92px; text: "Delete"; danger: true; clicked => { root.delete_requested(root.task.id); } }
+
+        VerticalLayout {
+            alignment: center;
+            FluentButton {
+                min-width: 78px;
+                text: "Restore";
+                accent: true;
+                clicked => { root.reopen_requested(root.task.id); }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            IconButton {
+                icon: Icons.delete;
+                tooltip: "Permanently delete task";
+                danger: true;
+                clicked => { root.delete_requested(root.task.id); }
+            }
+        }
     }
 }
 
@@ -37,32 +77,66 @@ export component CompletedView inherits Rectangle {
     callback delete_requested(string);
     callback load_more_requested;
 
+    property <bool> compact: root.width < UiConstants.compact_breakpoint;
+    property <bool> wide: root.width >= UiConstants.wide_breakpoint;
+    property <length> responsive_padding: root.compact ? UiConstants.page_padding_compact :
+                                                   root.wide ? UiConstants.page_padding_wide : UiConstants.page_padding_medium;
+
     ScrollView {
-        width: 100%; height: 100%;
+        width: 100%;
+        height: 100%;
+
         VerticalLayout {
-            padding: UiConstants.page_padding; spacing: 12px;
-            PageHeader { title: "Completed"; subtitle: "Restore unfinished work or permanently remove the task row."; }
+            padding: root.responsive_padding;
+            spacing: UiConstants.space_16;
+
+            PageHeader {
+                title: "Completed";
+                subtitle: "Restore unfinished work or permanently remove the task row.";
+            }
+
             if root.tasks.length == 0: EmptyState {
-                height: 290px;
                 title: "No completed tasks";
                 message: "Completed tasks remain here until restored or deleted. Review snapshots survive deletion.";
-                milestone: "History is repository-backed and bounded";
             }
-            for task in root.tasks: CompletedTaskCard {
-                task: task;
-                reopen_requested(id) => { root.reopen_requested(id); }
-                delete_requested(id) => { root.delete_requested(id); }
+
+            if root.tasks.length > 0: SurfaceCard {
+                height: root.tasks.length * 65px - 1px;
+                vertical-stretch: 0;
+
+                completed_list := VerticalLayout {
+                    for task[index] in root.tasks: VerticalLayout {
+                        CompletedTaskListRow {
+                            task: task;
+                            reopen_requested(id) => { root.reopen_requested(id); }
+                            delete_requested(id) => { root.delete_requested(id); }
+                        }
+
+                        if index < root.tasks.length - 1: Rectangle {
+                            height: 1px;
+                            background: Theme.divider;
+                        }
+                    }
+                }
             }
-            if root.has_more: FluentButton {
-                width: 132px; text: "Load 50 more";
-                clicked => { root.load_more_requested(); }
+
+            if root.has_more: HorizontalLayout {
+                FluentButton {
+                    min-width: 132px;
+                    text: "Load 50 more";
+                    clicked => { root.load_more_requested(); }
+                }
+                Rectangle { horizontal-stretch: 1; }
             }
+
             if root.tasks.length > 0 && !root.has_more: Text {
                 text: "End of completed history";
-                color: Theme.text_secondary;
+                color: Theme.text_tertiary;
                 font-size: Typography.caption;
                 horizontal-alignment: center;
             }
+
+            Rectangle { min-height: UiConstants.space_8; vertical-stretch: 1; }
         }
     }
 }

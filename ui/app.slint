@@ -36,6 +36,7 @@ export component MainWindow inherits Window {
 
     in-out property <string> ui_font_family <=> Theme.ui_font_family;
     in-out property <int> current_route: 0;
+    in-out property <bool> sidebar_user_collapsed: false;
     in-out property <bool> toast_visible: false;
     in-out property <string> toast_message;
     in-out property <ToastKind> toast_kind: ToastKind.info;
@@ -184,6 +185,8 @@ export component MainWindow inherits Window {
                 spacing: 0px;
 
                 Sidebar {
+                    collapsed <=> root.sidebar_user_collapsed;
+                    auto_collapsed: root.width < 920px;
                     selected_route: root.current_route;
                     route_selected(route) => {
                         root.current_route = route;

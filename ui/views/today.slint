@@ -4,8 +4,10 @@
 import { ScrollView } from "std-widgets.slint";
 import { Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
-import { FluentButton, SurfaceCard } from "../components/common.slint";
-import { EmptyState, PageHeader } from "../components/page_shell.slint";
+import { Badge, BadgeKind, SurfaceCard } from "../components/common.slint";
+import { EmptyState, PageHeader, SectionHeader } from "../components/page_shell.slint";
+import { IconButton } from "../components/icon.slint";
+import { Icons } from "../icons.slint";
 
 export struct TodayTaskRow {
     id: string,
@@ -13,30 +15,39 @@ export struct TodayTaskRow {
     metadata: string,
 }
 
-component TodayTaskCard inherits Rectangle {
+component TodayTaskListRow inherits Rectangle {
     in property <TodayTaskRow> task;
     callback edit_requested(string);
     callback complete_requested(string);
 
     height: 60px;
-    background: Theme.input_bg;
-    border-width: 1px;
-    border-color: Theme.input_border;
-    border-radius: 5px;
+    background: transparent;
 
     HorizontalLayout {
-        padding: 9px;
-        spacing: 8px;
+        padding-left: UiConstants.space_8;
+        padding-right: UiConstants.space_8;
+        spacing: UiConstants.space_8;
+        alignment: center;
+
+        IconButton {
+            icon: Icons.complete;
+            tooltip: "Complete task";
+            clicked => { root.complete_requested(root.task.id); }
+        }
+
         VerticalLayout {
-            spacing: 3px;
             horizontal-stretch: 1;
+            spacing: UiConstants.space_4;
+            alignment: center;
+
             Text {
                 text: root.task.title;
                 color: Theme.text_primary;
-                font-size: 13px;
+                font-size: Typography.body;
                 font-weight: Typography.semibold;
                 overflow: elide;
             }
+
             Text {
                 text: root.task.metadata;
                 color: Theme.text_secondary;
@@ -44,35 +55,61 @@ component TodayTaskCard inherits Rectangle {
                 overflow: elide;
             }
         }
-        FluentButton { min-width: 48px; text: "Edit"; clicked => { root.edit_requested(root.task.id); } }
-        FluentButton { min-width: 54px; text: "Done"; primary: true; clicked => { root.complete_requested(root.task.id); } }
+
+        IconButton {
+            icon: Icons.edit;
+            tooltip: "Edit task";
+            clicked => { root.edit_requested(root.task.id); }
+        }
     }
+
 }
 
 component TodaySection inherits SurfaceCard {
     in property <string> title;
     in property <string> subtitle;
     in property <color> accent;
+    in property <BadgeKind> badge_kind: BadgeKind.neutral;
     in property <[TodayTaskRow]> tasks;
     callback edit_requested(string);
     callback complete_requested(string);
 
     min-height: 92px;
+    preferred-height: section_content.preferred-height;
+    vertical-stretch: 0;
 
-    Rectangle { x: 0px; width: 4px; height: 100%; background: root.accent; border-radius: 2px; }
-    VerticalLayout {
-        padding: 12px;
-        spacing: 7px;
-        HorizontalLayout {
-            Text { text: root.title; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
-            Rectangle { horizontal-stretch: 1; }
-            Text { text: root.tasks.length + " tasks"; color: Theme.text_secondary; font-size: Typography.caption; }
+    Rectangle {
+        x: 0px;
+        width: 4px;
+        height: 100%;
+        background: root.accent;
+        border-radius: 2px;
+    }
+
+    section_content := VerticalLayout {
+        padding: UiConstants.space_12;
+        spacing: 0px;
+
+        SectionHeader {
+            title: root.title;
+            description: root.subtitle;
+            badge_text: root.tasks.length + (root.tasks.length == 1 ? " task" : " tasks");
+            badge_kind: root.badge_kind;
         }
-        Text { text: root.subtitle; color: Theme.text_secondary; font-size: Typography.caption; }
-        for task in root.tasks: TodayTaskCard {
-            task: task;
-            edit_requested(id) => { root.edit_requested(id); }
-            complete_requested(id) => { root.complete_requested(id); }
+
+        for task[index] in root.tasks: VerticalLayout {
+            spacing: 0px;
+
+            TodayTaskListRow {
+                task: task;
+                edit_requested(id) => { root.edit_requested(id); }
+                complete_requested(id) => { root.complete_requested(id); }
+            }
+
+            if index < root.tasks.length - 1: Rectangle {
+                height: 1px;
+                background: Theme.divider;
+            }
         }
     }
 }
@@ -86,68 +123,82 @@ export component TodayView inherits Rectangle {
     callback edit_requested(string);
     callback complete_requested(string);
 
+    property <bool> compact: root.width < UiConstants.compact_breakpoint;
+    property <bool> wide: root.width >= UiConstants.wide_breakpoint;
+    property <length> responsive_padding: root.compact ? UiConstants.page_padding_compact :
+                                                   root.wide ? UiConstants.page_padding_wide : UiConstants.page_padding_medium;
+
     background: transparent;
 
     ScrollView {
         width: 100%;
         height: 100%;
+
         VerticalLayout {
-            padding: UiConstants.page_padding;
-            spacing: 14px;
+            padding: root.responsive_padding;
+            spacing: UiConstants.space_16;
 
-            PageHeader { title: "Today"; subtitle: "Plans, deadlines, and work that needs attention now."; }
+            PageHeader {
+                title: "Today";
+                subtitle: "Plans, deadlines, and work that needs attention now.";
+            }
 
-            SurfaceCard {
-                height: 66px;
-                HorizontalLayout {
-                    padding: 14px;
-                    spacing: 18px;
-                    VerticalLayout {
-                        Text { text: "Tasks"; color: Theme.text_secondary; font-size: Typography.caption; font-weight: Typography.semibold; }
-                        Text { text: root.unique_task_count; color: Theme.text_primary; font-size: 20px; font-weight: 600; }
-                    }
-                    Rectangle { width: 1px; background: Theme.border_color; }
-                    Text {
-                        text: "Each task appears once: overdue, planned today, due today, then needs rescheduling.";
-                        color: Theme.text_secondary;
-                        font-size: Typography.caption;
-                        vertical-alignment: center;
-                        wrap: word-wrap;
-                    }
+            HorizontalLayout {
+                spacing: UiConstants.space_8;
+                Badge {
+                    text: root.unique_task_count + (root.unique_task_count == 1 ? " task needs attention" : " tasks need attention");
+                    kind: root.unique_task_count > 0 ? BadgeKind.accent : BadgeKind.neutral;
                 }
+                Rectangle { horizontal-stretch: 1; }
             }
 
             if root.overdue_tasks.length > 0: TodaySection {
-                title: "Overdue"; subtitle: "Deadlines before the current instant"; accent: Theme.danger;
+                title: "Overdue";
+                subtitle: "Deadlines before the current instant";
+                accent: Theme.danger;
+                badge_kind: BadgeKind.danger;
                 tasks: root.overdue_tasks;
                 edit_requested(id) => { root.edit_requested(id); }
                 complete_requested(id) => { root.complete_requested(id); }
             }
+
             if root.planned_today_tasks.length > 0: TodaySection {
-                title: "Planned today"; subtitle: "Work intentionally scheduled for the local date"; accent: Theme.accent;
+                title: "Planned today";
+                subtitle: "Work intentionally scheduled for the local date";
+                accent: Theme.accent;
+                badge_kind: BadgeKind.accent;
                 tasks: root.planned_today_tasks;
                 edit_requested(id) => { root.edit_requested(id); }
                 complete_requested(id) => { root.complete_requested(id); }
             }
+
             if root.due_today_tasks.length > 0: TodaySection {
-                title: "Due today"; subtitle: "Deadlines inside today's local calendar boundaries"; accent: Theme.success;
+                title: "Due today";
+                subtitle: "Deadlines inside today's local calendar boundaries";
+                accent: Theme.success;
+                badge_kind: BadgeKind.success;
                 tasks: root.due_today_tasks;
                 edit_requested(id) => { root.edit_requested(id); }
                 complete_requested(id) => { root.complete_requested(id); }
             }
+
             if root.needs_reschedule_tasks.length > 0: TodaySection {
-                title: "Needs rescheduling"; subtitle: "Unfinished work planned before today"; accent: #ca5010;
+                title: "Needs rescheduling";
+                subtitle: "Unfinished work planned before today";
+                accent: Theme.warning;
+                badge_kind: BadgeKind.warning;
                 tasks: root.needs_reschedule_tasks;
                 edit_requested(id) => { root.edit_requested(id); }
                 complete_requested(id) => { root.complete_requested(id); }
             }
 
             if root.unique_task_count == 0: EmptyState {
-                height: 250px;
+                vertical-stretch: 0;
                 title: "Nothing needs attention today";
                 message: "Plan a task for today or add a due date from the task editor.";
-                milestone: "Today is derived from live task data";
             }
+
+            Rectangle { min-height: UiConstants.space_8; vertical-stretch: 1; }
         }
     }
 }

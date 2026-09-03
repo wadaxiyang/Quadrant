@@ -13,11 +13,14 @@ import { FluentIcon } from "icon.slint";
 
 export component Sidebar inherits Rectangle {
     in-out property <bool> collapsed: false;
+    in property <bool> auto_collapsed: false;
     in property <int> selected_route: 0;
     callback route_selected(int);
     callback quick_add_clicked;
 
-    width: collapsed ? UiConstants.sidebar_collapsed_width : UiConstants.sidebar_expanded_width;
+    property <bool> effective_collapsed: root.collapsed || root.auto_collapsed;
+
+    width: effective_collapsed ? UiConstants.sidebar_collapsed_width : UiConstants.sidebar_expanded_width;
     background: Theme.sidebar_bg;
 
     animate width {
@@ -59,7 +62,7 @@ export component Sidebar inherits Rectangle {
 
             HorizontalLayout {
                 padding-left: UiConstants.navigation_item_padding;
-                spacing: root.collapsed ? 0px : UiConstants.space_10;
+                spacing: root.effective_collapsed ? 0px : UiConstants.space_10;
                 alignment: start;
 
                 Rectangle {
@@ -76,7 +79,7 @@ export component Sidebar inherits Rectangle {
                 }
 
                 Rectangle {
-                    width: root.collapsed ? 0px : quick_add_label.preferred-width;
+                    width: root.effective_collapsed ? 0px : quick_add_label.preferred-width;
                     clip: true;
 
                     animate width {
@@ -91,7 +94,7 @@ export component Sidebar inherits Rectangle {
                         font-size: Typography.body;
                         font-weight: Typography.semibold;
                         vertical-alignment: center;
-                        opacity: root.collapsed && parent.width < 10px ? 0 : 1;
+                        opacity: root.effective_collapsed && parent.width < 10px ? 0 : 1;
                         animate opacity { duration: Motion.standard; }
                     }
                 }
@@ -108,7 +111,7 @@ export component Sidebar inherits Rectangle {
             selected_icon: Icons.quadrants_filled;
             text: "Quadrants";
             selected: root.selected_route == 0;
-            collapsed: root.collapsed;
+            collapsed: root.effective_collapsed;
             clicked => { root.route_selected(0); }
         }
 
@@ -117,7 +120,7 @@ export component Sidebar inherits Rectangle {
             selected_icon: Icons.today_filled;
             text: "Today";
             selected: root.selected_route == 1;
-            collapsed: root.collapsed;
+            collapsed: root.effective_collapsed;
             clicked => { root.route_selected(1); }
         }
 
@@ -126,7 +129,7 @@ export component Sidebar inherits Rectangle {
             selected_icon: Icons.focus_filled;
             text: "Focus";
             selected: root.selected_route == 2;
-            collapsed: root.collapsed;
+            collapsed: root.effective_collapsed;
             clicked => { root.route_selected(2); }
         }
 
@@ -135,7 +138,7 @@ export component Sidebar inherits Rectangle {
             selected_icon: Icons.review_filled;
             text: "Review";
             selected: root.selected_route == 3;
-            collapsed: root.collapsed;
+            collapsed: root.effective_collapsed;
             clicked => { root.route_selected(3); }
         }
 
@@ -146,7 +149,7 @@ export component Sidebar inherits Rectangle {
             selected_icon: Icons.completed_filled;
             text: "Completed";
             selected: root.selected_route == 4;
-            collapsed: root.collapsed;
+            collapsed: root.effective_collapsed;
             clicked => { root.route_selected(4); }
         }
 
@@ -163,7 +166,7 @@ export component Sidebar inherits Rectangle {
             selected_icon: Icons.settings_filled;
             text: "Settings";
             selected: root.selected_route == 5;
-            collapsed: root.collapsed;
+            collapsed: root.effective_collapsed;
             clicked => { root.route_selected(5); }
         }
 
@@ -172,7 +175,7 @@ export component Sidebar inherits Rectangle {
             selected_icon: Icons.about_filled;
             text: "About";
             selected: root.selected_route == 6;
-            collapsed: root.collapsed;
+            collapsed: root.effective_collapsed;
             clicked => { root.route_selected(6); }
         }
     }

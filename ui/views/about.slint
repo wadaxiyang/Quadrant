@@ -1,10 +1,32 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { Theme } from "../theme.slint";
+import { ScrollView } from "std-widgets.slint";
+import { Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
-import { PageHeader } from "../components/page_shell.slint";
-import { FluentButton, SurfaceCard } from "../components/common.slint";
+import { PageHeader, SectionHeader } from "../components/page_shell.slint";
+import { Badge, BadgeKind, FluentButton, SettingRow, SurfaceCard } from "../components/common.slint";
+import { FluentIcon } from "../components/icon.slint";
+import { Icons } from "../icons.slint";
+
+component AppMark inherits Rectangle {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: Theme.accent;
+    accessible-role: image;
+    accessible-label: "Quadrant app mark";
+
+    GridLayout {
+        padding: 9px;
+        spacing: 4px;
+
+        Rectangle { row: 0; col: 0; border-radius: 3px; background: white; }
+        Rectangle { row: 0; col: 1; border-radius: 3px; background: white.with-alpha(0.78); }
+        Rectangle { row: 1; col: 0; border-radius: 3px; background: white.with-alpha(0.78); }
+        Rectangle { row: 1; col: 1; border-radius: 3px; background: white; }
+    }
+}
 
 export component AboutView inherits Rectangle {
     in property <string> application_version: "0.1.0";
@@ -12,26 +34,164 @@ export component AboutView inherits Rectangle {
     callback show_notices;
     callback open_releases;
 
-    VerticalLayout {
-        padding: UiConstants.page_padding;
-        spacing: 16px;
-        PageHeader { title: "About"; subtitle: "Quadrant Tasks · version " + root.application_version; }
-        SurfaceCard {
-            vertical-stretch: 1;
-            VerticalLayout {
-                padding: 24px;
-                spacing: 10px;
-                Text { text: "Quadrant"; color: Theme.text_primary; font-size: 24px; font-weight: 600; }
-                Text { text: "A local-first four-quadrant task manager built with Rust and Slint."; color: Theme.text_secondary; font-size: 13px; wrap: word-wrap; }
-                Text { text: "License: GPL-3.0-only"; color: Theme.text_primary; font-size: 12px; }
-                Text { text: "Fluent UI components are derived from owu/wsl-dashboard (GPL-3.0-only)."; color: Theme.text_secondary; font-size: 12px; wrap: word-wrap; }
-                Text { text: "Icons: Microsoft Fluent UI System Icons (MIT)."; color: Theme.text_secondary; font-size: 12px; }
-                Rectangle { vertical-stretch: 1; }
-                HorizontalLayout {
-                    spacing: 8px;
-                    FluentButton { width: 132px; text: "Source notices"; clicked => { root.show_notices(); } }
-                    FluentButton { width: 132px; text: "Releases"; primary: true; enabled: root.can_open_releases; clicked => { root.open_releases(); } }
+    property <bool> compact: root.width < UiConstants.compact_breakpoint;
+    property <bool> wide: root.width >= UiConstants.wide_breakpoint;
+    property <length> responsive_padding: root.compact ? UiConstants.page_padding_compact :
+                                                   root.wide ? UiConstants.page_padding_wide : UiConstants.page_padding_medium;
+    property <length> content_width: min(root.width - 2 * root.responsive_padding, 760px);
+
+    ScrollView {
+        width: 100%;
+        height: 100%;
+
+        VerticalLayout {
+            padding-top: root.responsive_padding;
+            padding-bottom: root.responsive_padding;
+
+            HorizontalLayout {
+                Rectangle { horizontal-stretch: 1; }
+
+                about_content := VerticalLayout {
+                    width: root.content_width;
+                    spacing: UiConstants.space_16;
+
+                    PageHeader {
+                        title: "About";
+                        subtitle: "Product identity, licensing, and release information.";
+                    }
+
+                    Rectangle {
+                        min-height: 160px;
+                        preferred-height: brand_layout.preferred-height;
+                        vertical-stretch: 0;
+
+                        brand_layout := VerticalLayout {
+                            padding-top: UiConstants.space_12;
+                            padding-bottom: UiConstants.space_20;
+                            spacing: UiConstants.space_8;
+                            alignment: center;
+
+                            HorizontalLayout {
+                                alignment: center;
+                                AppMark { }
+                            }
+
+                            Text {
+                                text: "Quadrant";
+                                color: Theme.text_primary;
+                                font-size: 24px;
+                                font-weight: Typography.semibold;
+                                horizontal-alignment: center;
+                            }
+
+                            HorizontalLayout {
+                                alignment: center;
+                                Badge {
+                                    text: "Version " + root.application_version;
+                                    kind: BadgeKind.accent;
+                                }
+                            }
+
+                            Text {
+                                text: "A local-first four-quadrant task manager built with Rust and Slint.";
+                                color: Theme.text_secondary;
+                                font-size: Typography.body;
+                                horizontal-alignment: center;
+                                wrap: word-wrap;
+                            }
+
+                            HorizontalLayout {
+                                alignment: center;
+                                spacing: UiConstants.space_4;
+
+                                Text {
+                                    text: "Copyright wadaxiyang";
+                                    color: Theme.text_secondary;
+                                    font-size: Typography.caption;
+                                }
+
+                                FluentIcon {
+                                    source: Icons.heart_filled;
+                                    size: 16px;
+                                    icon_color: Theme.danger;
+                                }
+
+                                Text {
+                                    text: "Niuniu";
+                                    color: Theme.text_secondary;
+                                    font-size: Typography.caption;
+                                }
+                            }
+                        }
+                    }
+
+                    SurfaceCard {
+                        preferred-height: license_layout.preferred-height;
+                        vertical-stretch: 0;
+
+                        license_layout := VerticalLayout {
+                            padding: UiConstants.space_16;
+                            spacing: UiConstants.space_8;
+
+                            SectionHeader {
+                                title: "Open source";
+                                description: "Quadrant is distributed under GPL-3.0-only.";
+                                badge_text: "GPL-3.0-only";
+                                badge_kind: BadgeKind.accent;
+                            }
+
+                            Text {
+                                text: "Fluent UI components are derived from owu/wsl-dashboard under GPL-3.0-only.";
+                                color: Theme.text_secondary;
+                                font-size: Typography.body;
+                                wrap: word-wrap;
+                            }
+
+                            Text {
+                                text: "Icons are from Microsoft Fluent UI System Icons under the MIT license.";
+                                color: Theme.text_secondary;
+                                font-size: Typography.caption;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+
+                    SurfaceCard {
+                        preferred-height: actions_layout.preferred-height;
+                        vertical-stretch: 0;
+
+                        actions_layout := VerticalLayout {
+                            padding-left: UiConstants.space_16;
+                            padding-right: UiConstants.space_16;
+
+                            SettingRow {
+                                title: "Source notices";
+                                description: "Review bundled licenses, upstream sources, and attribution.";
+                                FluentButton {
+                                    text: "View notices";
+                                    clicked => { root.show_notices(); }
+                                }
+                            }
+
+                            Rectangle { height: 1px; background: Theme.divider; }
+
+                            SettingRow {
+                                title: "Releases";
+                                description: root.can_open_releases ? "Open the official release page in your browser." : "Updates are managed by your package provider.";
+                                FluentButton {
+                                    text: "Open releases";
+                                    primary: true;
+                                    enabled: root.can_open_releases;
+                                    clicked => { root.open_releases(); }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle { min-height: UiConstants.space_8; vertical-stretch: 1; }
                 }
+
+                Rectangle { horizontal-stretch: 1; }
             }
         }
     }
