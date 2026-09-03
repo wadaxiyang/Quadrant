@@ -5,8 +5,9 @@ import { Palette, ScrollView, Switch } from "std-widgets.slint";
 import { Theme, ThemeMode, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
 import { Icons } from "../icons.slint";
-import { FluentButton, FluentTextArea, FluentTextField, SegmentButton, SurfaceCard } from "../components/common.slint";
+import { Badge, BadgeKind, FluentButton, FluentTextArea, FluentTextField, SegmentButton, SettingRow, SurfaceCard } from "../components/common.slint";
 import { FluentIcon, IconButton } from "../components/icon.slint";
+import { SectionHeader } from "../components/page_shell.slint";
 import { ToastHost, ToastKind } from "../components/toast.slint";
 
 component GalleryLabel inherits Text {
@@ -92,8 +93,45 @@ export component DesignGalleryWindow inherits Window {
                     GalleryLabel { text: "Buttons"; width: 92px; }
                     FluentButton { width: 112px; text: "Secondary"; }
                     FluentButton { width: 96px; text: "Primary"; primary: true; }
+                    FluentButton { text: "Add task"; icon: Icons.add; show_icon: true; primary: true; }
                     FluentButton { width: 96px; text: "Danger"; danger: true; }
                     FluentButton { width: 96px; text: "Disabled"; enabled: false; }
+                }
+            }
+
+            SurfaceCard {
+                preferred-height: primitives_layout.preferred-height;
+
+                primitives_layout := VerticalLayout {
+                    padding: UiConstants.space_16;
+                    spacing: UiConstants.space_12;
+
+                    SectionHeader {
+                        title: "Reusable rows and badges";
+                        description: "Content-driven primitives for sections, settings, and compact status.";
+                        badge_text: "Phase 2";
+                        badge_kind: BadgeKind.accent;
+                    }
+
+                    HorizontalLayout {
+                        spacing: UiConstants.space_8;
+                        Badge { text: "Neutral"; }
+                        Badge { text: "Accent"; kind: BadgeKind.accent; }
+                        Badge { text: "Ready"; kind: BadgeKind.success; }
+                        Badge { text: "Warning"; kind: BadgeKind.warning; }
+                        Badge { text: "Error"; kind: BadgeKind.danger; }
+                        Rectangle { horizontal-stretch: 1; }
+                    }
+
+                    SettingRow {
+                        title: "Standard setting row";
+                        description: "The description wraps and the row grows without a fixed card height.";
+                        Switch {
+                            text: "";
+                            accessible-label: "Standard setting row";
+                            checked <=> root.sample_switch;
+                        }
+                    }
                 }
             }
 

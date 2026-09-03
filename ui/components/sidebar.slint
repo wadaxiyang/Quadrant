@@ -39,9 +39,10 @@ export component Sidebar inherits Rectangle {
             background: menu_touch.has-hover ? Theme.hover_bg : transparent;
 
             FluentIcon {
-                x: 13px;
+                x: UiConstants.navigation_item_padding
+                    + (UiConstants.navigation_icon_slot_width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
-                size: 20px;
+                size: UiConstants.navigation_icon_size;
                 source: Icons.menu;
                 icon_color: menu_touch.has-hover ? Theme.accent : Theme.icon_neutral;
             }
@@ -57,15 +58,21 @@ export component Sidebar inherits Rectangle {
             background: quick_add_touch.has-hover ? Theme.accent_hover : Theme.accent;
 
             HorizontalLayout {
-                padding-left: 13px;
-                spacing: root.collapsed ? 0px : 12px;
+                padding-left: UiConstants.navigation_item_padding;
+                spacing: root.collapsed ? 0px : UiConstants.space_10;
                 alignment: start;
 
-                FluentIcon {
-                    width: 20px;
-                    size: 20px;
-                    source: Icons.add;
-                    icon_color: white;
+                Rectangle {
+                    width: UiConstants.navigation_icon_slot_width;
+                    height: UiConstants.navigation_item_height;
+
+                    FluentIcon {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        size: 16px;
+                        source: Icons.add;
+                        icon_color: white;
+                    }
                 }
 
                 Rectangle {

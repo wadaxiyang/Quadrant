@@ -7,7 +7,7 @@ import { Palette } from "std-widgets.slint";
 import { UiConstants } from "constants.slint";
 import { Sidebar } from "components/sidebar.slint";
 import { TitleBar } from "components/title_bar.slint";
-import { ModalManager } from "components/modal_manager.slint";
+import { ModalKind, ModalManager } from "components/modal_manager.slint";
 import { ToastHost, ToastKind } from "components/toast.slint";
 import { QuadrantsView, TaskRow } from "views/quadrants.slint";
 import { TodayTaskRow, TodayView } from "views/today.slint";
@@ -361,6 +361,8 @@ export component MainWindow inherits Window {
         primary_text: root.dialog_mode == 1 ? "Delete" : (root.dialog_mode == 2 ? "Stage restore" : "Close");
         show_secondary: root.dialog_mode == 1 || root.dialog_mode == 2;
         secondary_text: "Cancel";
+        kind: root.dialog_mode == 1 ? ModalKind.danger : (root.dialog_mode == 2 ? ModalKind.warning : ModalKind.info);
+        danger_primary: root.dialog_mode == 1;
         accepted => {
             if (root.dialog_mode == 1) {
                 root.task_delete_confirmed(root.pending_delete_id);

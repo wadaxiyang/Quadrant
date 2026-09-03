@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { Theme, Typography } from "../theme.slint";
-import { FluentButton, SurfaceCard } from "common.slint";
+import { UiConstants } from "../constants.slint";
+import { Icons } from "../icons.slint";
+import { FluentIcon } from "icon.slint";
+import { Badge, BadgeKind, FluentButton, SurfaceCard } from "common.slint";
 
 export component PageHeader inherits Rectangle {
     in property <string> title;
@@ -12,44 +15,62 @@ export component PageHeader inherits Rectangle {
     callback action_clicked;
 
     min-height: 72px;
+    preferred-height: max(root.min-height, header_layout.preferred-height);
 
-    VerticalLayout {
-        spacing: 4px;
-        alignment: center;
+    header_layout := HorizontalLayout {
+        spacing: UiConstants.space_16;
 
-        Text {
-            text: root.title;
-            color: Theme.text_primary;
-            font-size: Typography.title;
-            font-weight: Typography.semibold;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: UiConstants.space_4;
+            alignment: center;
+
+            Text {
+                text: root.title;
+                color: Theme.text_primary;
+                font-size: Typography.title;
+                font-weight: Typography.semibold;
+            }
+
+            Text {
+                text: root.subtitle;
+                color: Theme.text_secondary;
+                font-size: Typography.body;
+                wrap: word-wrap;
+                max-height: 40px;
+                overflow: elide;
+            }
         }
 
-        Text {
-            text: root.subtitle;
-            color: Theme.text_secondary;
-            font-size: Typography.body;
+        if root.show_action: FluentButton {
+            min-width: 112px;
+            text: root.action_text;
+            primary: true;
+            clicked => { root.action_clicked(); }
         }
-    }
-
-    if root.show_action: FluentButton {
-        x: parent.width - self.width;
-        y: (parent.height - self.height) / 2;
-        width: 112px;
-        text: root.action_text;
-        primary: true;
-        clicked => { root.action_clicked(); }
     }
 }
 
 export component EmptyState inherits SurfaceCard {
     in property <string> title;
     in property <string> message;
+    in property <image> icon: Icons.status_info;
+    // Retained for source compatibility. Development milestone text is no longer rendered.
     in property <string> milestone;
 
-    VerticalLayout {
-        padding: 28px;
-        spacing: 8px;
+    min-height: 144px;
+    preferred-height: max(root.min-height, empty_layout.preferred-height);
+
+    empty_layout := VerticalLayout {
+        padding: UiConstants.space_28;
+        spacing: UiConstants.space_8;
         alignment: center;
+
+        FluentIcon {
+            source: root.icon;
+            size: 24px;
+            icon_color: Theme.icon_neutral;
+        }
 
         Text {
             text: root.title;
@@ -67,12 +88,6 @@ export component EmptyState inherits SurfaceCard {
             wrap: word-wrap;
         }
 
-        Text {
-            text: root.milestone;
-            color: Theme.accent;
-            font-size: Typography.caption;
-            horizontal-alignment: center;
-        }
     }
 }
 
@@ -82,11 +97,12 @@ export component MetricCard inherits SurfaceCard {
     in property <string> hint;
 
     min-width: 150px;
-    height: 112px;
+    min-height: 112px;
+    preferred-height: max(root.min-height, metric_layout.preferred-height);
 
-    VerticalLayout {
-        padding: 16px;
-        spacing: 4px;
+    metric_layout := VerticalLayout {
+        padding: UiConstants.space_16;
+        spacing: UiConstants.space_4;
 
         Text {
             text: root.label;
@@ -105,6 +121,51 @@ export component MetricCard inherits SurfaceCard {
             text: root.hint;
             color: Theme.text_secondary;
             font-size: Typography.caption;
+        }
+    }
+}
+
+export component SectionHeader inherits Rectangle {
+    in property <string> title;
+    in property <string> description;
+    in property <string> badge_text;
+    in property <BadgeKind> badge_kind: BadgeKind.neutral;
+
+    min-height: root.description == "" ? 32px : 48px;
+    preferred-height: max(root.min-height, section_layout.preferred-height);
+
+    section_layout := HorizontalLayout {
+        spacing: UiConstants.space_12;
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: UiConstants.space_4;
+            alignment: center;
+
+            Text {
+                text: root.title;
+                color: Theme.text_primary;
+                font-size: 16px;
+                font-weight: Typography.semibold;
+            }
+
+            if root.description != "": Text {
+                text: root.description;
+                color: Theme.text_secondary;
+                font-size: Typography.caption;
+                wrap: word-wrap;
+            }
+        }
+
+        if root.badge_text != "": Badge {
+            text: root.badge_text;
+            kind: root.badge_kind;
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 0;
+            alignment: center;
+            @children
         }
     }
 }

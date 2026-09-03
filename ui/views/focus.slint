@@ -1,29 +1,16 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { ScrollView } from "std-widgets.slint";
+import { ScrollView, Switch } from "std-widgets.slint";
 import { Theme, Typography } from "../theme.slint";
 import { UiConstants } from "../constants.slint";
-import { PageHeader } from "../components/page_shell.slint";
-import { FluentButton, FluentTextField, SegmentButton, SurfaceCard } from "../components/common.slint";
+import { PageHeader, SectionHeader } from "../components/page_shell.slint";
+import { FluentButton, FluentTextField, SegmentButton, SettingRow, SurfaceCard } from "../components/common.slint";
 
 export struct FocusTaskRow {
     id: string,
     title: string,
     metadata: string,
-}
-
-component SettingToggle inherits Rectangle {
-    in property <string> label;
-    in property <bool> value;
-    callback changed(bool);
-    height: 32px;
-    HorizontalLayout {
-        Text { text: root.label; color: Theme.text_secondary; font-size: Typography.caption; vertical-alignment: center; }
-        Rectangle { horizontal-stretch: 1; }
-        SegmentButton { width: 42px; text: "Off"; selected: !root.value; clicked => { root.changed(false); } }
-        SegmentButton { width: 42px; text: "On"; selected: root.value; clicked => { root.changed(true); } }
-    }
 }
 
 export component FocusView inherits Rectangle {
@@ -102,14 +89,17 @@ export component FocusView inherits Rectangle {
                     width: 310px;
                     spacing: 12px;
                     SurfaceCard {
-                        height: 202px;
-                        VerticalLayout {
+                        preferred-height: associate_layout.preferred-height;
+                        associate_layout := VerticalLayout {
                             padding: 14px; spacing: 7px;
-                            Text { text: "Associate a task"; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
-                            Text { text: root.productive_phase ? "Optional; stored as a history snapshot." : "Breaks are intentionally task-free."; color: Theme.text_secondary; font-size: Typography.caption; }
+                            SectionHeader {
+                                title: "Associate a task";
+                                description: root.productive_phase ? "Optional; stored as a history snapshot." : "Breaks are intentionally task-free.";
+                            }
                             SegmentButton { text: "No task"; selected: root.selected_task_id == ""; enabled: root.idle && root.productive_phase; clicked => { root.selected_task_id = ""; } }
                             Rectangle {
-                                vertical-stretch: 1; clip: true;
+                                preferred-height: min(root.tasks.length * 37px, 148px);
+                                clip: true;
                                 ScrollView {
                                     width: 100%; height: 100%;
                                     VerticalLayout {
@@ -127,20 +117,65 @@ export component FocusView inherits Rectangle {
                     }
 
                     SurfaceCard {
-                        height: 216px;
-                        VerticalLayout {
-                            padding: 14px; spacing: 6px;
-                            Text { text: "Pomodoro settings"; color: Theme.text_primary; font-size: 14px; font-weight: 600; }
-                            HorizontalLayout {
-                                spacing: 6px;
-                                FluentTextField { horizontal-stretch: 1; text <=> root.focus_minutes; placeholder_text: "Focus"; enabled: root.idle; }
-                                FluentTextField { horizontal-stretch: 1; text <=> root.short_break_minutes; placeholder_text: "Short"; enabled: root.idle; }
-                                FluentTextField { horizontal-stretch: 1; text <=> root.long_break_minutes; placeholder_text: "Long"; enabled: root.idle; }
-                                FluentTextField { horizontal-stretch: 1; text <=> root.long_break_interval; placeholder_text: "Every"; enabled: root.idle; }
+                        preferred-height: pomodoro_layout.preferred-height;
+                        pomodoro_layout := VerticalLayout {
+                            padding: 14px; spacing: 8px;
+                            SectionHeader {
+                                title: "Pomodoro settings";
+                                description: "Durations are stored in minutes; the interval counts completed focus sessions.";
                             }
-                            Text { text: "Minutes: focus / short / long · long break every N focus sessions"; color: Theme.text_secondary; font-size: Typography.caption; wrap: word-wrap; }
-                            SettingToggle { label: "Auto-start break"; value: root.auto_start_break; changed(value) => { root.auto_start_break = value; } }
-                            SettingToggle { label: "Auto-start focus"; value: root.auto_start_focus; changed(value) => { root.auto_start_focus = value; } }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Text { text: "Focus"; color: Theme.text_secondary; font-size: Typography.caption; }
+                                    FluentTextField { text <=> root.focus_minutes; placeholder_text: "25"; enabled: root.idle; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Text { text: "Short break"; color: Theme.text_secondary; font-size: Typography.caption; }
+                                    FluentTextField { text <=> root.short_break_minutes; placeholder_text: "5"; enabled: root.idle; }
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Text { text: "Long break"; color: Theme.text_secondary; font-size: Typography.caption; }
+                                    FluentTextField { text <=> root.long_break_minutes; placeholder_text: "15"; enabled: root.idle; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Text { text: "Long break every"; color: Theme.text_secondary; font-size: Typography.caption; }
+                                    FluentTextField { text <=> root.long_break_interval; placeholder_text: "4"; enabled: root.idle; }
+                                }
+                            }
+                            SettingRow {
+                                title: "Auto-start break";
+                                description: "Begin the next break when a focus interval completes.";
+                                enabled: root.idle;
+                                Switch {
+                                    text: "";
+                                    accessible-label: "Auto-start break";
+                                    enabled: root.idle;
+                                    checked <=> root.auto_start_break;
+                                }
+                            }
+                            SettingRow {
+                                title: "Auto-start focus";
+                                description: "Begin the next focus interval when a break completes.";
+                                enabled: root.idle;
+                                Switch {
+                                    text: "";
+                                    accessible-label: "Auto-start focus";
+                                    enabled: root.idle;
+                                    checked <=> root.auto_start_focus;
+                                }
+                            }
                             FluentButton {
                                 text: "Save settings"; enabled: root.idle;
                                 clicked => { root.settings_changed(root.focus_minutes, root.short_break_minutes, root.long_break_minutes, root.long_break_interval, root.auto_start_break, root.auto_start_focus); }

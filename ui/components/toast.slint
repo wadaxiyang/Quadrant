@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { Theme, Typography, Motion } from "../theme.slint";
+import { UiConstants } from "../constants.slint";
 import { Icons } from "../icons.slint";
 import { FluentIcon, IconButton } from "icon.slint";
 
@@ -17,7 +18,7 @@ export component ToastHost inherits Rectangle {
     preferred-width: 360px;
     max-width: 420px;
     horizontal-stretch: 0;
-    height: root.shown ? 56px : 0px;
+    height: root.shown ? max(56px, toast_layout.preferred-height) : 0px;
     opacity: root.shown ? 1 : 0;
     background: Theme.card_bg;
     border-width: 1px;
@@ -39,31 +40,38 @@ export component ToastHost inherits Rectangle {
                     root.kind == ToastKind.success ? Theme.success : Theme.accent;
     }
 
-    FluentIcon {
-        x: 16px;
-        y: (parent.height - self.height) / 2;
-        source: root.kind == ToastKind.error ? Icons.error :
-                root.kind == ToastKind.success ? Icons.complete : Icons.info;
-        icon_color: root.kind == ToastKind.error ? Theme.danger :
-                    root.kind == ToastKind.success ? Theme.success : Theme.accent;
-    }
+    toast_layout := HorizontalLayout {
+        padding-left: UiConstants.space_16;
+        padding-right: UiConstants.space_8;
+        padding-top: UiConstants.space_8;
+        padding-bottom: UiConstants.space_8;
+        spacing: UiConstants.space_8;
+        alignment: center;
 
-    Text {
-        x: 44px;
-        width: parent.width - 88px;
-        text: root.message;
-        color: Theme.text_primary;
-        font-size: Typography.body;
-        vertical-alignment: center;
-        wrap: word-wrap;
-    }
+        FluentIcon {
+            source: root.kind == ToastKind.error ? Icons.status_error :
+                    root.kind == ToastKind.success ? Icons.status_success : Icons.status_info;
+            size: 24px;
+            icon_color: root.kind == ToastKind.error ? Theme.danger :
+                        root.kind == ToastKind.success ? Theme.success : Theme.accent;
+        }
 
-    IconButton {
-        x: parent.width - self.width - 8px;
-        y: (parent.height - self.height) / 2;
-        icon: Icons.dismiss;
-        tooltip: "Dismiss";
-        clicked => { root.dismissed(); }
+        Text {
+            horizontal-stretch: 1;
+            text: root.message;
+            color: Theme.text_primary;
+            font-size: Typography.body;
+            vertical-alignment: center;
+            wrap: word-wrap;
+            max-height: 40px;
+            overflow: elide;
+        }
+
+        IconButton {
+            icon: Icons.dismiss;
+            tooltip: "Dismiss";
+            clicked => { root.dismissed(); }
+        }
     }
 
     Timer {
