@@ -178,6 +178,75 @@ def duplicate_export_findings() -> list[Finding]:
     ]
 
 
+def foundation_ownership_findings() -> list[Finding]:
+    expected_locations = {
+        "ThemeMode": "ui/kit/foundation/theme.slint",
+        "Typography": "ui/kit/foundation/theme.slint",
+        "Motion": "ui/kit/foundation/theme.slint",
+        "Theme": "ui/kit/foundation/theme.slint",
+        "Elevation": "ui/kit/foundation/theme.slint",
+        "UiConstants": "ui/kit/foundation/constants.slint",
+        "FluentIcons": "ui/kit/foundation/fluent_icons.slint",
+        "Branding": "ui/kit/foundation/branding.slint",
+    }
+    definitions: dict[str, list[dict[str, object]]] = {}
+    for path in slint_files(UI_ROOT):
+        for definition in exported_definitions(path):
+            definitions.setdefault(str(definition["name"]), []).append(definition)
+
+    findings: list[Finding] = []
+    for name, expected_file in expected_locations.items():
+        actual = definitions.get(name, [])
+        locations = [str(item["file"]) for item in actual]
+        if locations != [expected_file]:
+            findings.append(
+                Finding(
+                    "FND001",
+                    name,
+                    f"canonical Foundation definition must be only in {expected_file}; found {locations}",
+                )
+            )
+
+    fluent = definitions.get("FluentIcons", [])
+    if fluent and any("app_mark" in str(item) for item in fluent[0]["api"]):
+        findings.append(
+            Finding("FND002", str(fluent[0]["file"]), "FluentIcons must not expose Branding.app_mark")
+        )
+
+    icons_facade = UI_ROOT / "icons.slint"
+    if icons_facade.exists():
+        facade_definitions = {
+            str(item["name"]): item for item in exported_definitions(icons_facade)
+        }
+        icons = facade_definitions.get("Icons")
+        if icons is None:
+            findings.append(
+                Finding("FND003", relative(icons_facade), "compatibility Icons global is missing")
+            )
+        else:
+            for declaration in icons["api"]:
+                match = re.fullmatch(
+                    r"out property <image> ([A-Za-z0-9_]+): (Branding|FluentIcons)\.([A-Za-z0-9_]+);",
+                    str(declaration),
+                )
+                if match is None:
+                    findings.append(
+                        Finding("FND004", relative(icons_facade), f"invalid Icons proxy: {declaration}")
+                    )
+                    continue
+                name, source, member = match.groups()
+                expected_source = "Branding" if name == "app_mark" else "FluentIcons"
+                if source != expected_source or member != name:
+                    findings.append(
+                        Finding(
+                            "FND004",
+                            relative(icons_facade),
+                            f"Icons.{name} must proxy {expected_source}.{name}",
+                        )
+                    )
+    return findings
+
+
 def kit_import_findings() -> list[Finding]:
     kit_root = UI_ROOT / "kit"
     findings: list[Finding] = []
@@ -310,6 +379,7 @@ def main() -> int:
     checks = [
         ("Frozen public API", frozen_api_findings),
         ("Duplicate exports", duplicate_export_findings),
+        ("Foundation ownership", foundation_ownership_findings),
         ("Kit imports", kit_import_findings),
         ("Gallery imports", gallery_import_findings),
         ("Product/Gallery separation", product_gallery_findings),

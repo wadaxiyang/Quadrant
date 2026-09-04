@@ -1,59 +1,56 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Semantic, platform-neutral icon IDs. The application mark is original
-// Quadrant artwork; UI glyphs are pinned Microsoft Fluent UI System Icons.
+// Stage 2 compatibility facade. Product callers keep Icons until Stage 5, while
+// canonical product branding and reusable Fluent icons remain separate globals.
+import { Branding, FluentIcons } from "kit/kit.slint";
 
 export global Icons {
-    out property <image> app_mark: @image-url("../assets/branding/quadrant-mark.svg");
+    out property <image> app_mark: Branding.app_mark;
 
-    // Navigation uses native 20px Regular/Filled variants so the renderer never
-    // has to downscale a 24px canvas into a 20px slot.
-    out property <image> menu: @image-url("../assets/icons/navigation-20-regular.svg");
-    out property <image> quadrants_regular: @image-url("../assets/icons/quadrants-20-regular.svg");
-    out property <image> quadrants_filled: @image-url("../assets/icons/quadrants-20-filled.svg");
-    out property <image> today_regular: @image-url("../assets/icons/today-20-regular.svg");
-    out property <image> today_filled: @image-url("../assets/icons/today-20-filled.svg");
-    out property <image> focus_regular: @image-url("../assets/icons/focus-20-regular.svg");
-    out property <image> focus_filled: @image-url("../assets/icons/focus-20-filled.svg");
-    out property <image> review_regular: @image-url("../assets/icons/review-20-regular.svg");
-    out property <image> review_filled: @image-url("../assets/icons/review-20-filled.svg");
-    out property <image> completed_regular: @image-url("../assets/icons/completed-20-regular.svg");
-    out property <image> completed_filled: @image-url("../assets/icons/completed-20-filled.svg");
-    out property <image> settings_regular: @image-url("../assets/icons/settings-20-regular.svg");
-    out property <image> settings_filled: @image-url("../assets/icons/settings-20-filled.svg");
-    out property <image> about_regular: @image-url("../assets/icons/about-20-regular.svg");
-    out property <image> about_filled: @image-url("../assets/icons/about-20-filled.svg");
+    out property <image> menu: FluentIcons.menu;
+    out property <image> quadrants_regular: FluentIcons.quadrants_regular;
+    out property <image> quadrants_filled: FluentIcons.quadrants_filled;
+    out property <image> today_regular: FluentIcons.today_regular;
+    out property <image> today_filled: FluentIcons.today_filled;
+    out property <image> focus_regular: FluentIcons.focus_regular;
+    out property <image> focus_filled: FluentIcons.focus_filled;
+    out property <image> review_regular: FluentIcons.review_regular;
+    out property <image> review_filled: FluentIcons.review_filled;
+    out property <image> completed_regular: FluentIcons.completed_regular;
+    out property <image> completed_filled: FluentIcons.completed_filled;
+    out property <image> settings_regular: FluentIcons.settings_regular;
+    out property <image> settings_filled: FluentIcons.settings_filled;
+    out property <image> about_regular: FluentIcons.about_regular;
+    out property <image> about_filled: FluentIcons.about_filled;
 
-    // Native 16px action/window-control variants.
-    out property <image> add: @image-url("../assets/icons/add-16-regular.svg");
-    out property <image> dismiss: @image-url("../assets/icons/dismiss-16-regular.svg");
-    out property <image> minimize: @image-url("../assets/icons/subtract-16-regular.svg");
-    out property <image> maximize: @image-url("../assets/icons/maximize-16-regular.svg");
-    out property <image> restore_window: @image-url("../assets/icons/restore-window-16-regular.svg");
-    out property <image> theme_system: @image-url("../assets/icons/theme-system-16-regular.svg");
-    out property <image> theme_light: @image-url("../assets/icons/theme-light-16-regular.svg");
-    out property <image> theme_dark: @image-url("../assets/icons/theme-dark-16-regular.svg");
-    out property <image> delete: @image-url("../assets/icons/delete-16-regular.svg");
-    out property <image> edit: @image-url("../assets/icons/edit-16-regular.svg");
-    out property <image> complete: @image-url("../assets/icons/complete-16-regular.svg");
-    out property <image> chevron_up: @image-url("../assets/icons/chevron-up-16-regular.svg");
-    out property <image> chevron_down: @image-url("../assets/icons/chevron-down-16-regular.svg");
-    out property <image> more_horizontal: @image-url("../assets/icons/more-horizontal-16-regular.svg");
-    out property <image> restore_task: @image-url("../assets/icons/restore-task-16-regular.svg");
-    out property <image> folder_open: @image-url("../assets/icons/folder-open-16-regular.svg");
-    out property <image> backup: @image-url("../assets/icons/backup-16-regular.svg");
-    out property <image> warning: @image-url("../assets/icons/warning-16-regular.svg");
-    out property <image> error: @image-url("../assets/icons/error-16-regular.svg");
-    out property <image> info: @image-url("../assets/icons/info-16-regular.svg");
-    out property <image> calendar: @image-url("../assets/icons/calendar-16-regular.svg");
-    out property <image> clock: @image-url("../assets/icons/clock-16-regular.svg");
-    out property <image> recurrence: @image-url("../assets/icons/recurrence-16-regular.svg");
-    out property <image> heart_filled: @image-url("../assets/icons/heart-16-filled.svg");
+    out property <image> add: FluentIcons.add;
+    out property <image> dismiss: FluentIcons.dismiss;
+    out property <image> minimize: FluentIcons.minimize;
+    out property <image> maximize: FluentIcons.maximize;
+    out property <image> restore_window: FluentIcons.restore_window;
+    out property <image> theme_system: FluentIcons.theme_system;
+    out property <image> theme_light: FluentIcons.theme_light;
+    out property <image> theme_dark: FluentIcons.theme_dark;
+    out property <image> delete: FluentIcons.delete;
+    out property <image> edit: FluentIcons.edit;
+    out property <image> complete: FluentIcons.complete;
+    out property <image> chevron_up: FluentIcons.chevron_up;
+    out property <image> chevron_down: FluentIcons.chevron_down;
+    out property <image> more_horizontal: FluentIcons.more_horizontal;
+    out property <image> restore_task: FluentIcons.restore_task;
+    out property <image> folder_open: FluentIcons.folder_open;
+    out property <image> backup: FluentIcons.backup;
+    out property <image> warning: FluentIcons.warning;
+    out property <image> error: FluentIcons.error;
+    out property <image> info: FluentIcons.info;
+    out property <image> calendar: FluentIcons.calendar;
+    out property <image> clock: FluentIcons.clock;
+    out property <image> recurrence: FluentIcons.recurrence;
+    out property <image> heart_filled: FluentIcons.heart_filled;
 
-    // Native 24px status/empty-state variants.
-    out property <image> status_success: @image-url("../assets/icons/success-24-regular.svg");
-    out property <image> status_info: @image-url("../assets/icons/info-24-regular.svg");
-    out property <image> status_warning: @image-url("../assets/icons/warning-24-regular.svg");
-    out property <image> status_error: @image-url("../assets/icons/error-24-regular.svg");
+    out property <image> status_success: FluentIcons.status_success;
+    out property <image> status_info: FluentIcons.status_info;
+    out property <image> status_warning: FluentIcons.status_warning;
+    out property <image> status_error: FluentIcons.status_error;
 }

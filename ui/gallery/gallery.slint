@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { Palette, ScrollView } from "std-widgets.slint";
-import { Theme, ThemeMode, Typography } from "../theme.slint";
-import { UiConstants } from "../constants.slint";
-import { Icons } from "../icons.slint";
+import { Branding, Theme, ThemeMode, Typography, UiConstants } from "../kit/kit.slint";
 import { SegmentButton } from "../components/common.slint";
 import { ModalKind, ModalManager } from "../components/modal_manager.slint";
 import { ButtonsPage } from "pages/buttons_page.slint";
@@ -17,7 +15,7 @@ import { TypographyPage } from "pages/typography_page.slint";
 
 export component DesignGalleryWindow inherits Window {
     title: "Quadrant Design Gallery";
-    icon: Icons.app_mark;
+    icon: Branding.app_mark;
     preferred-width: 1040px;
     preferred-height: 800px;
     min-width: 760px;
