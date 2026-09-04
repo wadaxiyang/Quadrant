@@ -1,99 +1,108 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { BadgeKind, FluentButton, SectionHeader, SurfaceCard, ToastHost, ToastKind, UiConstants } from "../../kit/kit.slint";
-import { GalleryLabel } from "../shared/gallery_label.slint";
+import { FluentButton, FluentTextField, SegmentButton, ToastHost, ToastKind, UiConstants } from "../../kit/kit.slint";
+import { GalleryPage } from "../shared/gallery_page.slint";
+import { Specimen } from "../shared/specimen.slint";
+import { PropertyPanel } from "../shared/property_panel.slint";
+import { CodeSample } from "../shared/code_sample.slint";
+import { PreviewContainer } from "../shared/preview_container.slint";
 import { ModalTextSample } from "../shared/modal_text_sample.slint";
 
-export component FeedbackPage inherits Rectangle {
+export component FeedbackPage inherits GalleryPage {
+    in property <int> preview_mode: 1;
     callback modal_requested(int);
-    preferred-height: feedback_layout.preferred-height;
-    vertical-stretch: 0;
+    private property <int> toast_kind: 0;
+    private property <string> toast_message: "The task was completed successfully.";
 
-    feedback_layout := VerticalLayout {
-        spacing: UiConstants.space_20;
+    page_title: "Feedback";
+    page_description: "Toast communicates transient outcomes; Modal owns focused decisions that require explicit acceptance or dismissal.";
 
-        SurfaceCard {
-            preferred-height: toast_gallery_layout.preferred-height;
-            vertical-stretch: 0;
+    Specimen {
+        specimen_title: "Toast · interactive";
+        specimen_description: "Change semantic kind and content while preserving the shared width, wrapping, status icon, and dismiss behavior.";
+        keyboard_info: "Dismiss IconButton enters Tab order and activates with Enter or Space; hover pauses auto-dismiss.";
+        accessibility_info: "Status icon is semantic decoration; visible message and labeled dismiss action remain available.";
 
-            toast_gallery_layout := VerticalLayout {
-                padding: UiConstants.space_16;
-                spacing: UiConstants.space_12;
-                GalleryLabel { text: "Toast states"; }
+        PreviewContainer {
+            preview_mode: root.preview_mode;
+            preview_title: "Toast width boundary";
 
-                Rectangle {
-                    height: 56px;
-                    ToastHost {
-                        width: min(parent.width, 420px);
-                        shown: true;
-                        message: "Information uses the shared SVG and type scale.";
-                        kind: ToastKind.info;
-                        auto_dismiss: false;
-                    }
-                }
-
-                Rectangle {
-                    height: 56px;
-                    ToastHost {
-                        width: min(parent.width, 420px);
-                        shown: true;
-                        message: "The task was completed successfully.";
-                        kind: ToastKind.success;
-                        auto_dismiss: false;
-                    }
-                }
-
-                Rectangle {
-                    height: 76px;
-                    ToastHost {
-                        width: min(parent.width, 420px);
-                        shown: true;
-                        message: "This deliberately long error wraps onto a second line so critical details remain visible at the maximum toast width.";
-                        kind: ToastKind.error;
-                        auto_dismiss: false;
-                    }
+            Rectangle {
+                height: 76px;
+                ToastHost {
+                    width: min(parent.width, 420px);
+                    shown: true;
+                    message: root.toast_message;
+                    kind: root.toast_kind == 1 ? ToastKind.info : root.toast_kind == 2 ? ToastKind.error : ToastKind.success;
+                    auto_dismiss: false;
                 }
             }
         }
 
-        SurfaceCard {
-            preferred-height: modal_gallery_layout.preferred-height;
-            vertical-stretch: 0;
-
-            modal_gallery_layout := VerticalLayout {
-                padding: UiConstants.space_16;
-                spacing: UiConstants.space_12;
-
-                SectionHeader {
-                    title: "Modal states";
-                    description: "Interactive info, warning, and destructive confirmation coverage.";
-                    badge_text: "Enter / Esc";
-                    badge_kind: BadgeKind.accent;
-                }
-
+        PropertyPanel {
+            VerticalLayout {
+                spacing: UiConstants.space_8;
                 HorizontalLayout {
-                    spacing: UiConstants.space_8;
-                    FluentButton { text: "Show info"; clicked => { root.modal_requested(0); } }
-                    FluentButton { text: "Show warning"; clicked => { root.modal_requested(1); } }
-                    FluentButton { text: "Show danger"; danger: true; clicked => { root.modal_requested(2); } }
+                    spacing: UiConstants.space_4;
+                    SegmentButton { text: "Success"; selected: root.toast_kind == 0; clicked => { root.toast_kind = 0; } }
+                    SegmentButton { text: "Info"; selected: root.toast_kind == 1; clicked => { root.toast_kind = 1; } }
+                    SegmentButton { text: "Error"; selected: root.toast_kind == 2; clicked => { root.toast_kind = 2; } }
                     Rectangle { horizontal-stretch: 1; }
                 }
-
-                HorizontalLayout {
-                    spacing: UiConstants.space_16;
-                    ModalTextSample {
-                        horizontal-stretch: 1;
-                        sample_title: "Short confirmation";
-                        sample_message: "Save these changes?";
-                    }
-                    ModalTextSample {
-                        horizontal-stretch: 1;
-                        sample_title: "Long wrapped confirmation";
-                        sample_message: "This longer modal copy demonstrates content-driven height when a decision needs enough context to remain clear without clipping or relying on a fixed dialog height.";
-                    }
-                }
+                FluentTextField { text <=> root.toast_message; placeholder_text: "Toast message"; }
             }
         }
+    }
+
+    Specimen {
+        specimen_title: "Toast content boundaries";
+        specimen_description: "Short, normal, and deliberately long messages verify content-driven height and constrained width.";
+        specimen_kind: "Boundaries";
+        keyboard_info: "Dismiss actions use the same keyboard contract in every semantic variant.";
+        accessibility_info: "Color is paired with a semantic icon and explicit message text.";
+
+        VerticalLayout {
+            spacing: UiConstants.space_8;
+            Rectangle {
+                height: 56px;
+                ToastHost { width: min(parent.width, 420px); shown: true; message: "Saved."; kind: ToastKind.success; auto_dismiss: false; }
+            }
+            Rectangle {
+                height: 56px;
+                ToastHost { width: min(parent.width, 420px); shown: true; message: "Information uses the shared SVG and type scale."; kind: ToastKind.info; auto_dismiss: false; }
+            }
+            Rectangle {
+                height: 76px;
+                ToastHost { width: min(parent.width, 420px); shown: true; message: "This deliberately long error wraps onto a second line so critical details remain visible at the maximum toast width."; kind: ToastKind.error; auto_dismiss: false; }
+            }
+        }
+    }
+
+    Specimen {
+        specimen_title: "Modal decisions";
+        specimen_description: "Info, warning, and destructive confirmation share one overlay, focus scope, and content-driven surface.";
+        keyboard_info: "Enter accepts the primary action; Escape dismisses; Tab stays within available actions.";
+        accessibility_info: "Semantic icon, title, message, labeled actions, and danger hierarchy describe the decision.";
+
+        HorizontalLayout {
+            spacing: UiConstants.space_8;
+            FluentButton { text: "Show info"; clicked => { root.modal_requested(0); } }
+            FluentButton { text: "Show warning"; clicked => { root.modal_requested(1); } }
+            FluentButton { text: "Show danger"; danger: true; clicked => { root.modal_requested(2); } }
+            Rectangle { horizontal-stretch: 1; }
+        }
+
+        GridLayout {
+            spacing: UiConstants.space_12;
+            Row {
+                ModalTextSample { sample_title: "Short confirmation"; sample_message: "Save these changes?"; }
+                ModalTextSample { sample_title: "Long wrapped confirmation"; sample_message: "This longer modal copy demonstrates content-driven height when a decision needs enough context to remain clear without clipping or relying on a fixed dialog height."; }
+            }
+        }
+    }
+
+    CodeSample {
+        code: "import { ModalManager, ToastHost, ToastKind } from \"../kit/kit.slint\";\n\nToastHost { shown: true; kind: ToastKind.success; message: \"Saved\"; }";
     }
 }

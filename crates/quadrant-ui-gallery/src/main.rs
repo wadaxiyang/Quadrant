@@ -3,9 +3,14 @@
 #![deny(unsafe_code)]
 #![allow(missing_docs)]
 
-use std::{fs::File, io::BufWriter, path::Path, time::Duration};
+use std::{
+    fs::File,
+    io::BufWriter,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
-use slint::{ComponentHandle, LogicalSize, Rgba8Pixel, SharedPixelBuffer, SharedString};
+use slint::{ComponentHandle, LogicalSize, Rgba8Pixel, SharedPixelBuffer, SharedString, Weak};
 
 slint::include_modules!();
 
@@ -30,25 +35,23 @@ fn main() -> Result<(), slint::PlatformError> {
         gallery.set_gallery_theme(theme);
     }
 
+    if let Some(page) = env_i32("QUADRANT_GALLERY_PAGE") {
+        gallery.set_gallery_page(page.clamp(0, 7));
+    }
+
+    if let Some(preview) = env_i32("QUADRANT_GALLERY_PREVIEW") {
+        gallery.set_preview_mode(preview.clamp(0, 2));
+    }
+
     if let Ok(snapshot_path) = std::env::var("QUADRANT_GALLERY_SNAPSHOT") {
         gallery.show()?;
         gallery.window().request_redraw();
-        let gallery_weak = gallery.as_weak();
-        slint::Timer::single_shot(Duration::from_millis(1200), move || {
-            let result = gallery_weak
-                .upgrade()
-                .ok_or_else(|| "gallery closed before snapshot".into())
-                .and_then(|gallery| gallery.window().take_snapshot())
-                .and_then(|pixels| {
-                    write_snapshot(Path::new(&snapshot_path), &pixels)
-                        .map_err(|error| error.to_string().into())
-                });
-            if let Err(error) = result {
-                eprintln!("failed to save Design Gallery snapshot: {error}");
-                std::process::exit(2);
-            }
-            drop(slint::quit_event_loop());
-        });
+        schedule_snapshot(
+            gallery.as_weak(),
+            PathBuf::from(snapshot_path),
+            3,
+            Duration::from_millis(1200),
+        );
         return slint::run_event_loop();
     }
 
@@ -57,6 +60,58 @@ fn main() -> Result<(), slint::PlatformError> {
 
 fn env_f32(name: &str) -> Option<f32> {
     std::env::var(name).ok()?.parse().ok()
+}
+
+fn env_i32(name: &str) -> Option<i32> {
+    std::env::var(name).ok()?.parse().ok()
+}
+
+fn schedule_snapshot(
+    gallery_weak: Weak<DesignGalleryWindow>,
+    snapshot_path: PathBuf,
+    attempts_remaining: u8,
+    delay: Duration,
+) {
+    slint::Timer::single_shot(delay, move || {
+        let Some(gallery) = gallery_weak.upgrade() else {
+            eprintln!("failed to save Design Gallery snapshot: gallery closed before snapshot");
+            std::process::exit(2);
+        };
+
+        match gallery.window().take_snapshot() {
+            Ok(pixels) if snapshot_has_visible_pixels(&pixels) => {
+                if let Err(error) = write_snapshot(&snapshot_path, &pixels) {
+                    eprintln!("failed to save Design Gallery snapshot: {error}");
+                    std::process::exit(2);
+                }
+                drop(slint::quit_event_loop());
+            }
+            Ok(_) if attempts_remaining > 1 => {
+                gallery.window().request_redraw();
+                drop(gallery);
+                schedule_snapshot(
+                    gallery_weak,
+                    snapshot_path,
+                    attempts_remaining - 1,
+                    Duration::from_millis(800),
+                );
+            }
+            Ok(_) => {
+                eprintln!(
+                    "failed to save Design Gallery snapshot: renderer returned an all-transparent frame"
+                );
+                std::process::exit(2);
+            }
+            Err(error) => {
+                eprintln!("failed to save Design Gallery snapshot: {error}");
+                std::process::exit(2);
+            }
+        }
+    });
+}
+
+fn snapshot_has_visible_pixels(pixels: &SharedPixelBuffer<Rgba8Pixel>) -> bool {
+    pixels.as_bytes().chunks_exact(4).any(|rgba| rgba[3] != 0)
 }
 
 fn write_snapshot(

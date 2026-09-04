@@ -1,0 +1,171 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Switch } from "std-widgets.slint";
+import { Badge, BadgeKind, FluentButton, FluentIcons, FluentTextArea, FluentTextField, IconButton, SegmentButton, SettingRow, Theme, Typography, UiConstants } from "../../kit/kit.slint";
+import { GalleryPage } from "../shared/gallery_page.slint";
+import { Specimen } from "../shared/specimen.slint";
+import { PropertyPanel } from "../shared/property_panel.slint";
+import { CodeSample } from "../shared/code_sample.slint";
+import { PreviewContainer } from "../shared/preview_container.slint";
+import { StateSpecimen } from "../shared/state_specimen.slint";
+
+export component ControlsPage inherits GalleryPage {
+    in property <int> preview_mode: 1;
+    in-out property <string> sample_text: "Prepare the weekly review";
+    in-out property <bool> sample_switch: true;
+    private property <bool> button_primary: true;
+    private property <bool> button_danger: false;
+    private property <bool> button_enabled: true;
+    private property <int> selected_segment: 0;
+
+    page_title: "Controls";
+    page_description: "Interactive input and command primitives with deterministic state, variant, content-boundary, keyboard, and accessibility coverage.";
+
+    Specimen {
+        specimen_title: "FluentButton · interactive";
+        specimen_description: "Live properties exercise the same public inputs used by Product surfaces.";
+        keyboard_info: "Tab focuses; Enter or Space invokes clicked.";
+        accessibility_info: "Role button; text is the label; enabled state and default action are exposed.";
+
+        PreviewContainer {
+            preview_mode: root.preview_mode;
+            preview_title: "Live button preview";
+            HorizontalLayout {
+                spacing: UiConstants.space_8;
+                FluentButton {
+                    text: root.sample_text == "" ? "Empty label" : root.sample_text;
+                    primary: root.button_primary;
+                    danger: root.button_danger;
+                    enabled: root.button_enabled;
+                }
+                FluentButton { text: "Secondary"; accent: true; }
+                Rectangle { horizontal-stretch: 1; }
+            }
+        }
+
+        PropertyPanel {
+            GridLayout {
+                spacing: UiConstants.space_8;
+                Row {
+                    Switch { text: "Primary"; checked <=> root.button_primary; accessible-label: "Primary button"; }
+                    Switch { text: "Danger"; checked <=> root.button_danger; accessible-label: "Danger button"; }
+                    Switch { text: "Enabled"; checked <=> root.button_enabled; accessible-label: "Button enabled"; }
+                }
+                Row {
+                    Text { text: "Label"; color: Theme.text_secondary; font-size: Typography.caption; vertical-alignment: center; }
+                    FluentTextField { text <=> root.sample_text; placeholder_text: "Button label"; }
+                }
+            }
+        }
+    }
+
+    Specimen {
+        specimen_title: "Button and IconButton states";
+        specimen_description: "Preview inputs are development-only visual overrides and remain false in Product code.";
+        specimen_kind: "States";
+        keyboard_info: "Enter and Space activate; pointer hover and press use the same visual hierarchy.";
+        accessibility_info: "Disabled controls expose disabled state; danger is reinforced by label and color.";
+
+        GridLayout {
+            spacing: UiConstants.space_12;
+            Row {
+                StateSpecimen { label: "Normal"; FluentButton { text: "Button"; } }
+                StateSpecimen { label: "Hover"; FluentButton { text: "Button"; preview_hover: true; } }
+                StateSpecimen { label: "Pressed"; FluentButton { text: "Button"; preview_pressed: true; } }
+            }
+            Row {
+                StateSpecimen { label: "Keyboard focus"; FluentButton { text: "Button"; preview_focus: true; } }
+                StateSpecimen { label: "Disabled"; FluentButton { text: "Button"; enabled: false; } }
+                StateSpecimen { label: "Danger"; FluentButton { text: "Delete"; danger: true; primary: true; } }
+            }
+            Row {
+                StateSpecimen { label: "Icon normal"; IconButton { icon: FluentIcons.add; tooltip: "Add"; } }
+                StateSpecimen { label: "Icon focus"; IconButton { icon: FluentIcons.edit; tooltip: "Edit"; preview_focus: true; } }
+                StateSpecimen { label: "Icon danger"; IconButton { icon: FluentIcons.delete; tooltip: "Delete"; danger: true; preview_hover: true; } }
+            }
+        }
+    }
+
+    Specimen {
+        specimen_title: "TextField and TextArea";
+        specimen_description: "Standard Slint Fluent editors own selection, scrolling, focus, placeholder, and input behavior.";
+        keyboard_info: "Tab enters fields; normal platform editing and selection keys apply; Enter accepts TextField.";
+        accessibility_info: "Standard editors expose text-entry semantics; errors remain adjacent visible text.";
+
+        PreviewContainer {
+            preview_mode: root.preview_mode;
+            preview_title: "Input width boundary";
+            FluentTextField { text <=> root.sample_text; placeholder_text: "Task title"; }
+            FluentTextArea { height: 88px; text <=> root.sample_text; placeholder_text: "Notes"; }
+        }
+
+        GridLayout {
+            spacing: UiConstants.space_8;
+            Row {
+                FluentTextField { text: "Focused value"; preview_focus: true; }
+                FluentTextField { text: "Invalid value"; error_text: "Explain the problem beside the field."; }
+            }
+            Row {
+                FluentTextField { text: "Disabled value"; enabled: false; }
+                FluentTextField { text: "A deliberately long value that remains editable"; }
+            }
+        }
+    }
+
+    Specimen {
+        specimen_title: "Segment, Switch, and Badge";
+        specimen_description: "Selection controls expose stable checked state; badges communicate compact non-interactive status.";
+        keyboard_info: "Tab focuses segments and Switch; Enter/Space activates segments, Space toggles Switch.";
+        accessibility_info: "Segments expose button + checked state; Switch uses native checked semantics; Badge has a visible label.";
+
+        VerticalLayout {
+            spacing: UiConstants.space_12;
+            GridLayout {
+                spacing: UiConstants.space_8;
+                Row {
+                    StateSpecimen { label: "Segment selected"; SegmentButton { text: "Selected"; selected: true; } }
+                    StateSpecimen { label: "Segment hover"; SegmentButton { text: "Hover"; preview_hover: true; } }
+                    StateSpecimen { label: "Segment pressed"; SegmentButton { text: "Pressed"; preview_pressed: true; } }
+                }
+                Row {
+                    StateSpecimen { label: "Segment focus"; SegmentButton { text: "Focus"; preview_focus: true; } }
+                    StateSpecimen { label: "Segment disabled"; SegmentButton { text: "Disabled"; enabled: false; } }
+                    StateSpecimen { label: "Not selected"; SegmentButton { text: "Available"; } }
+                }
+            }
+            HorizontalLayout {
+                spacing: UiConstants.space_4;
+                SegmentButton { text: "Inbox"; selected: root.selected_segment == 0; clicked => { root.selected_segment = 0; } }
+                SegmentButton { text: "Q1"; selected: root.selected_segment == 1; clicked => { root.selected_segment = 1; } }
+                SegmentButton { text: "Q2"; selected: root.selected_segment == 2; clicked => { root.selected_segment = 2; } }
+                SegmentButton { text: "Disabled"; enabled: false; }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            SettingRow {
+                title: "Standard setting row";
+                description: "Supporting text wraps while the trailing control remains aligned.";
+                Switch { text: ""; accessible-label: "Standard setting row"; checked <=> root.sample_switch; }
+            }
+            HorizontalLayout {
+                spacing: UiConstants.space_12;
+                Switch { text: "Interactive switch"; checked <=> root.sample_switch; }
+                Switch { text: "Disabled switch"; enabled: false; }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            HorizontalLayout {
+                spacing: UiConstants.space_8;
+                Badge { text: "Neutral"; }
+                Badge { text: "Accent"; kind: BadgeKind.accent; }
+                Badge { text: "Ready"; kind: BadgeKind.success; }
+                Badge { text: "Warning"; kind: BadgeKind.warning; }
+                Badge { text: "Error"; kind: BadgeKind.danger; }
+                Rectangle { horizontal-stretch: 1; }
+            }
+        }
+    }
+
+    CodeSample {
+        code: "import { FluentButton, FluentTextField } from \"../kit/kit.slint\";\n\nFluentTextField { text <=> title; placeholder_text: \"Task title\"; }\nFluentButton { text: \"Save\"; primary: true; clicked => { save(); } }";
+    }
+}

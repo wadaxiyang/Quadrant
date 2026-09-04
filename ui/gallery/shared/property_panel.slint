@@ -1,0 +1,30 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Badge, BadgeKind, SurfaceCard, Theme, Typography, UiConstants } from "../../kit/kit.slint";
+
+export component PropertyPanel inherits SurfaceCard {
+    in property <string> panel_title: "Live properties";
+    preferred-height: property_layout.preferred-height;
+    vertical-stretch: 0;
+
+    property_layout := VerticalLayout {
+        padding: UiConstants.space_12;
+        spacing: UiConstants.space_10;
+
+        HorizontalLayout {
+            spacing: UiConstants.space_8;
+            Text {
+                horizontal-stretch: 1;
+                text: root.panel_title;
+                color: Theme.text_primary;
+                font-size: Typography.body;
+                font-weight: Typography.semibold;
+                vertical-alignment: center;
+            }
+            Badge { text: "Live"; kind: BadgeKind.accent; }
+        }
+
+        @children
+    }
+}

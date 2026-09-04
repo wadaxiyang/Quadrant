@@ -1,0 +1,53 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { BadgeKind, SectionHeader, SurfaceCard, Theme, Typography, UiConstants } from "../../kit/kit.slint";
+
+export component Specimen inherits SurfaceCard {
+    in property <string> specimen_title;
+    in property <string> specimen_description;
+    in property <string> specimen_kind: "Interactive";
+    in property <string> keyboard_info: "Not applicable";
+    in property <string> accessibility_info: "No interactive semantics";
+    preferred-height: specimen_layout.preferred-height;
+    vertical-stretch: 0;
+
+    specimen_layout := VerticalLayout {
+        padding: UiConstants.space_16;
+        spacing: UiConstants.space_12;
+
+        SectionHeader {
+            title: root.specimen_title;
+            description: root.specimen_description;
+            badge_text: root.specimen_kind;
+            badge_kind: root.specimen_kind == "Interactive" ? BadgeKind.accent : BadgeKind.neutral;
+        }
+
+        @children
+
+        Rectangle {
+            height: access_layout.preferred-height + UiConstants.space_16;
+            background: Theme.card_bg_muted;
+            border-radius: UiConstants.control_radius;
+
+            access_layout := VerticalLayout {
+                padding: UiConstants.space_8;
+                spacing: UiConstants.space_4;
+
+                Text {
+                    text: "Keyboard · " + root.keyboard_info;
+                    color: Theme.text_secondary;
+                    font-size: Typography.caption;
+                    wrap: word-wrap;
+                }
+
+                Text {
+                    text: "Accessibility · " + root.accessibility_info;
+                    color: Theme.text_secondary;
+                    font-size: Typography.caption;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+}

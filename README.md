@@ -30,6 +30,12 @@ cargo run --locked -p quadrant-ui-gallery
 Use `scripts/capture_gallery_baseline.ps1` to create its deterministic renderer
 snapshot smoke or matrix outputs.
 
+The Gallery provides keyboard-accessible catalog navigation, category filters,
+Light/Dark/System themes, Compact/Medium/Wide preview containers, live component
+properties, accessibility notes, and Kit-only code samples. Snapshot automation
+may select a routed page with `QUADRANT_GALLERY_PAGE=0..7` and a preview width with
+`QUADRANT_GALLERY_PREVIEW=0..2`.
+
 The Windows executable is written to `target/release/quadrant-app.exe`. A portable release archive and SHA-256 checksum can be created locally with:
 
 ```powershell

@@ -1,0 +1,56 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Badge, BadgeKind, Theme, Typography, UiConstants } from "../../kit/kit.slint";
+
+export component PreviewContainer inherits Rectangle {
+    in property <int> preview_mode: 1;
+    in property <string> preview_title: "Responsive preview";
+    private property <length> requested_width: root.preview_mode == 0 ? 320px : root.preview_mode == 1 ? 560px : 840px;
+    preferred-height: preview_layout.preferred-height;
+    vertical-stretch: 0;
+    background: transparent;
+
+    preview_layout := VerticalLayout {
+        spacing: UiConstants.space_8;
+
+        HorizontalLayout {
+            spacing: UiConstants.space_8;
+            Text {
+                horizontal-stretch: 1;
+                text: root.preview_title;
+                color: Theme.text_secondary;
+                font-size: Typography.caption;
+                font-weight: Typography.semibold;
+                vertical-alignment: center;
+            }
+            Badge {
+                text: root.preview_mode == 0 ? "Compact · 320" : root.preview_mode == 1 ? "Medium · 560" : "Wide · 840";
+                kind: BadgeKind.neutral;
+            }
+        }
+
+        Rectangle {
+            height: preview_surface.height;
+            background: Theme.background;
+            border-radius: UiConstants.content_radius;
+
+            preview_surface := Rectangle {
+                x: (parent.width - self.width) / 2;
+                width: min(parent.width - UiConstants.space_16, root.requested_width);
+                height: preview_content.preferred-height + UiConstants.space_24;
+                background: Theme.content_bg;
+                border-width: 1px;
+                border-color: Theme.border_color;
+                border-radius: UiConstants.content_radius;
+                clip: true;
+
+                preview_content := VerticalLayout {
+                    padding: UiConstants.space_12;
+                    spacing: UiConstants.space_12;
+                    @children
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,133 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Switch } from "std-widgets.slint";
+import { EmptyState, FluentIcons, IconButton, MetricCard, PageHeader, SidebarItem, TaskRowShell, Theme, Typography, UiConstants, WindowControlButton } from "../../kit/kit.slint";
+import { GalleryPage } from "../shared/gallery_page.slint";
+import { Specimen } from "../shared/specimen.slint";
+import { PropertyPanel } from "../shared/property_panel.slint";
+import { CodeSample } from "../shared/code_sample.slint";
+import { PreviewContainer } from "../shared/preview_container.slint";
+
+component TaskFixtureRow inherits Rectangle {
+    in property <string> task_title;
+    in property <string> task_meta;
+    in property <bool> preview_hover: false;
+    height: 60px;
+
+    TaskRowShell { width: 100%; hovered: root.preview_hover; }
+    HorizontalLayout {
+        padding-left: UiConstants.space_12;
+        padding-right: UiConstants.space_8;
+        spacing: UiConstants.space_8;
+        Text { horizontal-stretch: 1; text: root.task_title; color: Theme.text_primary; font-size: Typography.body; vertical-alignment: center; overflow: elide; }
+        Text { text: root.task_meta; color: Theme.text_secondary; font-size: Typography.caption; vertical-alignment: center; }
+        IconButton { icon: FluentIcons.complete; tooltip: "Complete task"; }
+        IconButton { icon: FluentIcons.more_horizontal; tooltip: "More task actions"; }
+    }
+}
+
+export component NavigationPage inherits GalleryPage {
+    in property <int> preview_mode: 1;
+    private property <bool> sidebar_selected: true;
+    private property <bool> sidebar_collapsed: false;
+
+    page_title: "Navigation & shell";
+    page_description: "Reusable navigation, page framing, window controls, empty states, and task-row presentation without Product routing or data.";
+
+    Specimen {
+        specimen_title: "SidebarItem · interactive";
+        specimen_description: "The same 40px navigation pattern supports selected and collapsed states without importing the Product Sidebar.";
+        keyboard_info: "Tab focuses; Enter or Space invokes clicked on the first activation.";
+        accessibility_info: "Role button with label, checkable, and checked state; collapsed hover exposes a tooltip.";
+
+        PreviewContainer {
+            preview_mode: root.preview_mode;
+            preview_title: "Navigation width boundary";
+            SidebarItem {
+                width: root.sidebar_collapsed ? UiConstants.sidebar_collapsed_width : min(parent.width, UiConstants.sidebar_expanded_width);
+                icon: FluentIcons.today_regular;
+                selected_icon: FluentIcons.today_filled;
+                text: "Today";
+                selected: root.sidebar_selected;
+                collapsed: root.sidebar_collapsed;
+                clicked => { root.sidebar_selected = !root.sidebar_selected; }
+            }
+        }
+
+        PropertyPanel {
+            HorizontalLayout {
+                spacing: UiConstants.space_16;
+                Switch { text: "Selected"; checked <=> root.sidebar_selected; }
+                Switch { text: "Collapsed"; checked <=> root.sidebar_collapsed; }
+                Rectangle { horizontal-stretch: 1; }
+            }
+        }
+    }
+
+    Specimen {
+        specimen_title: "PageHeader and EmptyState";
+        specimen_description: "Both patterns derive height from their content and remain valid in Compact, Medium, and Wide containers.";
+        specimen_kind: "Responsive";
+        keyboard_info: "PageHeader action follows FluentButton keyboard behavior; EmptyState is not interactive.";
+        accessibility_info: "The action is labeled; empty-state meaning is carried by visible title and message, not icon alone.";
+
+        PreviewContainer {
+            preview_mode: root.preview_mode;
+            preview_title: "Page surface preview";
+            PageHeader {
+                title: "Today";
+                subtitle: "Plan intentional work while keeping deadlines and overdue tasks visible.";
+                show_action: true;
+                action_text: "Add task";
+            }
+            GridLayout {
+                spacing: UiConstants.space_8;
+                Row {
+                    MetricCard { label: "Completed"; value: "18"; hint: "+4 from previous"; }
+                    MetricCard { label: "Focus"; value: "3h 20m"; hint: "6 productive sessions"; }
+                }
+            }
+            EmptyState {
+                title: "Nothing scheduled";
+                message: "Tasks with a planned date or due time will appear here.";
+                icon: FluentIcons.status_info;
+            }
+        }
+    }
+
+    Specimen {
+        specimen_title: "TaskRowShell fixtures";
+        specimen_description: "Deterministic empty, normal, hover, and long-title rows exercise the 60px presentation boundary without task DTOs.";
+        specimen_kind: "Fixtures";
+        keyboard_info: "Task actions use labeled IconButtons; row-level business activation is intentionally not invented here.";
+        accessibility_info: "Visible title/meta and labeled actions provide the presentation contract; Product owns task semantics.";
+
+        VerticalLayout {
+            spacing: UiConstants.space_8;
+            TaskFixtureRow { task_title: "Prepare the weekly review"; task_meta: "Q2"; }
+            TaskFixtureRow { task_title: "Send the revised project plan before the stakeholder meeting"; task_meta: "Today · 16:00"; preview_hover: true; }
+            TaskFixtureRow { task_title: "Untitled fixture"; task_meta: "Inbox"; }
+        }
+    }
+
+    Specimen {
+        specimen_title: "Window controls";
+        specimen_description: "Native-feeling actions retain a stable 46×40 target and explicit accessible labels.";
+        specimen_kind: "States";
+        keyboard_info: "Tab focuses; Enter or Space activates each window action.";
+        accessibility_info: "Every action exposes button role and Minimize, Maximize, or Close label.";
+
+        HorizontalLayout {
+            spacing: 0px;
+            WindowControlButton { icon: FluentIcons.minimize; label: "Minimize"; }
+            WindowControlButton { icon: FluentIcons.maximize; label: "Maximize"; }
+            WindowControlButton { icon: FluentIcons.dismiss; label: "Close"; close_button: true; }
+            Rectangle { horizontal-stretch: 1; }
+        }
+    }
+
+    CodeSample {
+        code: "import { PageHeader, SidebarItem, TaskRowShell } from \"../kit/kit.slint\";\n\nSidebarItem { text: \"Today\"; selected: true; clicked => { navigate(); } }";
+    }
+}

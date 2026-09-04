@@ -1,18 +1,58 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { SurfaceCard, Theme, Typography, UiConstants } from "../../kit/kit.slint";
-import { GalleryLabel } from "../shared/gallery_label.slint";
+import { Theme, Typography, UiConstants } from "../../kit/kit.slint";
+import { GalleryPage } from "../shared/gallery_page.slint";
+import { Specimen } from "../shared/specimen.slint";
+import { CodeSample } from "../shared/code_sample.slint";
 
-export component TypographyPage inherits SurfaceCard {
-    height: 156px;
+component TypeRow inherits GridLayout {
+    in property <string> token;
+    in property <string> sample;
+    in property <length> sample_size;
+    in property <int> sample_weight: Typography.regular;
+    height: max(44px, sample_text.preferred-height + UiConstants.space_12);
 
-    VerticalLayout {
-        padding: UiConstants.space_16;
-        spacing: UiConstants.space_8;
-        GalleryLabel { text: "Typography"; }
-        Text { text: "Page title — 28 / Semibold"; color: Theme.text_primary; font-size: Typography.title; font-weight: Typography.semibold; }
-        Text { text: "Body — 14 / Regular"; color: Theme.text_primary; font-size: Typography.body; }
-        Text { text: "Caption — 12 / Regular"; color: Theme.text_tertiary; font-size: Typography.caption; }
+    Row {
+        Text { text: root.token; color: Theme.text_secondary; font-size: Typography.caption; vertical-alignment: center; }
+        sample_text := Text { text: root.sample; color: Theme.text_primary; font-size: root.sample_size; font-weight: root.sample_weight; vertical-alignment: center; wrap: word-wrap; }
+    }
+}
+
+export component TypographyPage inherits GalleryPage {
+    page_title: "Typography";
+    page_description: "A compact desktop scale with two supported weights. Product copy never drops below the 12px caption token.";
+
+    Specimen {
+        specimen_title: "Type scale";
+        specimen_description: "Use semantic roles instead of selecting arbitrary font sizes per surface.";
+        specimen_kind: "Tokens";
+        keyboard_info: "Not applicable; type specimens are static reference content.";
+        accessibility_info: "The visual hierarchy supplements semantic labels and control roles.";
+
+        VerticalLayout {
+            spacing: UiConstants.space_4;
+            TypeRow { token: "title · 28 / 600"; sample: "Page title"; sample_size: Typography.title; sample_weight: Typography.semibold; }
+            TypeRow { token: "subtitle · 20 / 600"; sample: "Section title"; sample_size: Typography.subtitle; sample_weight: Typography.semibold; }
+            TypeRow { token: "body_large · 18 / 400"; sample: "Prominent value"; sample_size: Typography.body_large; }
+            TypeRow { token: "body · 14 / 400"; sample: "Readable desktop body copy and control labels"; sample_size: Typography.body; }
+            TypeRow { token: "caption · 12 / 400"; sample: "Supporting metadata and concise help"; sample_size: Typography.caption; }
+        }
+    }
+
+    Specimen {
+        specimen_title: "Content boundaries";
+        specimen_description: "Text wraps instead of clipping and avoids using weight alone to carry meaning.";
+        specimen_kind: "Boundaries";
+        keyboard_info: "Not applicable.";
+        accessibility_info: "Long content remains text, preserving screen-reader order.";
+
+        Text { text: "Short label"; color: Theme.text_primary; font-size: Typography.body; }
+        Text { text: "A deliberately long line demonstrates how shared type remains readable when localized content wraps over more than one line in a constrained preview."; color: Theme.text_secondary; font-size: Typography.body; wrap: word-wrap; }
+        Text { text: "Empty strings are not rendered as decorative placeholder content."; color: Theme.text_tertiary; font-size: Typography.caption; wrap: word-wrap; }
+    }
+
+    CodeSample {
+        code: "import { Theme, Typography } from \"../kit/kit.slint\";\n\nText { color: Theme.text_primary; font-size: Typography.body; font-weight: Typography.regular; }";
     }
 }

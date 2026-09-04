@@ -1,0 +1,86 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Badge, BadgeKind, FluentIcons, FluentIcon, SurfaceCard, Theme, Typography, UiConstants } from "../../kit/kit.slint";
+import { GalleryPage } from "../shared/gallery_page.slint";
+import { Specimen } from "../shared/specimen.slint";
+import { CodeSample } from "../shared/code_sample.slint";
+
+component OverviewTile inherits SurfaceCard {
+    in property <image> tile_icon;
+    in property <string> tile_title;
+    in property <string> tile_description;
+    in property <string> tile_count;
+    preferred-height: tile_layout.preferred-height;
+
+    tile_layout := VerticalLayout {
+        padding: UiConstants.space_12;
+        spacing: UiConstants.space_8;
+
+        HorizontalLayout {
+            spacing: UiConstants.space_8;
+            FluentIcon { source: root.tile_icon; size: 20px; icon_color: Theme.accent; }
+            Text {
+                horizontal-stretch: 1;
+                text: root.tile_title;
+                color: Theme.text_primary;
+                font-size: Typography.body;
+                font-weight: Typography.semibold;
+                vertical-alignment: center;
+            }
+            Badge { text: root.tile_count; kind: BadgeKind.accent; }
+        }
+
+        Text {
+            text: root.tile_description;
+            color: Theme.text_secondary;
+            font-size: Typography.caption;
+            wrap: word-wrap;
+        }
+    }
+}
+
+export component OverviewPage inherits GalleryPage {
+    page_title: "Overview";
+    page_description: "A development-only catalog for choosing, exercising, and integrating the shared Fluent UI Kit.";
+
+    Specimen {
+        specimen_title: "Catalog map";
+        specimen_description: "Eight routed pages cover the public Foundation, Controls, Surfaces, Feedback, and Navigation APIs.";
+        specimen_kind: "Overview";
+        keyboard_info: "Tab through the sidebar; Enter or Space opens a page.";
+        accessibility_info: "Sidebar entries expose button role, selected state, and stable labels.";
+
+        GridLayout {
+            spacing: UiConstants.space_12;
+            Row {
+                OverviewTile { tile_icon: FluentIcons.info; tile_title: "Foundation"; tile_description: "Tokens, type, motion, elevation, and semantic icons."; tile_count: "4 pages"; }
+                OverviewTile { tile_icon: FluentIcons.add; tile_title: "Controls"; tile_description: "Buttons, fields, selection, Switch, badge, and tooltip states."; tile_count: "1 page"; }
+            }
+            Row {
+                OverviewTile { tile_icon: FluentIcons.quadrants_regular; tile_title: "Surfaces & feedback"; tile_description: "Cards, empty states, modal decisions, and transient toast messages."; tile_count: "2 pages"; }
+                OverviewTile { tile_icon: FluentIcons.menu; tile_title: "Navigation"; tile_description: "Sidebar items, page headers, window controls, and deterministic task rows."; tile_count: "1 page"; }
+            }
+        }
+    }
+
+    Specimen {
+        specimen_title: "Using this tool";
+        specimen_description: "Choose a page, set theme and preview width, adjust live properties, then verify interaction and usage guidance together.";
+        specimen_kind: "Workflow";
+        keyboard_info: "All controls participate in normal Tab order; component-specific keys are listed in each specimen.";
+        accessibility_info: "Every interactive specimen documents its exposed role, label, enabled, checked, or selected state.";
+
+        Text {
+            text: "1  Filter the catalog   ·   2  Open a page   ·   3  Change live properties   ·   4  Inspect states, keyboard behavior, accessibility, and code";
+            color: Theme.text_primary;
+            font-size: Typography.body;
+            wrap: word-wrap;
+        }
+    }
+
+    CodeSample {
+        caption: "Supported public entry";
+        code: "import { FluentButton, Theme } from \"../kit/kit.slint\";\n\nFluentButton { text: \"Save\"; primary: true; }";
+    }
+}

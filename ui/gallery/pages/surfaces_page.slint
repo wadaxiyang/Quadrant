@@ -1,0 +1,96 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Switch } from "std-widgets.slint";
+import { SurfaceCard, Theme, Typography, UiConstants } from "../../kit/kit.slint";
+import { GalleryPage } from "../shared/gallery_page.slint";
+import { Specimen } from "../shared/specimen.slint";
+import { PropertyPanel } from "../shared/property_panel.slint";
+import { CodeSample } from "../shared/code_sample.slint";
+import { PreviewContainer } from "../shared/preview_container.slint";
+import { CardStateSample } from "../shared/card_state_sample.slint";
+
+export component SurfacesPage inherits GalleryPage {
+    in property <int> preview_mode: 1;
+    private property <bool> sample_interactive: true;
+    private property <bool> sample_elevated: false;
+    private property <bool> sample_selected: false;
+    private property <bool> sample_enabled: true;
+
+    page_title: "Surfaces";
+    page_description: "SurfaceCard supplies the shared surface, border, radius, elevation, selection, and interaction recipes used by higher-level patterns.";
+
+    Specimen {
+        specimen_title: "SurfaceCard · interactive";
+        specimen_description: "Adjust live properties and activate the card to toggle selected state.";
+        keyboard_info: "When interactive, Tab focuses and Enter or Space invokes clicked.";
+        accessibility_info: "Interactive cards expose button role, label, enabled, checkable, and checked state.";
+
+        PreviewContainer {
+            preview_mode: root.preview_mode;
+            preview_title: "Responsive surface preview";
+
+            SurfaceCard {
+                height: 108px;
+                interactive: root.sample_interactive;
+                elevated: root.sample_elevated;
+                selected: root.sample_selected;
+                enabled: root.sample_enabled;
+                accessible_name: "Example task surface";
+                clicked => { root.sample_selected = !root.sample_selected; }
+
+                VerticalLayout {
+                    padding: UiConstants.space_16;
+                    spacing: UiConstants.space_4;
+                    Text { text: "Example task surface"; color: Theme.text_primary; font-size: Typography.body; font-weight: Typography.semibold; }
+                    Text { text: "Content and interaction stay separate from the shared elevation recipe."; color: Theme.text_secondary; font-size: Typography.caption; wrap: word-wrap; }
+                }
+            }
+        }
+
+        PropertyPanel {
+            GridLayout {
+                spacing: UiConstants.space_8;
+                Row {
+                    Switch { text: "Interactive"; checked <=> root.sample_interactive; }
+                    Switch { text: "Elevated"; checked <=> root.sample_elevated; }
+                }
+                Row {
+                    Switch { text: "Selected"; checked <=> root.sample_selected; }
+                    Switch { text: "Enabled"; checked <=> root.sample_enabled; }
+                }
+            }
+        }
+    }
+
+    Specimen {
+        specimen_title: "SurfaceCard states and variants";
+        specimen_description: "Static preview inputs make hover, pressed, and focus snapshots deterministic without firing business callbacks.";
+        specimen_kind: "States";
+        keyboard_info: "Only interactive variants enter Tab order; decorative cards are not controls.";
+        accessibility_info: "Normal/elevated cards have no role; interactive variants expose explicit semantics.";
+
+        GridLayout {
+            spacing: UiConstants.space_12;
+            Row {
+                CardStateSample { label: "Base"; }
+                CardStateSample { label: "Hover"; interactive: true; preview_hover: true; }
+                CardStateSample { label: "Pressed"; interactive: true; preview_pressed: true; }
+            }
+            Row {
+                CardStateSample { label: "Elevated"; elevated: true; }
+                CardStateSample { label: "Selected"; selected: true; }
+                CardStateSample { label: "Keyboard focus"; interactive: true; preview_focus: true; }
+            }
+            Row {
+                CardStateSample { label: "Disabled"; interactive: true; enabled: false; }
+                CardStateSample { label: "Long content wraps without changing surface ownership"; }
+                CardStateSample { label: "Empty content"; }
+            }
+        }
+    }
+
+    CodeSample {
+        code: "import { SurfaceCard } from \"../kit/kit.slint\";\n\nSurfaceCard { interactive: true; elevated: false; accessible_name: \"Open task\"; clicked => { open(); } }";
+    }
+}

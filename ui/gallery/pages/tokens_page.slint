@@ -1,0 +1,117 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Elevation, Motion, SurfaceCard, Theme, Typography, UiConstants } from "../../kit/kit.slint";
+import { GalleryPage } from "../shared/gallery_page.slint";
+import { Specimen } from "../shared/specimen.slint";
+import { CodeSample } from "../shared/code_sample.slint";
+
+component ColorToken inherits VerticalLayout {
+    in property <string> token_name;
+    in property <color> token_color;
+    spacing: UiConstants.space_4;
+
+    Rectangle {
+        height: 44px;
+        background: root.token_color;
+        border-width: 1px;
+        border-color: Theme.border_color;
+        border-radius: UiConstants.control_radius;
+    }
+    Text { text: root.token_name; color: Theme.text_secondary; font-size: Typography.caption; horizontal-alignment: center; }
+}
+
+component SpacingToken inherits HorizontalLayout {
+    in property <string> token_name;
+    in property <length> token_size;
+    spacing: UiConstants.space_8;
+    height: 24px;
+
+    Text { width: 84px; text: root.token_name; color: Theme.text_secondary; font-size: Typography.caption; vertical-alignment: center; }
+    Rectangle { width: root.token_size; height: 12px; vertical-stretch: 0; background: Theme.accent; border-radius: 2px; }
+    Text { text: "" + root.token_size / 1px + " px"; color: Theme.text_tertiary; font-size: Typography.caption; vertical-alignment: center; }
+}
+
+export component TokensPage inherits GalleryPage {
+    page_title: "Theme tokens";
+    page_description: "Canonical semantic color, spacing, elevation, and motion values. Consumers use names, never copied literals.";
+
+    Specimen {
+        specimen_title: "Semantic colors";
+        specimen_description: "The same token names resolve for Light, Dark, and System theme modes.";
+        specimen_kind: "Tokens";
+        keyboard_info: "Not applicable; color swatches are reference content.";
+        accessibility_info: "Every swatch includes its semantic token name as text.";
+
+        GridLayout {
+            spacing: UiConstants.space_8;
+            Row {
+                ColorToken { token_name: "background"; token_color: Theme.background; }
+                ColorToken { token_name: "content_bg"; token_color: Theme.content_bg; }
+                ColorToken { token_name: "card_bg"; token_color: Theme.card_bg; }
+                ColorToken { token_name: "selected_bg"; token_color: Theme.selected_bg; }
+            }
+            Row {
+                ColorToken { token_name: "accent"; token_color: Theme.accent; }
+                ColorToken { token_name: "success"; token_color: Theme.success; }
+                ColorToken { token_name: "warning"; token_color: Theme.warning; }
+                ColorToken { token_name: "danger"; token_color: Theme.danger; }
+            }
+            Row {
+                ColorToken { token_name: "Q1"; token_color: Theme.q1_accent; }
+                ColorToken { token_name: "Q2"; token_color: Theme.q2_accent; }
+                ColorToken { token_name: "Q3"; token_color: Theme.q3_accent; }
+                ColorToken { token_name: "Q4"; token_color: Theme.q4_accent; }
+            }
+        }
+    }
+
+    Specimen {
+        specimen_title: "Spacing and dimensions";
+        specimen_description: "A 4px-centered rhythm supports compact desktop density; 2px and 6px exist for optical corrections.";
+        specimen_kind: "Tokens";
+        keyboard_info: "Not applicable.";
+        accessibility_info: "Token names and resolved sizes are presented as text.";
+
+        GridLayout {
+            spacing: UiConstants.space_8;
+            Row {
+                VerticalLayout {
+                    SpacingToken { token_name: "space_4"; token_size: UiConstants.space_4; }
+                    SpacingToken { token_name: "space_8"; token_size: UiConstants.space_8; }
+                    SpacingToken { token_name: "space_12"; token_size: UiConstants.space_12; }
+                }
+                VerticalLayout {
+                    SpacingToken { token_name: "space_16"; token_size: UiConstants.space_16; }
+                    SpacingToken { token_name: "space_24"; token_size: UiConstants.space_24; }
+                    SpacingToken { token_name: "space_32"; token_size: UiConstants.space_32; }
+                }
+            }
+        }
+    }
+
+    Specimen {
+        specimen_title: "Elevation and motion";
+        specimen_description: "Cards, popups, and dialogs own coherent surface/border/shadow recipes; motion remains restrained.";
+        specimen_kind: "Tokens";
+        keyboard_info: "Not applicable.";
+        accessibility_info: "Elevation is never the sole carrier of state or meaning.";
+
+        HorizontalLayout {
+            spacing: UiConstants.space_12;
+            SurfaceCard { horizontal-stretch: 1; height: 64px; }
+            SurfaceCard { horizontal-stretch: 1; height: 64px; elevated: true; }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                Text { text: "fast · " + Motion.fast / 1ms + " ms"; color: Theme.text_secondary; font-size: Typography.caption; }
+                Text { text: "standard · " + Motion.standard / 1ms + " ms"; color: Theme.text_secondary; font-size: Typography.caption; }
+                Text { text: "slow · " + Motion.slow / 1ms + " ms"; color: Theme.text_secondary; font-size: Typography.caption; }
+                Text { text: "card blur · " + Elevation.card_blur / 1px + " px"; color: Theme.text_secondary; font-size: Typography.caption; }
+            }
+        }
+    }
+
+    CodeSample {
+        code: "import { Theme, UiConstants } from \"../kit/kit.slint\";\n\nRectangle { background: Theme.card_bg; border-radius: UiConstants.content_radius; }";
+    }
+}

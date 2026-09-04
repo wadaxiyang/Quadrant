@@ -1,39 +1,125 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { FluentIcon, FluentIcons, IconButton, SurfaceCard, Theme, UiConstants } from "../../kit/kit.slint";
-import { GalleryLabel } from "../shared/gallery_label.slint";
+import { FluentIcon, FluentIcons, IconButton, Theme, Typography, UiConstants } from "../../kit/kit.slint";
+import { GalleryPage } from "../shared/gallery_page.slint";
+import { Specimen } from "../shared/specimen.slint";
+import { CodeSample } from "../shared/code_sample.slint";
 import { StateSpecimen } from "../shared/state_specimen.slint";
 
-export component IconsPage inherits SurfaceCard {
-    preferred-height: icon_states.preferred-height;
+component IconCatalogItem inherits VerticalLayout {
+    in property <image> catalog_icon;
+    in property <string> catalog_name;
+    spacing: UiConstants.space_4;
+    alignment: center;
+    min-width: 88px;
 
-    icon_states := VerticalLayout {
-        padding: UiConstants.space_16;
-        spacing: UiConstants.space_12;
+    FluentIcon { source: root.catalog_icon; size: 20px; icon_color: Theme.icon_neutral; }
+    Text { text: root.catalog_name; color: Theme.text_secondary; font-size: Typography.caption; horizontal-alignment: center; overflow: elide; }
+}
 
-        GalleryLabel { text: "IconButton interaction states"; }
+export component IconsPage inherits GalleryPage {
+    page_title: "Icons";
+    page_description: "Vendored, cross-platform Microsoft Fluent SVG assets exposed through semantic public names.";
 
-        HorizontalLayout {
+    Specimen {
+        specimen_title: "IconButton states";
+        specimen_description: "Action icons retain native 16px geometry inside a 32px keyboard target.";
+        specimen_kind: "States";
+        keyboard_info: "Tab focuses; Enter or Space invokes the default action.";
+        accessibility_info: "Role button; tooltip supplies the accessible label; enabled state is exposed.";
+
+        GridLayout {
             spacing: UiConstants.space_12;
-            StateSpecimen { horizontal-stretch: 1; label: "Normal"; IconButton { icon: FluentIcons.add; tooltip: "Normal"; } }
-            StateSpecimen { horizontal-stretch: 1; label: "Hover"; IconButton { icon: FluentIcons.add; tooltip: "Hover"; preview_hover: true; } }
-            StateSpecimen { horizontal-stretch: 1; label: "Pressed"; IconButton { icon: FluentIcons.add; tooltip: "Pressed"; preview_pressed: true; } }
-            StateSpecimen { horizontal-stretch: 1; label: "Keyboard focus"; IconButton { icon: FluentIcons.add; tooltip: "Focused"; preview_focus: true; } }
-            StateSpecimen { horizontal-stretch: 1; label: "Danger"; IconButton { icon: FluentIcons.delete; tooltip: "Delete"; danger: true; preview_hover: true; } }
-            StateSpecimen { horizontal-stretch: 1; label: "Disabled"; IconButton { icon: FluentIcons.dismiss; tooltip: "Disabled"; enabled: false; } }
+            Row {
+                StateSpecimen { label: "Normal"; IconButton { icon: FluentIcons.add; tooltip: "Add"; } }
+                StateSpecimen { label: "Hover"; IconButton { icon: FluentIcons.add; tooltip: "Add"; preview_hover: true; } }
+                StateSpecimen { label: "Pressed"; IconButton { icon: FluentIcons.add; tooltip: "Add"; preview_pressed: true; } }
+            }
+            Row {
+                StateSpecimen { label: "Keyboard focus"; IconButton { icon: FluentIcons.add; tooltip: "Add"; preview_focus: true; } }
+                StateSpecimen { label: "Danger"; IconButton { icon: FluentIcons.delete; tooltip: "Delete"; danger: true; preview_hover: true; } }
+                StateSpecimen { label: "Disabled"; IconButton { icon: FluentIcons.dismiss; tooltip: "Dismiss"; enabled: false; } }
+            }
         }
+    }
 
-        HorizontalLayout {
+    Specimen {
+        specimen_title: "Semantic icon catalog";
+        specimen_description: "Regular/Filled navigation, 16px actions, and 24px status icons remain distinct assets.";
+        specimen_kind: "Catalog";
+        keyboard_info: "Not applicable; catalog glyphs are reference content.";
+        accessibility_info: "Decorative FluentIcon hosts are paired with visible semantic names.";
+
+        VerticalLayout {
             spacing: UiConstants.space_12;
-            GalleryLabel { text: "Semantic icons"; width: 116px; vertical-alignment: center; }
-            FluentIcon { source: FluentIcons.quadrants_regular; size: 20px; }
-            FluentIcon { source: FluentIcons.quadrants_filled; size: 20px; icon_color: Theme.accent; }
-            FluentIcon { source: FluentIcons.status_info; size: 24px; icon_color: Theme.accent; }
-            FluentIcon { source: FluentIcons.status_success; size: 24px; icon_color: Theme.success; }
-            FluentIcon { source: FluentIcons.status_warning; size: 24px; icon_color: Theme.warning; }
-            FluentIcon { source: FluentIcons.status_error; size: 24px; icon_color: Theme.danger; }
-            Rectangle { horizontal-stretch: 1; }
+            HorizontalLayout {
+                IconCatalogItem { catalog_icon: FluentIcons.quadrants_regular; catalog_name: "quadrants"; }
+                IconCatalogItem { catalog_icon: FluentIcons.today_regular; catalog_name: "today"; }
+                IconCatalogItem { catalog_icon: FluentIcons.focus_regular; catalog_name: "focus"; }
+                IconCatalogItem { catalog_icon: FluentIcons.review_regular; catalog_name: "review"; }
+                IconCatalogItem { catalog_icon: FluentIcons.completed_regular; catalog_name: "completed"; }
+            }
+            HorizontalLayout {
+                IconCatalogItem { catalog_icon: FluentIcons.quadrants_filled; catalog_name: "quadrants filled"; }
+                IconCatalogItem { catalog_icon: FluentIcons.today_filled; catalog_name: "today filled"; }
+                IconCatalogItem { catalog_icon: FluentIcons.focus_filled; catalog_name: "focus filled"; }
+                IconCatalogItem { catalog_icon: FluentIcons.review_filled; catalog_name: "review filled"; }
+                IconCatalogItem { catalog_icon: FluentIcons.completed_filled; catalog_name: "completed filled"; }
+            }
+            HorizontalLayout {
+                IconCatalogItem { catalog_icon: FluentIcons.settings_regular; catalog_name: "settings"; }
+                IconCatalogItem { catalog_icon: FluentIcons.about_regular; catalog_name: "about"; }
+                IconCatalogItem { catalog_icon: FluentIcons.settings_filled; catalog_name: "settings filled"; }
+                IconCatalogItem { catalog_icon: FluentIcons.about_filled; catalog_name: "about filled"; }
+                IconCatalogItem { catalog_icon: FluentIcons.menu; catalog_name: "menu"; }
+            }
+            HorizontalLayout {
+                IconCatalogItem { catalog_icon: FluentIcons.add; catalog_name: "add"; }
+                IconCatalogItem { catalog_icon: FluentIcons.dismiss; catalog_name: "dismiss"; }
+                IconCatalogItem { catalog_icon: FluentIcons.minimize; catalog_name: "minimize"; }
+                IconCatalogItem { catalog_icon: FluentIcons.maximize; catalog_name: "maximize"; }
+                IconCatalogItem { catalog_icon: FluentIcons.restore_window; catalog_name: "window restore"; }
+            }
+            HorizontalLayout {
+                IconCatalogItem { catalog_icon: FluentIcons.edit; catalog_name: "edit"; }
+                IconCatalogItem { catalog_icon: FluentIcons.delete; catalog_name: "delete"; }
+                IconCatalogItem { catalog_icon: FluentIcons.complete; catalog_name: "complete"; }
+                IconCatalogItem { catalog_icon: FluentIcons.more_horizontal; catalog_name: "more"; }
+                IconCatalogItem { catalog_icon: FluentIcons.restore_task; catalog_name: "restore"; }
+            }
+            HorizontalLayout {
+                IconCatalogItem { catalog_icon: FluentIcons.calendar; catalog_name: "calendar"; }
+                IconCatalogItem { catalog_icon: FluentIcons.clock; catalog_name: "clock"; }
+                IconCatalogItem { catalog_icon: FluentIcons.recurrence; catalog_name: "recurrence"; }
+                IconCatalogItem { catalog_icon: FluentIcons.folder_open; catalog_name: "folder"; }
+                IconCatalogItem { catalog_icon: FluentIcons.backup; catalog_name: "backup"; }
+            }
+            HorizontalLayout {
+                IconCatalogItem { catalog_icon: FluentIcons.theme_system; catalog_name: "theme system"; }
+                IconCatalogItem { catalog_icon: FluentIcons.theme_light; catalog_name: "theme light"; }
+                IconCatalogItem { catalog_icon: FluentIcons.theme_dark; catalog_name: "theme dark"; }
+                IconCatalogItem { catalog_icon: FluentIcons.chevron_up; catalog_name: "chevron up"; }
+                IconCatalogItem { catalog_icon: FluentIcons.chevron_down; catalog_name: "chevron down"; }
+            }
+            HorizontalLayout {
+                IconCatalogItem { catalog_icon: FluentIcons.info; catalog_name: "info action"; }
+                IconCatalogItem { catalog_icon: FluentIcons.warning; catalog_name: "warning action"; }
+                IconCatalogItem { catalog_icon: FluentIcons.error; catalog_name: "error action"; }
+                Rectangle { horizontal-stretch: 1; }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            HorizontalLayout {
+                IconCatalogItem { catalog_icon: FluentIcons.status_info; catalog_name: "info"; }
+                IconCatalogItem { catalog_icon: FluentIcons.status_success; catalog_name: "success"; }
+                IconCatalogItem { catalog_icon: FluentIcons.status_warning; catalog_name: "warning"; }
+                IconCatalogItem { catalog_icon: FluentIcons.status_error; catalog_name: "error"; }
+                IconCatalogItem { catalog_icon: FluentIcons.heart_filled; catalog_name: "heart"; }
+            }
         }
+    }
+
+    CodeSample {
+        code: "import { FluentIcon, FluentIcons } from \"../kit/kit.slint\";\n\nFluentIcon { source: FluentIcons.calendar; size: 16px; }";
     }
 }

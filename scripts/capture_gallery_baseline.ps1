@@ -6,6 +6,10 @@ param(
     [ValidateSet('Smoke', 'Matrix', 'All')]
     [string]$Mode = 'Smoke',
     [string]$OutputDirectory,
+    [ValidateRange(0, 7)]
+    [int]$Page = 0,
+    [ValidateRange(0, 2)]
+    [int]$Preview = 1,
     [switch]$ReuseExisting
 )
 
@@ -18,7 +22,7 @@ $resolvedOutput = [System.IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force -Path $resolvedOutput | Out-Null
 
 $saved = @{}
-foreach ($name in @('QUADRANT_GALLERY_WIDTH', 'QUADRANT_GALLERY_HEIGHT', 'QUADRANT_GALLERY_THEME', 'QUADRANT_GALLERY_SNAPSHOT', 'SLINT_SCALE_FACTOR')) {
+foreach ($name in @('QUADRANT_GALLERY_WIDTH', 'QUADRANT_GALLERY_HEIGHT', 'QUADRANT_GALLERY_THEME', 'QUADRANT_GALLERY_SNAPSHOT', 'QUADRANT_GALLERY_PAGE', 'QUADRANT_GALLERY_PREVIEW', 'SLINT_SCALE_FACTOR')) {
     $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
 }
 
@@ -63,6 +67,8 @@ function Invoke-GallerySnapshot {
         $env:QUADRANT_GALLERY_WIDTH = [string]$Width
         $env:QUADRANT_GALLERY_HEIGHT = [string]$Height
         $env:QUADRANT_GALLERY_THEME = $Theme
+        $env:QUADRANT_GALLERY_PAGE = [string]$Page
+        $env:QUADRANT_GALLERY_PREVIEW = [string]$Preview
         $env:SLINT_SCALE_FACTOR = [string]::Format([Globalization.CultureInfo]::InvariantCulture, '{0:0.##}', $ScalePercent / 100.0)
         $env:QUADRANT_GALLERY_SNAPSHOT = $snapshotPath
 
@@ -113,6 +119,8 @@ try {
         source_commit = (& git -C $repoRoot rev-parse --short HEAD).Trim()
         generated_at_utc = [DateTime]::UtcNow.ToString('o')
         mode = $Mode
+        gallery_page = $Page
+        preview_mode = $Preview
         snapshots = @($records)
     }
     $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestPath -Encoding utf8

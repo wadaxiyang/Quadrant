@@ -1,0 +1,49 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Badge, BadgeKind, Theme, Typography, UiConstants } from "../../kit/kit.slint";
+
+export component GalleryPage inherits Rectangle {
+    in property <string> page_title;
+    in property <string> page_description;
+    in property <string> stability: "Stable";
+    preferred-height: page_layout.preferred-height;
+    vertical-stretch: 0;
+    background: transparent;
+
+    page_layout := VerticalLayout {
+        spacing: UiConstants.space_20;
+
+        HorizontalLayout {
+            spacing: UiConstants.space_16;
+            vertical-stretch: 0;
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: UiConstants.space_4;
+
+                Text {
+                    text: root.page_title;
+                    color: Theme.text_primary;
+                    font-size: Typography.title;
+                    font-weight: Typography.semibold;
+                    wrap: word-wrap;
+                }
+
+                Text {
+                    text: root.page_description;
+                    color: Theme.text_secondary;
+                    font-size: Typography.body;
+                    wrap: word-wrap;
+                }
+            }
+
+            Badge {
+                text: root.stability;
+                kind: root.stability == "Stable" ? BadgeKind.success : BadgeKind.warning;
+            }
+        }
+
+        @children
+    }
+}

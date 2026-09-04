@@ -1,0 +1,31 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { SurfaceCard, Theme, Typography, UiConstants } from "../../kit/kit.slint";
+
+export component CodeSample inherits SurfaceCard {
+    in property <string> code;
+    in property <string> caption: "Kit public import";
+    preferred-height: code_layout.preferred-height;
+    vertical-stretch: 0;
+
+    code_layout := VerticalLayout {
+        padding: UiConstants.space_12;
+        spacing: UiConstants.space_8;
+
+        Text {
+            text: root.caption;
+            color: Theme.text_tertiary;
+            font-size: Typography.caption;
+            font-weight: Typography.semibold;
+        }
+
+        Text {
+            text: root.code;
+            color: Theme.text_primary;
+            font-family: "monospace";
+            font-size: Typography.caption;
+            wrap: word-wrap;
+        }
+    }
+}

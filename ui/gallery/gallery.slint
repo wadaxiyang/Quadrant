@@ -2,18 +2,25 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { Palette, ScrollView } from "std-widgets.slint";
-import { Branding, ModalKind, ModalManager, SegmentButton, Theme, ThemeMode, Typography, UiConstants } from "../kit/kit.slint";
-import { ButtonsPage } from "pages/buttons_page.slint";
-import { RowsBadgesPage } from "pages/rows_badges_page.slint";
-import { IconsPage } from "pages/icons_page.slint";
-import { CardsPage } from "pages/cards_page.slint";
-import { InputsSelectionPage } from "pages/inputs_selection_page.slint";
-import { FeedbackPage } from "pages/feedback_page.slint";
+import { Branding, FluentIcons, ModalKind, ModalManager, SegmentButton, SidebarItem, Theme, ThemeMode, Typography, UiConstants } from "../kit/kit.slint";
+import { GalleryCatalogEntry } from "shared/gallery_catalog.slint";
+import { OverviewPage } from "pages/overview_page.slint";
+import { TokensPage } from "pages/tokens_page.slint";
 import { TypographyPage } from "pages/typography_page.slint";
-import { PatternsPage } from "pages/patterns_page.slint";
+import { IconsPage } from "pages/icons_page.slint";
+import { ControlsPage } from "pages/controls_page.slint";
+import { SurfacesPage } from "pages/surfaces_page.slint";
+import { FeedbackPage } from "pages/feedback_page.slint";
+import { NavigationPage } from "pages/navigation_page.slint";
+
+component ShellLabel inherits Text {
+    color: Theme.text_tertiary;
+    font-size: Typography.caption;
+    font-weight: Typography.semibold;
+}
 
 export component DesignGalleryWindow inherits Window {
-    title: "Quadrant Design Gallery";
+    title: "Quadrant Fluent Gallery";
     icon: Branding.app_mark;
     preferred-width: 1040px;
     preferred-height: 800px;
@@ -25,11 +32,25 @@ export component DesignGalleryWindow inherits Window {
     default-font-weight: Typography.regular;
 
     in-out property <string> ui_font_family <=> Theme.ui_font_family;
-    in-out property <string> sample_text;
+    in-out property <string> sample_text: "Prepare the weekly review";
     in-out property <bool> sample_switch: true;
     in-out property <ThemeMode> gallery_theme: ThemeMode.light;
+    in-out property <int> gallery_page: 0;
+    in-out property <int> catalog_filter: 0;
+    in-out property <int> preview_mode: 1;
     in-out property <bool> sample_modal_visible: false;
     in-out property <int> sample_modal_kind: 0;
+
+    private property <[GalleryCatalogEntry]> gallery_catalog: [
+        { id: 0, category: 1, title: "Overview", icon: FluentIcons.about_regular, selected_icon: FluentIcons.about_filled },
+        { id: 1, category: 1, title: "Tokens", icon: FluentIcons.theme_system, selected_icon: FluentIcons.theme_system },
+        { id: 2, category: 1, title: "Typography", icon: FluentIcons.edit, selected_icon: FluentIcons.edit },
+        { id: 3, category: 1, title: "Icons", icon: FluentIcons.info, selected_icon: FluentIcons.info },
+        { id: 4, category: 2, title: "Controls", icon: FluentIcons.add, selected_icon: FluentIcons.add },
+        { id: 5, category: 3, title: "Surfaces", icon: FluentIcons.quadrants_regular, selected_icon: FluentIcons.quadrants_filled },
+        { id: 6, category: 3, title: "Feedback", icon: FluentIcons.status_info, selected_icon: FluentIcons.status_success },
+        { id: 7, category: 4, title: "Navigation", icon: FluentIcons.menu, selected_icon: FluentIcons.menu },
+    ];
 
     changed gallery_theme => {
         Theme.mode = root.gallery_theme;
@@ -37,91 +58,125 @@ export component DesignGalleryWindow inherits Window {
                                root.gallery_theme == ThemeMode.light ? ColorScheme.light : ColorScheme.dark;
     }
 
-    ScrollView {
-        width: 100%;
-        height: 100%;
-        viewport-width: self.width;
+    HorizontalLayout {
+        spacing: 0px;
 
-        VerticalLayout {
-            padding: UiConstants.page_padding_wide;
-            spacing: UiConstants.space_20;
+        Rectangle {
+            width: 216px;
+            background: Theme.background;
+            border-width: 0px;
 
-            Text {
-                text: "Quadrant Fluent design gallery";
-                color: Theme.text_primary;
-                font-size: Typography.title;
-                font-weight: Typography.semibold;
+            Rectangle {
+                x: parent.width - 1px;
+                width: 1px;
+                height: 100%;
+                background: Theme.divider;
             }
 
-            Text {
-                text: "Shared tokens and reusable component states. Development-only; not part of release navigation.";
-                color: Theme.text_secondary;
-                font-size: Typography.body;
-            }
+            ScrollView {
+                width: 100%;
+                height: 100%;
+                viewport-width: self.width;
 
-            HorizontalLayout {
-                spacing: UiConstants.space_4;
+                VerticalLayout {
+                    padding: UiConstants.space_12;
+                    spacing: UiConstants.space_12;
 
-                SegmentButton {
-                    text: "System";
-                    selected: root.gallery_theme == ThemeMode.system;
-                    clicked => {
-                        root.gallery_theme = ThemeMode.system;
-                        Theme.mode = ThemeMode.system;
-                        Palette.color-scheme = ColorScheme.unknown;
+                    HorizontalLayout {
+                        spacing: UiConstants.space_8;
+                        Image { source: Branding.app_mark; width: 28px; height: 28px; }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            spacing: 0px;
+                            Text { text: "Fluent Gallery"; color: Theme.text_primary; font-size: Typography.body; font-weight: Typography.semibold; }
+                            Text { text: "UI Kit v1"; color: Theme.text_tertiary; font-size: Typography.caption; }
+                        }
+                    }
+
+                    ShellLabel { text: "Theme"; }
+                    HorizontalLayout {
+                        spacing: UiConstants.space_4;
+                        SegmentButton { horizontal-stretch: 1; text: "System"; selected: root.gallery_theme == ThemeMode.system; clicked => { root.gallery_theme = ThemeMode.system; } }
+                        SegmentButton { horizontal-stretch: 1; text: "Light"; selected: root.gallery_theme == ThemeMode.light; clicked => { root.gallery_theme = ThemeMode.light; } }
+                        SegmentButton { horizontal-stretch: 1; text: "Dark"; selected: root.gallery_theme == ThemeMode.dark; clicked => { root.gallery_theme = ThemeMode.dark; } }
+                    }
+
+                    ShellLabel { text: "Preview width"; }
+                    HorizontalLayout {
+                        spacing: UiConstants.space_4;
+                        SegmentButton { horizontal-stretch: 1; text: "C"; selected: root.preview_mode == 0; clicked => { root.preview_mode = 0; } }
+                        SegmentButton { horizontal-stretch: 1; text: "M"; selected: root.preview_mode == 1; clicked => { root.preview_mode = 1; } }
+                        SegmentButton { horizontal-stretch: 1; text: "W"; selected: root.preview_mode == 2; clicked => { root.preview_mode = 2; } }
+                    }
+
+                    ShellLabel { text: "Catalog filter"; }
+                    VerticalLayout {
+                        spacing: UiConstants.space_4;
+                        SegmentButton { width: 100%; text: "All components"; selected: root.catalog_filter == 0; clicked => { root.catalog_filter = 0; } }
+                        SegmentButton { width: 100%; text: "Foundation"; selected: root.catalog_filter == 1; clicked => { root.catalog_filter = 1; root.gallery_page = 0; } }
+                        SegmentButton { width: 100%; text: "Controls"; selected: root.catalog_filter == 2; clicked => { root.catalog_filter = 2; root.gallery_page = 4; } }
+                        SegmentButton { width: 100%; text: "Surfaces & feedback"; selected: root.catalog_filter == 3; clicked => { root.catalog_filter = 3; root.gallery_page = 5; } }
+                        SegmentButton { width: 100%; text: "Navigation"; selected: root.catalog_filter == 4; clicked => { root.catalog_filter = 4; root.gallery_page = 7; } }
+                    }
+
+                    ShellLabel { text: "Pages"; }
+                    VerticalLayout {
+                        spacing: UiConstants.space_2;
+                        for entry in root.gallery_catalog: SidebarItem {
+                            visible: root.catalog_filter == 0 || root.catalog_filter == entry.category;
+                            width: 100%;
+                            icon: entry.icon;
+                            selected_icon: entry.selected_icon;
+                            text: entry.title;
+                            selected: root.gallery_page == entry.id;
+                            clicked => { root.gallery_page = entry.id; }
+                        }
+                    }
+
+                    Rectangle { height: 1px; background: Theme.divider; }
+                    Text {
+                        text: "Slint 1.17.1 · Gallery v1\nDevelopment only · no Product routes";
+                        color: Theme.text_tertiary;
+                        font-size: Typography.caption;
+                        wrap: word-wrap;
                     }
                 }
+            }
+        }
 
-                SegmentButton {
-                    text: "Light";
-                    selected: root.gallery_theme == ThemeMode.light;
-                    clicked => {
-                        root.gallery_theme = ThemeMode.light;
-                        Theme.mode = ThemeMode.light;
-                        Palette.color-scheme = ColorScheme.light;
+        Rectangle {
+            horizontal-stretch: 1;
+            background: Theme.content_bg;
+
+            ScrollView {
+                width: 100%;
+                height: 100%;
+                viewport-width: self.width;
+
+                VerticalLayout {
+                    padding: parent.width < UiConstants.compact_breakpoint ? UiConstants.page_padding_compact : UiConstants.page_padding_medium;
+                    spacing: UiConstants.space_20;
+
+                    if root.gallery_page == 0: OverviewPage { }
+                    if root.gallery_page == 1: TokensPage { }
+                    if root.gallery_page == 2: TypographyPage { }
+                    if root.gallery_page == 3: IconsPage { }
+                    if root.gallery_page == 4: ControlsPage {
+                        preview_mode: root.preview_mode;
+                        sample_text <=> root.sample_text;
+                        sample_switch <=> root.sample_switch;
                     }
-                }
-
-                SegmentButton {
-                    text: "Dark";
-                    selected: root.gallery_theme == ThemeMode.dark;
-                    clicked => {
-                        root.gallery_theme = ThemeMode.dark;
-                        Theme.mode = ThemeMode.dark;
-                        Palette.color-scheme = ColorScheme.dark;
+                    if root.gallery_page == 5: SurfacesPage { preview_mode: root.preview_mode; }
+                    if root.gallery_page == 6: FeedbackPage {
+                        preview_mode: root.preview_mode;
+                        modal_requested(kind) => {
+                            root.sample_modal_kind = kind;
+                            root.sample_modal_visible = true;
+                        }
                     }
-                }
-
-                Rectangle { horizontal-stretch: 1; }
-            }
-
-            PatternsPage {
-                sample_switch <=> root.sample_switch;
-            }
-
-            ButtonsPage { }
-
-            RowsBadgesPage {
-                sample_switch <=> root.sample_switch;
-            }
-
-            IconsPage { }
-
-            CardsPage { }
-
-            InputsSelectionPage {
-                sample_text <=> root.sample_text;
-                sample_switch <=> root.sample_switch;
-            }
-
-            FeedbackPage {
-                modal_requested(kind) => {
-                    root.sample_modal_kind = kind;
-                    root.sample_modal_visible = true;
+                    if root.gallery_page == 7: NavigationPage { preview_mode: root.preview_mode; }
                 }
             }
-
-            TypographyPage { }
         }
     }
 
