@@ -8,6 +8,8 @@ import {
     FluentButton,
     FluentIcons as Icons,
     IconButton,
+    InboxItem,
+    InboxPane,
     PageHeader,
     SegmentButton,
     SurfaceCard,
@@ -234,7 +236,7 @@ component TaskColumn inherits SurfaceCard {
 }
 
 export component QuadrantsView inherits Rectangle {
-    in property <[TaskRow]> inbox_tasks;
+    in property <[InboxItem]> inbox_tasks;
     in property <[TaskRow]> q1_tasks;
     in property <[TaskRow]> q2_tasks;
     in property <[TaskRow]> q3_tasks;
@@ -244,6 +246,7 @@ export component QuadrantsView inherits Rectangle {
     callback reorder_requested(string, int);
     callback complete_requested(string);
     callback delete_requested(string);
+    callback add_requested;
 
     property <bool> compact: root.width < UiConstants.compact_breakpoint;
     property <bool> wide: root.width >= UiConstants.wide_breakpoint;
@@ -271,15 +274,15 @@ export component QuadrantsView inherits Rectangle {
                 HorizontalLayout {
                     spacing: UiConstants.space_16;
 
-                    TaskColumn {
+                    InboxPane {
                         width: 280px;
-                        code: ""; title: "Inbox"; subtitle: "Unclassified captures"; accent: Theme.accent;
-                        destination: 0; tasks: root.inbox_tasks;
-                        move_requested(id, destination) => { root.move_requested(id, destination); }
-                        edit_requested(id) => { root.edit_requested(id); }
-                        reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
-                        complete_requested(id) => { root.complete_requested(id); }
-                        delete_requested(id) => { root.delete_requested(id); }
+                        items: root.inbox_tasks;
+                        add_requested => { root.add_requested(); }
+                        item_opened(id) => { root.edit_requested(id); }
+                        item_move_requested(id, destination) => { root.move_requested(id, destination); }
+                        item_reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
+                        item_completed(id) => { root.complete_requested(id); }
+                        item_delete_requested(id) => { root.delete_requested(id); }
                     }
 
                     VerticalLayout {
@@ -336,15 +339,14 @@ export component QuadrantsView inherits Rectangle {
             if !root.wide && !root.compact: VerticalLayout {
                 spacing: UiConstants.space_12;
 
-                TaskColumn {
-                    content_sized: true;
-                    code: ""; title: "Inbox"; subtitle: "Unclassified captures"; accent: Theme.accent;
-                    destination: 0; tasks: root.inbox_tasks;
-                    move_requested(id, destination) => { root.move_requested(id, destination); }
-                    edit_requested(id) => { root.edit_requested(id); }
-                    reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
-                    complete_requested(id) => { root.complete_requested(id); }
-                    delete_requested(id) => { root.delete_requested(id); }
+                InboxPane {
+                    items: root.inbox_tasks;
+                    add_requested => { root.add_requested(); }
+                    item_opened(id) => { root.edit_requested(id); }
+                    item_move_requested(id, destination) => { root.move_requested(id, destination); }
+                    item_reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
+                    item_completed(id) => { root.complete_requested(id); }
+                    item_delete_requested(id) => { root.delete_requested(id); }
                 }
 
                 HorizontalLayout {
@@ -399,12 +401,14 @@ export component QuadrantsView inherits Rectangle {
             if root.compact: VerticalLayout {
                 spacing: UiConstants.space_12;
 
-                TaskColumn {
-                    content_sized: true; code: ""; title: "Inbox"; subtitle: "Unclassified captures"; accent: Theme.accent;
-                    destination: 0; tasks: root.inbox_tasks;
-                    move_requested(id, destination) => { root.move_requested(id, destination); } edit_requested(id) => { root.edit_requested(id); }
-                    reorder_requested(id, direction) => { root.reorder_requested(id, direction); } complete_requested(id) => { root.complete_requested(id); }
-                    delete_requested(id) => { root.delete_requested(id); }
+                InboxPane {
+                    items: root.inbox_tasks;
+                    add_requested => { root.add_requested(); }
+                    item_opened(id) => { root.edit_requested(id); }
+                    item_move_requested(id, destination) => { root.move_requested(id, destination); }
+                    item_reorder_requested(id, direction) => { root.reorder_requested(id, direction); }
+                    item_completed(id) => { root.complete_requested(id); }
+                    item_delete_requested(id) => { root.delete_requested(id); }
                 }
                 TaskColumn {
                     content_sized: true; code: "Q1"; title: "Important + Urgent"; subtitle: "Do now"; accent: Theme.q1_accent;

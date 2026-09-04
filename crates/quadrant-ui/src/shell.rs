@@ -20,7 +20,7 @@ use quadrant_application::{
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, TimerMode, VecModel};
 
 use crate::{
-    CompletedTaskRow, Date as SlintDate, FocusTaskRow, MainWindow, QuickAddWindow,
+    CompletedTaskRow, Date as SlintDate, FocusTaskRow, InboxItem, MainWindow, QuickAddWindow,
     ReviewActivityRow, ReviewQuadrantRow, ReviewRecentRow, TaskEditorWindow, TaskRow,
     ThemeMode as SlintThemeMode, Time as SlintTime, ToastKind, TodayTaskRow,
 };
@@ -1397,11 +1397,26 @@ fn parse_editor_schedule(value: &str, time_zone: &str) -> Option<(bool, SlintDat
 }
 
 fn apply_quadrants_state(main: &MainWindow, state: &QuadrantsViewState) {
-    main.set_inbox_tasks(task_model(&state.inbox));
+    main.set_inbox_tasks(inbox_model(&state.inbox));
     main.set_q1_tasks(task_model(&state.q1));
     main.set_q2_tasks(task_model(&state.q2));
     main.set_q3_tasks(task_model(&state.q3));
     main.set_q4_tasks(task_model(&state.q4));
+}
+
+fn inbox_model(tasks: &[quadrant_application::TaskSummary]) -> ModelRc<InboxItem> {
+    let rows = tasks
+        .iter()
+        .map(|task| InboxItem {
+            id: SharedString::from(task.id.to_string()),
+            title: SharedString::from(task.title.as_str()),
+            supporting_text: SharedString::default(),
+            completed: false,
+            selected: false,
+            disabled: false,
+        })
+        .collect::<Vec<_>>();
+    ModelRc::from(Rc::new(VecModel::from(rows)))
 }
 
 fn apply_today_state(main: &MainWindow, state: &TodayViewState) {
@@ -1505,10 +1520,32 @@ fn move_window_by(window: &slint::Window, dx: f32, dy: f32) {
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_editor_schedule, placement_from_destination, scheduled_input, should_hide_at_startup,
-        should_hide_to_tray,
+        inbox_model, parse_editor_schedule, placement_from_destination, scheduled_input,
+        should_hide_at_startup, should_hide_to_tray,
     };
-    use quadrant_application::{Quadrant, TaskPlacement};
+    use quadrant_application::{Quadrant, TaskId, TaskPlacement, TaskSummary};
+    use slint::Model;
+    use std::str::FromStr;
+
+    #[test]
+    fn inbox_adapter_produces_presentation_only_defaults() {
+        let task_id = TaskId::from_str("018f3f76-3773-7a35-b310-48f25ed6bc93")
+            .expect("fixture id should be valid");
+        let model = inbox_model(&[TaskSummary {
+            id: task_id,
+            title: "Capture portable Inbox contract".to_owned(),
+            placement: TaskPlacement::Inbox,
+        }]);
+
+        assert_eq!(model.row_count(), 1);
+        let row = model.row_data(0).expect("adapter should retain the row");
+        assert_eq!(row.id.as_str(), task_id.to_string());
+        assert_eq!(row.title.as_str(), "Capture portable Inbox contract");
+        assert!(row.supporting_text.is_empty());
+        assert!(!row.completed);
+        assert!(!row.selected);
+        assert!(!row.disabled);
+    }
 
     #[test]
     fn quick_add_destinations_map_to_typed_placement() {

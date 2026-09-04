@@ -331,6 +331,8 @@ def pattern_overlay_ownership_findings() -> list[Finding]:
     expected_locations = {
         "SettingRow": "ui/kit/patterns/settings/setting_row.slint",
         "TaskRowShell": "ui/kit/patterns/tasks/task_row_shell.slint",
+        "InboxItem": "ui/kit/patterns/tasks/inbox/inbox_types.slint",
+        "InboxPane": "ui/kit/patterns/tasks/inbox/inbox_pane.slint",
         "SidebarItem": "ui/kit/patterns/navigation/sidebar_item.slint",
         "WindowControlButton": "ui/kit/patterns/window/window_control_button.slint",
         "SectionHeader": "ui/kit/patterns/page/section_header.slint",

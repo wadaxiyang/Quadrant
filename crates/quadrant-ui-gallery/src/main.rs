@@ -36,7 +36,7 @@ fn main() -> Result<(), slint::PlatformError> {
     }
 
     if let Some(page) = env_i32("QUADRANT_GALLERY_PAGE") {
-        gallery.set_gallery_page(page.clamp(0, 7));
+        gallery.set_gallery_page(page.clamp(0, 8));
     }
 
     if let Some(preview) = env_i32("QUADRANT_GALLERY_PREVIEW") {

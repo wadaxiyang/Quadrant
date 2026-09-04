@@ -46,7 +46,7 @@ export component OverviewPage inherits GalleryPage {
 
     Specimen {
         specimen_title: "Catalog map";
-        specimen_description: "Eight routed pages cover the public Foundation, Controls, Surfaces, Feedback, and Navigation APIs.";
+        specimen_description: "Nine routed pages cover the public Foundation, Controls, Surfaces, Feedback, Navigation, and Task Pattern APIs.";
         specimen_kind: "Overview";
         keyboard_info: "Tab through the sidebar; Enter or Space opens a page.";
         accessibility_info: "Sidebar entries expose button role, selected state, and stable labels.";
@@ -60,6 +60,10 @@ export component OverviewPage inherits GalleryPage {
             Row {
                 OverviewTile { tile_icon: FluentIcons.quadrants_regular; tile_title: "Surfaces & feedback"; tile_description: "Cards, empty states, modal decisions, and transient toast messages."; tile_count: "2 pages"; }
                 OverviewTile { tile_icon: FluentIcons.menu; tile_title: "Navigation"; tile_description: "Sidebar items, page headers, window controls, and deterministic task rows."; tile_count: "1 page"; }
+            }
+            Row {
+                OverviewTile { tile_icon: FluentIcons.today_regular; tile_title: "Task patterns"; tile_description: "Portable Inbox data, lifecycle states, responsive boundaries, and callback contracts."; tile_count: "1 page"; }
+                Rectangle { }
             }
         }
     }

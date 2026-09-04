@@ -1,0 +1,13 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Presentation-only data. Product adapters map application projections into
+// this type; the reusable Inbox package has no domain or repository knowledge.
+export struct InboxItem {
+    id: string,
+    title: string,
+    supporting_text: string,
+    completed: bool,
+    selected: bool,
+    disabled: bool,
+}

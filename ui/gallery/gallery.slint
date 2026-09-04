@@ -12,6 +12,7 @@ import { ControlsPage } from "pages/controls_page.slint";
 import { SurfacesPage } from "pages/surfaces_page.slint";
 import { FeedbackPage } from "pages/feedback_page.slint";
 import { NavigationPage } from "pages/navigation_page.slint";
+import { InboxPage } from "pages/inbox_page.slint";
 
 component ShellLabel inherits Text {
     color: Theme.text_tertiary;
@@ -50,6 +51,7 @@ export component DesignGalleryWindow inherits Window {
         { id: 5, category: 3, title: "Surfaces", icon: FluentIcons.quadrants_regular, selected_icon: FluentIcons.quadrants_filled },
         { id: 6, category: 3, title: "Feedback", icon: FluentIcons.status_info, selected_icon: FluentIcons.status_success },
         { id: 7, category: 4, title: "Navigation", icon: FluentIcons.menu, selected_icon: FluentIcons.menu },
+        { id: 8, category: 5, title: "Inbox", icon: FluentIcons.today_regular, selected_icon: FluentIcons.today_filled },
     ];
 
     changed gallery_theme => {
@@ -117,6 +119,7 @@ export component DesignGalleryWindow inherits Window {
                         SegmentButton { width: 100%; text: "Controls"; selected: root.catalog_filter == 2; clicked => { root.catalog_filter = 2; root.gallery_page = 4; } }
                         SegmentButton { width: 100%; text: "Surfaces & feedback"; selected: root.catalog_filter == 3; clicked => { root.catalog_filter = 3; root.gallery_page = 5; } }
                         SegmentButton { width: 100%; text: "Navigation"; selected: root.catalog_filter == 4; clicked => { root.catalog_filter = 4; root.gallery_page = 7; } }
+                        SegmentButton { width: 100%; text: "Task patterns"; selected: root.catalog_filter == 5; clicked => { root.catalog_filter = 5; root.gallery_page = 8; } }
                     }
 
                     ShellLabel { text: "Pages"; }
@@ -175,6 +178,7 @@ export component DesignGalleryWindow inherits Window {
                         }
                     }
                     if root.gallery_page == 7: NavigationPage { preview_mode: root.preview_mode; }
+                    if root.gallery_page == 8: InboxPage { preview_mode: root.preview_mode; }
                 }
             }
         }

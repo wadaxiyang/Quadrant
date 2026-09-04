@@ -6,7 +6,7 @@ param(
     [ValidateSet('Smoke', 'Matrix', 'All')]
     [string]$Mode = 'Smoke',
     [string]$OutputDirectory,
-    [ValidateRange(0, 7)]
+    [ValidateRange(0, 8)]
     [int]$Page = 0,
     [ValidateRange(0, 2)]
     [int]$Preview = 1,

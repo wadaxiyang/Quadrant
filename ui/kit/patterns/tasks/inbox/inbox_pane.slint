@@ -1,0 +1,275 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme, Typography } from "../../../foundation/theme.slint";
+import { UiConstants } from "../../../foundation/constants.slint";
+import { FluentIcons } from "../../../foundation/fluent_icons.slint";
+import { Badge } from "../../../primitives/badge.slint";
+import { FluentButton } from "../../../primitives/fluent_button.slint";
+import { IconButton } from "../../../primitives/icon_button.slint";
+import { SegmentButton } from "../../../primitives/segment_button.slint";
+import { SurfaceCard } from "../../../primitives/surface_card.slint";
+import { SectionHeader } from "../../page/section_header.slint";
+import { TaskRowShell } from "../task_row_shell.slint";
+import { InboxItem } from "inbox_types.slint";
+
+component InboxTaskRow inherits TaskRowShell {
+    in property <InboxItem> item;
+    in property <int> destination: 0;
+    in property <bool> interaction_enabled: true;
+    // Stable deterministic test hooks used by the development Gallery.
+    in property <bool> preview_hover: false;
+    in property <bool> preview_focus: false;
+    callback opened(string);
+    callback completed(string);
+    callback move_requested(string, int);
+    callback reorder_requested(string, int);
+    callback delete_requested(string);
+
+    private property <bool> row_enabled: root.interaction_enabled && !root.item.disabled;
+
+    row_height: root.item.supporting_text == "" ? 60px : 68px;
+    hovered: row_touch.has-hover || root.preview_hover;
+    background: root.item.selected ? Theme.selected_bg :
+                root.hovered ? Theme.card_hover : Theme.input_bg;
+    border-width: (row_focus.has-focus || root.preview_focus) ? 2px : 1px;
+    border-color: (row_focus.has-focus || root.preview_focus) ? Theme.focus_ring :
+                  root.item.selected ? Theme.accent : Theme.input_border;
+    opacity: root.row_enabled ? 1 : 0.5;
+    forward-focus: row_focus;
+    accessible-role: button;
+    accessible-label: root.item.supporting_text == "" ? root.item.title : root.item.title + ". " + root.item.supporting_text;
+    accessible-enabled: root.row_enabled;
+    accessible-checkable: true;
+    accessible-checked: root.item.selected;
+    accessible-action-default => { if (root.row_enabled) { root.opened(root.item.id); } }
+
+    row_touch := TouchArea {
+        enabled: root.row_enabled;
+        mouse-cursor: pointer;
+        clicked => { root.opened(root.item.id); }
+    }
+
+    row_focus := FocusScope {
+        enabled: root.row_enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.opened(root.item.id);
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: UiConstants.space_8;
+        padding-right: UiConstants.space_8;
+        spacing: UiConstants.space_6;
+
+        VerticalLayout {
+            alignment: center;
+            IconButton {
+                icon: root.item.completed ? FluentIcons.restore_task : FluentIcons.complete;
+                tooltip: root.item.completed ? "Restore task" : "Complete task";
+                enabled: root.row_enabled;
+                clicked => { root.completed(root.item.id); }
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: UiConstants.space_2;
+            alignment: center;
+
+            Text {
+                text: root.item.title;
+                color: Theme.text_primary;
+                font-size: Typography.body;
+                font-weight: Typography.semibold;
+                overflow: elide;
+            }
+
+            if root.item.supporting_text != "": Text {
+                text: root.item.supporting_text;
+                color: Theme.text_secondary;
+                font-size: Typography.caption;
+                overflow: elide;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            IconButton {
+                icon: FluentIcons.edit;
+                tooltip: "Open task";
+                enabled: root.row_enabled;
+                clicked => { root.opened(root.item.id); }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            FluentButton {
+                min-width: 68px;
+                text: "Move";
+                enabled: root.row_enabled;
+                clicked => { move_popup.show(); }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            IconButton {
+                icon: FluentIcons.more_horizontal;
+                tooltip: "More task actions";
+                enabled: root.row_enabled;
+                clicked => { more_popup.show(); }
+            }
+        }
+    }
+
+    move_popup := PopupWindow {
+        x: root.width - self.width - 40px;
+        y: root.height - UiConstants.space_4;
+        width: 172px;
+        height: 196px;
+        close-policy: close-on-click-outside;
+
+        SurfaceCard {
+            VerticalLayout {
+                padding: UiConstants.space_8;
+                spacing: UiConstants.space_4;
+
+                SegmentButton { text: "Inbox"; selected: root.destination == 0; clicked => { root.move_requested(root.item.id, 0); move_popup.close(); } }
+                SegmentButton { text: "Q1 · Important + Urgent"; selected: root.destination == 1; clicked => { root.move_requested(root.item.id, 1); move_popup.close(); } }
+                SegmentButton { text: "Q2 · Important"; selected: root.destination == 2; clicked => { root.move_requested(root.item.id, 2); move_popup.close(); } }
+                SegmentButton { text: "Q3 · Urgent"; selected: root.destination == 3; clicked => { root.move_requested(root.item.id, 3); move_popup.close(); } }
+                SegmentButton { text: "Q4 · Neither"; selected: root.destination == 4; clicked => { root.move_requested(root.item.id, 4); move_popup.close(); } }
+            }
+        }
+    }
+
+    more_popup := PopupWindow {
+        x: root.width - self.width;
+        y: root.height - UiConstants.space_4;
+        width: 148px;
+        height: 124px;
+        close-policy: close-on-click-outside;
+
+        SurfaceCard {
+            VerticalLayout {
+                padding: UiConstants.space_8;
+                spacing: UiConstants.space_4;
+
+                FluentButton { text: "Move up"; icon: FluentIcons.chevron_up; show_icon: true; clicked => { root.reorder_requested(root.item.id, -1); more_popup.close(); } }
+                FluentButton { text: "Move down"; icon: FluentIcons.chevron_down; show_icon: true; clicked => { root.reorder_requested(root.item.id, 1); more_popup.close(); } }
+                FluentButton { text: "Delete"; icon: FluentIcons.delete; show_icon: true; danger: true; clicked => { root.delete_requested(root.item.id); more_popup.close(); } }
+            }
+        }
+    }
+}
+
+export component InboxPane inherits SurfaceCard {
+    in property <[InboxItem]> items;
+    in property <string> title: "Inbox";
+    in property <string> description: "Unclassified captures";
+    in property <color> accent: Theme.accent;
+    in property <int> destination: 0;
+    in property <bool> loading: false;
+    in property <bool> interaction_enabled: true;
+    in property <bool> show_add_action: true;
+    in property <string> empty_title: "Inbox is empty";
+    in property <string> empty_message: "Capture a task, then classify it when you are ready.";
+    // Stable deterministic test hooks used by the development Gallery.
+    in property <string> preview_hovered_item_id;
+    in property <string> preview_focused_item_id;
+
+    callback add_requested;
+    callback item_opened(string);
+    callback item_completed(string);
+    callback item_move_requested(string, int);
+    callback item_reorder_requested(string, int);
+    callback item_delete_requested(string);
+
+    height: max(112px, pane_content.preferred-height);
+    vertical-stretch: 0;
+
+    Rectangle {
+        x: 0px;
+        y: 0px;
+        width: 4px;
+        height: 100%;
+        background: root.accent;
+        border-radius: 2px;
+    }
+
+    pane_content := VerticalLayout {
+        padding: UiConstants.space_12;
+        spacing: UiConstants.space_8;
+
+        SectionHeader {
+            title: root.title;
+            description: root.description;
+            badge_text: root.loading ? "Loading" : root.items.length + (root.items.length == 1 ? " task" : " tasks");
+
+            if root.show_add_action: IconButton {
+                icon: FluentIcons.add;
+                tooltip: "Add task";
+                enabled: root.interaction_enabled && !root.loading;
+                clicked => { root.add_requested(); }
+            }
+        }
+
+        if root.loading: Rectangle {
+            height: 60px;
+            background: Theme.card_bg_muted;
+            border-radius: UiConstants.control_radius;
+
+            Text {
+                text: "Loading tasks…";
+                color: Theme.text_secondary;
+                font-size: Typography.body;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        if !root.loading && root.items.length == 0: VerticalLayout {
+            padding-top: UiConstants.space_12;
+            padding-bottom: UiConstants.space_12;
+            spacing: UiConstants.space_4;
+
+            Text {
+                text: root.empty_title;
+                color: Theme.text_primary;
+                font-size: Typography.body;
+                font-weight: Typography.semibold;
+                horizontal-alignment: center;
+            }
+            Text {
+                text: root.empty_message;
+                color: Theme.text_secondary;
+                font-size: Typography.caption;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+        }
+
+        if !root.loading: VerticalLayout {
+            spacing: UiConstants.space_8;
+
+            for item in root.items: InboxTaskRow {
+                item: item;
+                destination: root.destination;
+                interaction_enabled: root.interaction_enabled;
+                preview_hover: item.id == root.preview_hovered_item_id;
+                preview_focus: item.id == root.preview_focused_item_id;
+                opened(id) => { root.item_opened(id); }
+                completed(id) => { root.item_completed(id); }
+                move_requested(id, destination) => { root.item_move_requested(id, destination); }
+                reorder_requested(id, direction) => { root.item_reorder_requested(id, direction); }
+                delete_requested(id) => { root.item_delete_requested(id); }
+            }
+        }
+    }
+}

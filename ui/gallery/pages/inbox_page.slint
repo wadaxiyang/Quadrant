@@ -1,0 +1,127 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Badge, BadgeKind, InboxItem, InboxPane, Theme, Typography, UiConstants } from "../../kit/kit.slint";
+import { GalleryPage } from "../shared/gallery_page.slint";
+import { Specimen } from "../shared/specimen.slint";
+import { PreviewContainer } from "../shared/preview_container.slint";
+import { CodeSample } from "../shared/code_sample.slint";
+
+export component InboxPage inherits GalleryPage {
+    in property <int> preview_mode: 1;
+    private property <string> last_callback: "No callback invoked";
+    private property <int> callback_count: 0;
+
+    private property <[InboxItem]> single_item: [
+        { id: "single", title: "Triage the captured note", supporting_text: "", completed: false, selected: false, disabled: false },
+    ];
+    private property <[InboxItem]> multiple_items: [
+        { id: "alpha", title: "Prepare the weekly review", supporting_text: "Today · 15:30", completed: false, selected: false, disabled: false },
+        { id: "long", title: "A deliberately long task title that must elide cleanly without pushing trailing actions outside the row", supporting_text: "Supporting text remains secondary and uses the available width", completed: false, selected: false, disabled: false },
+        { id: "selected", title: "Selected task", supporting_text: "Keyboard selection fixture", completed: false, selected: true, disabled: false },
+    ];
+    private property <[InboxItem]> state_items: [
+        { id: "hover", title: "Hover preview", supporting_text: "Deterministic pointer state", completed: false, selected: false, disabled: false },
+        { id: "focus", title: "Keyboard focus preview", supporting_text: "Enter or Space opens", completed: false, selected: false, disabled: false },
+        { id: "disabled", title: "Disabled task", supporting_text: "Actions and row activation are unavailable", completed: false, selected: false, disabled: true },
+    ];
+
+    page_title: "Inbox & Task Patterns";
+    page_description: "A portable presentation-only Inbox package driven by InboxItem data and callbacks, with no Product View, database, or application-command dependency.";
+
+    Specimen {
+        specimen_title: "Interactive Inbox contract";
+        specimen_description: "Add, Open, Complete, Move, Reorder, and Delete report deterministic callback payloads without a repository.";
+        keyboard_info: "Tab reaches Add, each row, and row actions; Enter or Space opens a focused row or invokes an action.";
+        accessibility_info: "Rows and actions expose button labels, enabled state, and selected state; disabled items remain visible but inert.";
+
+        PreviewContainer {
+            preview_mode: root.preview_mode;
+            preview_title: "Live callback preview";
+
+            InboxPane {
+                items: root.multiple_items;
+                add_requested => { root.callback_count += 1; root.last_callback = "Add"; }
+                item_opened(id) => { root.callback_count += 1; root.last_callback = "Open · " + id; }
+                item_completed(id) => { root.callback_count += 1; root.last_callback = "Complete · " + id; }
+                item_move_requested(id, destination) => { root.callback_count += 1; root.last_callback = "Move · " + id + " → " + destination; }
+                item_reorder_requested(id, direction) => { root.callback_count += 1; root.last_callback = "Reorder · " + id + " · " + direction; }
+                item_delete_requested(id) => { root.callback_count += 1; root.last_callback = "Delete · " + id; }
+            }
+
+            HorizontalLayout {
+                spacing: UiConstants.space_8;
+                Text {
+                    horizontal-stretch: 1;
+                    text: root.last_callback;
+                    color: Theme.text_secondary;
+                    font-size: Typography.caption;
+                    overflow: elide;
+                }
+                Badge { text: root.callback_count + " callbacks"; kind: BadgeKind.accent; }
+            }
+        }
+    }
+
+    Specimen {
+        specimen_title: "Content and lifecycle fixtures";
+        specimen_description: "Empty, single, multiple, long-title, supporting-text, loading, and disabled states remain content-driven.";
+        specimen_kind: "States";
+        keyboard_info: "Loading and disabled controls are skipped; enabled rows retain the normal Tab sequence.";
+        accessibility_info: "Loading has visible status text; empty-state copy and task counts do not rely on color alone.";
+
+        GridLayout {
+            spacing: UiConstants.space_12;
+            Row {
+                InboxPane { title: "Empty"; description: "No task fixtures"; show_add_action: false; items: []; }
+                InboxPane { title: "Single"; description: "One task fixture"; show_add_action: false; items: root.single_item; }
+            }
+            Row {
+                InboxPane { title: "Loading"; description: "Awaiting presentation data"; show_add_action: true; loading: true; items: []; }
+                InboxPane { title: "Disabled"; description: "Read-only presentation"; show_add_action: true; interaction_enabled: false; items: root.single_item; }
+            }
+        }
+    }
+
+    Specimen {
+        specimen_title: "Hover, focus, selected, and disabled";
+        specimen_description: "Stable preview hooks make transient interaction states available to screenshot and regression automation.";
+        specimen_kind: "States";
+        keyboard_info: "Focus uses the same ring as Product interaction; selection is independent from focus.";
+        accessibility_info: "Selected state is exposed alongside the visible accent treatment; disabled state reduces opacity and blocks actions.";
+
+        InboxPane {
+            title: "Interaction states";
+            description: "Forced only by Gallery preview inputs";
+            show_add_action: false;
+            items: root.state_items;
+            preview_hovered_item_id: "hover";
+            preview_focused_item_id: "focus";
+        }
+    }
+
+    Specimen {
+        specimen_title: "Compact and Wide boundaries";
+        specimen_description: "The complete package can be copied with its declared Kit dependencies; no Quadrant Product View is required.";
+        specimen_kind: "Responsive";
+        keyboard_info: "Responsive width does not change callback or focus behavior.";
+        accessibility_info: "Long text elides visually while the complete title remains the row accessibility label.";
+
+        PreviewContainer {
+            preview_mode: 0;
+            preview_title: "Compact boundary";
+            InboxPane { show_add_action: false; items: root.multiple_items; }
+        }
+
+        PreviewContainer {
+            preview_mode: 2;
+            preview_title: "Wide boundary";
+            InboxPane { show_add_action: false; items: root.multiple_items; }
+        }
+    }
+
+    CodeSample {
+        caption: "Portable Kit contract";
+        code: "import { InboxItem, InboxPane } from \"../kit/kit.slint\";\n\nin property <[InboxItem]> items;\nInboxPane {\n    items: items;\n    add_requested => { add(); }\n    item_opened(id) => { open(id); }\n    item_completed(id) => { complete(id); }\n    item_move_requested(id, destination) => { move(id, destination); }\n}";
+    }
+}
