@@ -1,0 +1,53 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from wsl-dashboard src/ui/components/common.slint at
+// 948589a255a4bd8a3ff9c3de49e2e13109378fcd.
+
+import { Theme, Typography } from "../../foundation/theme.slint";
+import { UiConstants } from "../../foundation/constants.slint";
+
+export component SettingRow inherits Rectangle {
+    in property <string> title;
+    in property <string> description;
+    in property <bool> enabled: true;
+
+    min-height: 64px;
+    opacity: root.enabled ? 1 : 0.55;
+    accessible-role: groupbox;
+    accessible-label: root.title;
+    accessible-description: root.description;
+
+    HorizontalLayout {
+        padding-top: UiConstants.space_10;
+        padding-bottom: UiConstants.space_10;
+        spacing: UiConstants.space_16;
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: UiConstants.space_4;
+
+            Text {
+                text: root.title;
+                color: Theme.text_primary;
+                font-size: Typography.body;
+                font-weight: Typography.semibold;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: root.description;
+                color: Theme.text_secondary;
+                font-size: Typography.caption;
+                wrap: word-wrap;
+                vertical-alignment: center;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            @children
+        }
+    }
+}

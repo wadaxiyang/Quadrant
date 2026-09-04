@@ -1,0 +1,22 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from wsl-dashboard src/ui/components/common.slint at
+// 948589a255a4bd8a3ff9c3de49e2e13109378fcd.
+
+import { Theme } from "../../foundation/theme.slint";
+import { UiConstants } from "../../foundation/constants.slint";
+
+export component TaskRowShell inherits Rectangle {
+    in property <length> row_height: 60px;
+    in property <bool> hovered: row_touch.has-hover;
+
+    height: root.row_height;
+    background: root.hovered ? Theme.card_hover : Theme.input_bg;
+    border-width: 1px;
+    border-color: Theme.input_border;
+    border-radius: UiConstants.control_radius;
+
+    row_touch := TouchArea { }
+}

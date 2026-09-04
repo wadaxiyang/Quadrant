@@ -327,6 +327,95 @@ def primitive_ownership_findings() -> list[Finding]:
     return findings
 
 
+def pattern_overlay_ownership_findings() -> list[Finding]:
+    expected_locations = {
+        "SettingRow": "ui/kit/patterns/settings/setting_row.slint",
+        "TaskRowShell": "ui/kit/patterns/tasks/task_row_shell.slint",
+        "SidebarItem": "ui/kit/patterns/navigation/sidebar_item.slint",
+        "WindowControlButton": "ui/kit/patterns/window/window_control_button.slint",
+        "SectionHeader": "ui/kit/patterns/page/section_header.slint",
+        "PageHeader": "ui/kit/patterns/page/page_header.slint",
+        "EmptyState": "ui/kit/patterns/page/empty_state.slint",
+        "MetricCard": "ui/kit/patterns/page/metric_card.slint",
+        "ToastKind": "ui/kit/overlays/toast.slint",
+        "ToastHost": "ui/kit/overlays/toast.slint",
+        "ModalKind": "ui/kit/overlays/modal.slint",
+        "ModalManager": "ui/kit/overlays/modal.slint",
+    }
+    definitions: dict[str, list[str]] = {}
+    for path in slint_files(UI_ROOT):
+        for definition in exported_definitions(path):
+            definitions.setdefault(str(definition["name"]), []).append(
+                str(definition["file"])
+            )
+
+    findings: list[Finding] = []
+    for name, expected_file in expected_locations.items():
+        locations = definitions.get(name, [])
+        if locations != [expected_file]:
+            findings.append(
+                Finding(
+                    "PAT001",
+                    name,
+                    f"canonical Pattern/Overlay definition must be only in {expected_file}; found {locations}",
+                )
+            )
+
+    expected_reexports = {
+        "ui/kit/kit.slint": set(expected_locations),
+        "ui/components/common.slint": {
+            "SettingRow",
+            "SidebarItem",
+            "TaskRowShell",
+            "WindowControlButton",
+        },
+        "ui/components/page_shell.slint": {
+            "EmptyState",
+            "MetricCard",
+            "PageHeader",
+            "SectionHeader",
+        },
+        "ui/components/toast.slint": {"ToastHost", "ToastKind"},
+        "ui/components/modal_manager.slint": {"ModalKind", "ModalManager"},
+    }
+    for facade, expected_names in expected_reexports.items():
+        path = REPO_ROOT / facade
+        reexports: set[str] = set()
+        for names, _source in REEXPORT_RE.findall(path.read_text(encoding="utf-8")):
+            reexports.update(name.strip() for name in names.split(",") if name.strip())
+        missing = sorted(expected_names - reexports)
+        if missing:
+            findings.append(
+                Finding(
+                    "PAT002",
+                    facade,
+                    f"missing Pattern/Overlay re-export(s): {', '.join(missing)}",
+                )
+            )
+
+    facade_paths = (
+        UI_ROOT / "components" / "common.slint",
+        UI_ROOT / "components" / "page_shell.slint",
+        UI_ROOT / "components" / "toast.slint",
+        UI_ROOT / "components" / "modal_manager.slint",
+    )
+    for facade in facade_paths:
+        duplicate_names = sorted(
+            str(item["name"])
+            for item in exported_definitions(facade)
+            if str(item["name"]) in expected_locations
+        )
+        if duplicate_names:
+            findings.append(
+                Finding(
+                    "PAT003",
+                    relative(facade),
+                    f"compatibility facade still defines Pattern/Overlay(s): {', '.join(duplicate_names)}",
+                )
+            )
+    return findings
+
+
 def kit_import_findings() -> list[Finding]:
     kit_root = UI_ROOT / "kit"
     findings: list[Finding] = []
@@ -461,6 +550,7 @@ def main() -> int:
         ("Duplicate exports", duplicate_export_findings),
         ("Foundation ownership", foundation_ownership_findings),
         ("Primitive ownership", primitive_ownership_findings),
+        ("Pattern/Overlay ownership", pattern_overlay_ownership_findings),
         ("Kit imports", kit_import_findings),
         ("Gallery imports", gallery_import_findings),
         ("Product/Gallery separation", product_gallery_findings),

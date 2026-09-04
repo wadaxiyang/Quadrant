@@ -1,0 +1,160 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Switch } from "std-widgets.slint";
+import {
+    BadgeKind,
+    EmptyState,
+    FluentIcons,
+    MetricCard,
+    PageHeader,
+    SectionHeader,
+    SettingRow,
+    SidebarItem,
+    SurfaceCard,
+    TaskRowShell,
+    Theme,
+    Typography,
+    UiConstants,
+    WindowControlButton,
+} from "../../kit/kit.slint";
+
+export component PatternsPage inherits Rectangle {
+    in-out property <bool> sample_switch: true;
+    preferred-height: patterns_layout.preferred-height;
+    vertical-stretch: 0;
+
+    patterns_layout := VerticalLayout {
+        spacing: UiConstants.space_20;
+
+        SurfaceCard {
+            preferred-height: navigation_layout.preferred-height;
+            vertical-stretch: 0;
+
+            navigation_layout := VerticalLayout {
+                padding: UiConstants.space_16;
+                spacing: UiConstants.space_12;
+
+                SectionHeader {
+                    title: "Navigation and window patterns";
+                    description: "Reusable navigation state and native-feeling title-bar actions.";
+                    badge_text: "Keyboard";
+                    badge_kind: BadgeKind.accent;
+                }
+
+                HorizontalLayout {
+                    spacing: UiConstants.space_16;
+                    alignment: center;
+
+                    SidebarItem {
+                        width: UiConstants.sidebar_expanded_width;
+                        icon: FluentIcons.today_regular;
+                        selected_icon: FluentIcons.today_filled;
+                        text: "Today";
+                        selected: true;
+                    }
+
+                    Rectangle {
+                        horizontal-stretch: 1;
+                    }
+
+                    Rectangle {
+                        width: 138px;
+                        height: UiConstants.title_bar_height;
+
+                        HorizontalLayout {
+                            spacing: 0px;
+                            WindowControlButton { icon: FluentIcons.minimize; label: "Minimize"; }
+                            WindowControlButton { icon: FluentIcons.maximize; label: "Maximize"; }
+                            WindowControlButton { icon: FluentIcons.dismiss; label: "Close"; close_button: true; }
+                        }
+                    }
+                }
+            }
+        }
+
+        SurfaceCard {
+            preferred-height: page_layout.preferred-height;
+            vertical-stretch: 0;
+
+            page_layout := VerticalLayout {
+                padding: UiConstants.space_16;
+                spacing: UiConstants.space_12;
+
+                PageHeader {
+                    title: "Page patterns";
+                    subtitle: "Headers and data surfaces grow with their content while retaining the shared type scale.";
+                    show_action: true;
+                    action_text: "Add task";
+                }
+
+                HorizontalLayout {
+                    spacing: UiConstants.space_12;
+                    MetricCard { horizontal-stretch: 1; label: "Completed"; value: "18"; hint: "+4 from previous"; }
+                    MetricCard { horizontal-stretch: 1; label: "Focus"; value: "3h 20m"; hint: "6 productive sessions"; }
+                    MetricCard { horizontal-stretch: 1; label: "Inbox"; value: "7"; hint: "2 need review"; }
+                }
+
+                EmptyState {
+                    title: "Nothing scheduled";
+                    message: "Tasks with a planned date or due time will appear here.";
+                    icon: FluentIcons.status_info;
+                }
+            }
+        }
+
+        SurfaceCard {
+            preferred-height: row_layout.preferred-height;
+            vertical-stretch: 0;
+
+            row_layout := VerticalLayout {
+                padding: UiConstants.space_16;
+                spacing: UiConstants.space_12;
+
+                SectionHeader {
+                    title: "Settings and task rows";
+                    description: "Content-driven settings plus the fixed 60px task presentation shell.";
+                    badge_text: "60px";
+                }
+
+                SettingRow {
+                    title: "Show completed tasks";
+                    description: "SettingRow keeps control alignment stable when this supporting text wraps.";
+
+                    Switch {
+                        text: "";
+                        accessible-label: "Show completed tasks";
+                        checked <=> root.sample_switch;
+                    }
+                }
+
+                Rectangle {
+                    height: 60px;
+
+                    TaskRowShell { width: 100%; }
+
+                    HorizontalLayout {
+                        padding-left: UiConstants.space_16;
+                        padding-right: UiConstants.space_16;
+                        spacing: UiConstants.space_12;
+
+                        Text {
+                            horizontal-stretch: 1;
+                            text: "Prepare the weekly review";
+                            color: Theme.text_primary;
+                            font-size: Typography.body;
+                            vertical-alignment: center;
+                        }
+
+                        Text {
+                            text: "Q2";
+                            color: Theme.text_secondary;
+                            font-size: Typography.caption;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

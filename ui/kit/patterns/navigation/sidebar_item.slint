@@ -1,0 +1,114 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from wsl-dashboard src/ui/components/common.slint at
+// 948589a255a4bd8a3ff9c3de49e2e13109378fcd. Font glyph icons were replaced by
+// semantic SVG images.
+
+import { Motion, Theme, Typography } from "../../foundation/theme.slint";
+import { UiConstants } from "../../foundation/constants.slint";
+import { FluentIcon } from "../../primitives/fluent_icon.slint";
+import { TooltipHost } from "../../primitives/tooltip_host.slint";
+
+export component SidebarItem inherits Rectangle {
+    in property <image> icon;
+    in property <image> selected_icon: root.icon;
+    in property <string> text;
+    in property <color> icon_color: Theme.icon_neutral;
+    in property <bool> selected: false;
+    in property <bool> collapsed: false;
+    callback clicked;
+
+    height: UiConstants.navigation_item_height;
+    border-radius: 4px;
+    border-width: sidebar_focus.has-focus ? 2px : 0px;
+    border-color: Theme.focus_ring;
+    background: selected ? Theme.selected_bg : (touch.has-hover ? Theme.hover_bg : transparent);
+    forward-focus: sidebar_focus;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-checkable: true;
+    accessible-checked: root.selected;
+    accessible-action-default => { root.clicked(); }
+
+    TooltipHost {
+        x: parent.width + 8px;
+        y: (parent.height - self.height) / 2;
+        text: root.text;
+        shown: root.collapsed && touch.has-hover;
+    }
+
+    HorizontalLayout {
+        padding-left: UiConstants.navigation_item_padding;
+        spacing: root.collapsed ? 0px : UiConstants.space_10;
+        alignment: start;
+        width: 100%;
+
+        animate spacing {
+            duration: Motion.slow;
+            easing: ease-out-quad;
+        }
+
+        Rectangle {
+            width: UiConstants.navigation_icon_slot_width;
+            height: UiConstants.navigation_item_height;
+
+            FluentIcon {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                size: UiConstants.navigation_icon_size;
+                source: root.selected ? root.selected_icon : root.icon;
+                icon_color: (root.selected || touch.has-hover) ? Theme.accent : root.icon_color;
+            }
+        }
+
+        Rectangle {
+            width: root.collapsed ? 0px : item_label.preferred-width;
+            clip: true;
+
+            animate width {
+                duration: Motion.slow;
+                easing: ease-out-quad;
+            }
+
+            item_label := Text {
+                width: 100%;
+                text: root.text;
+                font-size: Typography.body;
+                font-weight: root.selected ? Typography.semibold : Typography.regular;
+                color: (root.selected || touch.has-hover) ? Theme.text_primary : Theme.text_secondary;
+                vertical-alignment: center;
+                horizontal-alignment: left;
+                overflow: elide;
+                opacity: root.collapsed && parent.width < 10px ? 0 : 1;
+                animate opacity { duration: Motion.standard; }
+            }
+        }
+    }
+
+    Rectangle {
+        visible: root.selected;
+        x: 0;
+        y: (parent.height - self.height) / 2;
+        width: 3px;
+        height: 16px;
+        background: Theme.accent;
+        border-radius: 1.5px;
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    sidebar_focus := FocusScope {
+        width: 0px;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+}

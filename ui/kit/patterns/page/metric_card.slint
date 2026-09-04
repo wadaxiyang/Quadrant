@@ -1,0 +1,40 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme, Typography } from "../../foundation/theme.slint";
+import { UiConstants } from "../../foundation/constants.slint";
+import { SurfaceCard } from "../../primitives/surface_card.slint";
+
+export component MetricCard inherits SurfaceCard {
+    in property <string> label;
+    in property <string> value: "—";
+    in property <string> hint;
+
+    min-width: 150px;
+    min-height: 112px;
+    preferred-height: max(root.min-height, metric_layout.preferred-height);
+
+    metric_layout := VerticalLayout {
+        padding: UiConstants.space_16;
+        spacing: UiConstants.space_4;
+
+        Text {
+            text: root.label;
+            color: Theme.text_secondary;
+            font-size: 12px;
+        }
+
+        Text {
+            text: root.value;
+            color: Theme.text_primary;
+            font-size: Typography.title;
+            font-weight: Typography.semibold;
+        }
+
+        Text {
+            text: root.hint;
+            color: Theme.text_secondary;
+            font-size: Typography.caption;
+        }
+    }
+}

@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { Palette, ScrollView } from "std-widgets.slint";
-import { Branding, SegmentButton, Theme, ThemeMode, Typography, UiConstants } from "../kit/kit.slint";
-import { ModalKind, ModalManager } from "../components/modal_manager.slint";
+import { Branding, ModalKind, ModalManager, SegmentButton, Theme, ThemeMode, Typography, UiConstants } from "../kit/kit.slint";
 import { ButtonsPage } from "pages/buttons_page.slint";
 import { RowsBadgesPage } from "pages/rows_badges_page.slint";
 import { IconsPage } from "pages/icons_page.slint";
@@ -11,6 +10,7 @@ import { CardsPage } from "pages/cards_page.slint";
 import { InputsSelectionPage } from "pages/inputs_selection_page.slint";
 import { FeedbackPage } from "pages/feedback_page.slint";
 import { TypographyPage } from "pages/typography_page.slint";
+import { PatternsPage } from "pages/patterns_page.slint";
 
 export component DesignGalleryWindow inherits Window {
     title: "Quadrant Design Gallery";
@@ -93,6 +93,10 @@ export component DesignGalleryWindow inherits Window {
                 }
 
                 Rectangle { horizontal-stretch: 1; }
+            }
+
+            PatternsPage {
+                sample_switch <=> root.sample_switch;
             }
 
             ButtonsPage { }

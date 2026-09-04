@@ -1,0 +1,53 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from wsl-dashboard src/ui/components/common.slint at
+// 948589a255a4bd8a3ff9c3de49e2e13109378fcd. Font glyph icons were replaced by
+// semantic SVG images.
+
+import { Theme } from "../../foundation/theme.slint";
+import { FluentIcon } from "../../primitives/fluent_icon.slint";
+
+export component WindowControlButton inherits Rectangle {
+    in property <image> icon;
+    in property <string> symbol;
+    in property <string> label;
+    in property <bool> close_button: false;
+    callback clicked;
+
+    width: 46px;
+    height: 100%;
+    border-width: control_focus.has-focus ? 2px : 0px;
+    border-color: Theme.focus_ring;
+    background: control_touch.has-hover ? (root.close_button ? #e81123 : Theme.hover_bg) : transparent;
+    forward-focus: control_focus;
+
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+
+    FluentIcon {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        source: root.icon;
+        size: 16px;
+        icon_color: control_touch.has-hover && root.close_button ? white : Theme.icon_neutral;
+    }
+
+    control_touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+
+    control_focus := FocusScope {
+        width: 0px;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+}

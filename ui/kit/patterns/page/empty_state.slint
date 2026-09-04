@@ -1,0 +1,49 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { FluentIcons as Icons } from "../../foundation/fluent_icons.slint";
+import { Theme, Typography } from "../../foundation/theme.slint";
+import { UiConstants } from "../../foundation/constants.slint";
+import { FluentIcon } from "../../primitives/fluent_icon.slint";
+import { SurfaceCard } from "../../primitives/surface_card.slint";
+
+export component EmptyState inherits SurfaceCard {
+    in property <string> title;
+    in property <string> message;
+    in property <image> icon: Icons.status_info;
+    // Retained for source compatibility. Development milestone text is no longer rendered.
+    in property <string> milestone;
+
+    min-height: 144px;
+    preferred-height: max(root.min-height, empty_layout.preferred-height);
+    vertical-stretch: 0;
+
+    empty_layout := VerticalLayout {
+        padding: UiConstants.space_28;
+        spacing: UiConstants.space_8;
+        alignment: center;
+
+        FluentIcon {
+            source: root.icon;
+            size: 24px;
+            icon_color: Theme.icon_neutral;
+        }
+
+        Text {
+            text: root.title;
+            color: Theme.text_primary;
+            font-size: Typography.body_large;
+            font-weight: Typography.semibold;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: root.message;
+            color: Theme.text_secondary;
+            font-size: Typography.body;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+
+    }
+}

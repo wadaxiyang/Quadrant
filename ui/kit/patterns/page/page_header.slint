@@ -1,0 +1,51 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme, Typography } from "../../foundation/theme.slint";
+import { UiConstants } from "../../foundation/constants.slint";
+import { FluentButton } from "../../primitives/fluent_button.slint";
+
+export component PageHeader inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <bool> show_action: false;
+    in property <string> action_text;
+    callback action_clicked;
+
+    min-height: 72px;
+    preferred-height: max(root.min-height, header_layout.preferred-height);
+    vertical-stretch: 0;
+
+    header_layout := HorizontalLayout {
+        spacing: UiConstants.space_16;
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: UiConstants.space_4;
+            alignment: center;
+
+            Text {
+                text: root.title;
+                color: Theme.text_primary;
+                font-size: Typography.title;
+                font-weight: Typography.semibold;
+            }
+
+            Text {
+                text: root.subtitle;
+                color: Theme.text_secondary;
+                font-size: Typography.body;
+                wrap: word-wrap;
+                max-height: 40px;
+                overflow: elide;
+            }
+        }
+
+        if root.show_action: FluentButton {
+            min-width: 112px;
+            text: root.action_text;
+            primary: true;
+            clicked => { root.action_clicked(); }
+        }
+    }
+}

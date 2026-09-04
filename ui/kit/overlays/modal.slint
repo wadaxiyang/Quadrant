@@ -1,0 +1,122 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from the overlay/manager pattern in wsl-dashboard
+// src/ui/components/modal_manager.slint at 948589a255a4bd8a3ff9c3de49e2e13109378fcd.
+// WSL-specific dialogs and data were removed in favor of one reusable shell.
+
+import { Elevation, Theme, Typography } from "../foundation/theme.slint";
+import { UiConstants } from "../foundation/constants.slint";
+import { FluentIcons as Icons } from "../foundation/fluent_icons.slint";
+import { FluentIcon } from "../primitives/fluent_icon.slint";
+import { FluentButton } from "../primitives/fluent_button.slint";
+import { SurfaceCard } from "../primitives/surface_card.slint";
+
+export enum ModalKind { info, warning, danger }
+
+export component ModalManager inherits Rectangle {
+    in property <bool> shown: false;
+    in property <string> title;
+    in property <string> message;
+    in property <string> primary_text: "OK";
+    in property <string> secondary_text: "Cancel";
+    in property <bool> show_secondary: false;
+    in property <ModalKind> kind: ModalKind.info;
+    in property <bool> danger_primary: false;
+    callback accepted;
+    callback dismissed;
+
+    changed shown => {
+        if root.shown {
+            modal_focus.focus();
+        }
+    }
+
+    modal_focus := FocusScope {
+        enabled: root.shown;
+        capture-key-pressed(event) => {
+            if event.text == Key.Escape {
+                root.dismissed();
+                return accept;
+            }
+            if event.text == Key.Return {
+                root.accepted();
+                return accept;
+            }
+            return reject;
+        }
+
+        if root.shown: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: Elevation.dialog_overlay;
+        z: 500;
+
+        TouchArea { }
+
+        SurfaceCard {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: Math.min(parent.width - 48px, 420px);
+            height: max(176px, modal_layout.preferred-height);
+            background: Elevation.dialog_surface;
+            border-color: Elevation.dialog_border;
+            drop-shadow-blur: Elevation.dialog_blur;
+            drop-shadow-color: Elevation.dialog_shadow;
+
+            modal_layout := VerticalLayout {
+                padding: UiConstants.space_24;
+                spacing: UiConstants.space_16;
+
+                HorizontalLayout {
+                    spacing: UiConstants.space_12;
+                    alignment: center;
+
+                    FluentIcon {
+                        source: root.kind == ModalKind.danger ? Icons.status_error :
+                                root.kind == ModalKind.warning ? Icons.status_warning : Icons.status_info;
+                        size: 24px;
+                        icon_color: root.kind == ModalKind.danger ? Theme.danger :
+                                    root.kind == ModalKind.warning ? Theme.warning : Theme.accent;
+                    }
+
+                    Text {
+                        text: root.title;
+                        color: Theme.text_primary;
+                        font-size: Typography.subtitle;
+                        font-weight: Typography.semibold;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: root.message;
+                    color: Theme.text_secondary;
+                    font-size: Typography.body;
+                    wrap: word-wrap;
+                }
+
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 8px;
+
+                    if root.show_secondary: FluentButton {
+                        width: 92px;
+                        text: root.secondary_text;
+                        clicked => { root.dismissed(); }
+                    }
+
+                    FluentButton {
+                        width: 92px;
+                        text: root.primary_text;
+                        primary: true;
+                        danger: root.danger_primary;
+                        clicked => { root.accepted(); }
+                    }
+                }
+            }
+        }
+    }
+    }
+}
