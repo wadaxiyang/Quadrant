@@ -67,7 +67,7 @@ function Invoke-GallerySnapshot {
         $env:QUADRANT_GALLERY_SNAPSHOT = $snapshotPath
 
         Write-Host "Capturing $FileName"
-        & cargo run --locked --quiet -p quadrant-ui --example design_gallery
+        & cargo run --manifest-path (Join-Path $repoRoot 'Cargo.toml') --locked --quiet -p quadrant-ui-gallery
         if ($LASTEXITCODE -ne 0) {
             throw "Gallery snapshot command failed for $FileName with exit code $LASTEXITCODE"
         }

@@ -20,6 +20,16 @@ For an optimized executable:
 cargo build --locked --release -p quadrant-app
 ```
 
+The Fluent component Gallery is an independent development tool and is not part of
+the Product build:
+
+```console
+cargo run --locked -p quadrant-ui-gallery
+```
+
+Use `scripts/capture_gallery_baseline.ps1` to create its deterministic renderer
+snapshot smoke or matrix outputs.
+
 The Windows executable is written to `target/release/quadrant-app.exe`. A portable release archive and SHA-256 checksum can be created locally with:
 
 ```powershell

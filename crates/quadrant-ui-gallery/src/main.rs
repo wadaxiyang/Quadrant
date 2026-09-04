@@ -1,9 +1,13 @@
-//! Opens the development-only Fluent component gallery.
+//! Development-only Fluent component gallery host.
+
+#![deny(unsafe_code)]
+#![allow(missing_docs)]
 
 use std::{fs::File, io::BufWriter, path::Path, time::Duration};
 
-use quadrant_ui::{DesignGalleryWindow, ThemeMode};
 use slint::{ComponentHandle, LogicalSize, Rgba8Pixel, SharedPixelBuffer, SharedString};
+
+slint::include_modules!();
 
 fn main() -> Result<(), slint::PlatformError> {
     let gallery = DesignGalleryWindow::new()?;
