@@ -209,7 +209,12 @@ def gallery_import_findings() -> list[Finding]:
     legacy_gallery = UI_ROOT / "dev" / "design_gallery.slint"
     if legacy_gallery.exists():
         for source, target in import_targets(legacy_gallery):
-            if target is None or target == kit_public or is_within(target, legacy_gallery.parent):
+            if (
+                target is None
+                or target == kit_public
+                or is_within(target, legacy_gallery.parent)
+                or is_within(target, gallery_root)
+            ):
                 continue
             findings.append(
                 Finding(
@@ -312,7 +317,7 @@ def main() -> int:
         ("SPDX headers", spdx_findings),
     ]
     all_findings: list[Finding] = []
-    print("Quadrant UI boundary audit (Stage 0 report-only mode)")
+    print("Quadrant UI boundary audit (report-only mode; introduced in Stage 0)")
     for title, check in checks:
         findings = check()
         all_findings.extend(findings)

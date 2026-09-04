@@ -1,0 +1,20 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme, Typography } from "../../theme.slint";
+import { UiConstants } from "../../constants.slint";
+import { SurfaceCard } from "../../components/common.slint";
+import { GalleryLabel } from "../shared/gallery_label.slint";
+
+export component TypographyPage inherits SurfaceCard {
+    height: 156px;
+
+    VerticalLayout {
+        padding: UiConstants.space_16;
+        spacing: UiConstants.space_8;
+        GalleryLabel { text: "Typography"; }
+        Text { text: "Page title — 28 / Semibold"; color: Theme.text_primary; font-size: Typography.title; font-weight: Typography.semibold; }
+        Text { text: "Body — 14 / Regular"; color: Theme.text_primary; font-size: Typography.body; }
+        Text { text: "Caption — 12 / Regular"; color: Theme.text_tertiary; font-size: Typography.caption; }
+    }
+}

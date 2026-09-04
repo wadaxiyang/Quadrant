@@ -1,0 +1,43 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme } from "../../theme.slint";
+import { UiConstants } from "../../constants.slint";
+import { Icons } from "../../icons.slint";
+import { SurfaceCard } from "../../components/common.slint";
+import { FluentIcon, IconButton } from "../../components/icon.slint";
+import { GalleryLabel } from "../shared/gallery_label.slint";
+import { StateSpecimen } from "../shared/state_specimen.slint";
+
+export component IconsPage inherits SurfaceCard {
+    preferred-height: icon_states.preferred-height;
+
+    icon_states := VerticalLayout {
+        padding: UiConstants.space_16;
+        spacing: UiConstants.space_12;
+
+        GalleryLabel { text: "IconButton interaction states"; }
+
+        HorizontalLayout {
+            spacing: UiConstants.space_12;
+            StateSpecimen { horizontal-stretch: 1; label: "Normal"; IconButton { icon: Icons.add; tooltip: "Normal"; } }
+            StateSpecimen { horizontal-stretch: 1; label: "Hover"; IconButton { icon: Icons.add; tooltip: "Hover"; preview_hover: true; } }
+            StateSpecimen { horizontal-stretch: 1; label: "Pressed"; IconButton { icon: Icons.add; tooltip: "Pressed"; preview_pressed: true; } }
+            StateSpecimen { horizontal-stretch: 1; label: "Keyboard focus"; IconButton { icon: Icons.add; tooltip: "Focused"; preview_focus: true; } }
+            StateSpecimen { horizontal-stretch: 1; label: "Danger"; IconButton { icon: Icons.delete; tooltip: "Delete"; danger: true; preview_hover: true; } }
+            StateSpecimen { horizontal-stretch: 1; label: "Disabled"; IconButton { icon: Icons.dismiss; tooltip: "Disabled"; enabled: false; } }
+        }
+
+        HorizontalLayout {
+            spacing: UiConstants.space_12;
+            GalleryLabel { text: "Semantic icons"; width: 116px; vertical-alignment: center; }
+            FluentIcon { source: Icons.quadrants_regular; size: 20px; }
+            FluentIcon { source: Icons.quadrants_filled; size: 20px; icon_color: Theme.accent; }
+            FluentIcon { source: Icons.status_info; size: 24px; icon_color: Theme.accent; }
+            FluentIcon { source: Icons.status_success; size: 24px; icon_color: Theme.success; }
+            FluentIcon { source: Icons.status_warning; size: 24px; icon_color: Theme.warning; }
+            FluentIcon { source: Icons.status_error; size: 24px; icon_color: Theme.danger; }
+            Rectangle { horizontal-stretch: 1; }
+        }
+    }
+}

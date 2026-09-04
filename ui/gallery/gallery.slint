@@ -1,0 +1,146 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Palette, ScrollView } from "std-widgets.slint";
+import { Theme, ThemeMode, Typography } from "../theme.slint";
+import { UiConstants } from "../constants.slint";
+import { Icons } from "../icons.slint";
+import { SegmentButton } from "../components/common.slint";
+import { ModalKind, ModalManager } from "../components/modal_manager.slint";
+import { ButtonsPage } from "pages/buttons_page.slint";
+import { RowsBadgesPage } from "pages/rows_badges_page.slint";
+import { IconsPage } from "pages/icons_page.slint";
+import { CardsPage } from "pages/cards_page.slint";
+import { InputsSelectionPage } from "pages/inputs_selection_page.slint";
+import { FeedbackPage } from "pages/feedback_page.slint";
+import { TypographyPage } from "pages/typography_page.slint";
+
+export component DesignGalleryWindow inherits Window {
+    title: "Quadrant Design Gallery";
+    icon: Icons.app_mark;
+    preferred-width: 1040px;
+    preferred-height: 800px;
+    min-width: 760px;
+    min-height: 520px;
+    background: Theme.background;
+    default-font-family: root.ui_font_family;
+    default-font-size: Typography.body;
+    default-font-weight: Typography.regular;
+
+    in-out property <string> ui_font_family <=> Theme.ui_font_family;
+    in-out property <string> sample_text;
+    in-out property <bool> sample_switch: true;
+    in-out property <ThemeMode> gallery_theme: ThemeMode.light;
+    in-out property <bool> sample_modal_visible: false;
+    in-out property <int> sample_modal_kind: 0;
+
+    changed gallery_theme => {
+        Theme.mode = root.gallery_theme;
+        Palette.color-scheme = root.gallery_theme == ThemeMode.system ? ColorScheme.unknown :
+                               root.gallery_theme == ThemeMode.light ? ColorScheme.light : ColorScheme.dark;
+    }
+
+    ScrollView {
+        width: 100%;
+        height: 100%;
+        viewport-width: self.width;
+
+        VerticalLayout {
+            padding: UiConstants.page_padding_wide;
+            spacing: UiConstants.space_20;
+
+            Text {
+                text: "Quadrant Fluent design gallery";
+                color: Theme.text_primary;
+                font-size: Typography.title;
+                font-weight: Typography.semibold;
+            }
+
+            Text {
+                text: "Shared tokens and reusable component states. Development-only; not part of release navigation.";
+                color: Theme.text_secondary;
+                font-size: Typography.body;
+            }
+
+            HorizontalLayout {
+                spacing: UiConstants.space_4;
+
+                SegmentButton {
+                    text: "System";
+                    selected: root.gallery_theme == ThemeMode.system;
+                    clicked => {
+                        root.gallery_theme = ThemeMode.system;
+                        Theme.mode = ThemeMode.system;
+                        Palette.color-scheme = ColorScheme.unknown;
+                    }
+                }
+
+                SegmentButton {
+                    text: "Light";
+                    selected: root.gallery_theme == ThemeMode.light;
+                    clicked => {
+                        root.gallery_theme = ThemeMode.light;
+                        Theme.mode = ThemeMode.light;
+                        Palette.color-scheme = ColorScheme.light;
+                    }
+                }
+
+                SegmentButton {
+                    text: "Dark";
+                    selected: root.gallery_theme == ThemeMode.dark;
+                    clicked => {
+                        root.gallery_theme = ThemeMode.dark;
+                        Theme.mode = ThemeMode.dark;
+                        Palette.color-scheme = ColorScheme.dark;
+                    }
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+            }
+
+            ButtonsPage { }
+
+            RowsBadgesPage {
+                sample_switch <=> root.sample_switch;
+            }
+
+            IconsPage { }
+
+            CardsPage { }
+
+            InputsSelectionPage {
+                sample_text <=> root.sample_text;
+                sample_switch <=> root.sample_switch;
+            }
+
+            FeedbackPage {
+                modal_requested(kind) => {
+                    root.sample_modal_kind = kind;
+                    root.sample_modal_visible = true;
+                }
+            }
+
+            TypographyPage { }
+        }
+    }
+
+    ModalManager {
+        width: 100%;
+        height: 100%;
+        shown: root.sample_modal_visible;
+        title: root.sample_modal_kind == 2 ? "Delete this task?" :
+               root.sample_modal_kind == 1 ? "Review this change" : "Information";
+        message: root.sample_modal_kind == 2 ? "This action permanently removes the task. Completion snapshots remain available in Review." :
+                 root.sample_modal_kind == 1 ? "The validated backup will be staged and applied after Quadrant restarts." :
+                 "Modal content grows with wrapped text and keeps its primary action keyboard accessible.";
+        primary_text: root.sample_modal_kind == 2 ? "Delete" :
+                      root.sample_modal_kind == 1 ? "Continue" : "Close";
+        secondary_text: "Cancel";
+        show_secondary: root.sample_modal_kind != 0;
+        kind: root.sample_modal_kind == 2 ? ModalKind.danger :
+              root.sample_modal_kind == 1 ? ModalKind.warning : ModalKind.info;
+        danger_primary: root.sample_modal_kind == 2;
+        accepted => { root.sample_modal_visible = false; }
+        dismissed => { root.sample_modal_visible = false; }
+    }
+}

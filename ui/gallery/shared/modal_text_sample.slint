@@ -1,0 +1,32 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme, Typography } from "../../theme.slint";
+import { UiConstants } from "../../constants.slint";
+import { SurfaceCard } from "../../components/common.slint";
+
+export component ModalTextSample inherits SurfaceCard {
+    in property <string> sample_title;
+    in property <string> sample_message;
+    preferred-height: sample_layout.preferred-height;
+    elevated: true;
+
+    sample_layout := VerticalLayout {
+        padding: UiConstants.space_16;
+        spacing: UiConstants.space_8;
+
+        Text {
+            text: root.sample_title;
+            color: Theme.text_primary;
+            font-size: Typography.subtitle;
+            font-weight: Typography.semibold;
+        }
+
+        Text {
+            text: root.sample_message;
+            color: Theme.text_secondary;
+            font-size: Typography.body;
+            wrap: word-wrap;
+        }
+    }
+}

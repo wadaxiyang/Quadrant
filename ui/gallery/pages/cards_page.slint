@@ -1,0 +1,29 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { UiConstants } from "../../constants.slint";
+import { SurfaceCard } from "../../components/common.slint";
+import { CardStateSample } from "../shared/card_state_sample.slint";
+import { GalleryLabel } from "../shared/gallery_label.slint";
+
+export component CardsPage inherits SurfaceCard {
+    preferred-height: card_states.preferred-height;
+
+    card_states := VerticalLayout {
+        padding: UiConstants.space_16;
+        spacing: UiConstants.space_12;
+
+        GalleryLabel { text: "SurfaceCard variants"; }
+
+        HorizontalLayout {
+            spacing: UiConstants.space_12;
+            CardStateSample { horizontal-stretch: 1; label: "Base"; }
+            CardStateSample { horizontal-stretch: 1; label: "Hover"; interactive: true; preview_hover: true; }
+            CardStateSample { horizontal-stretch: 1; label: "Pressed"; interactive: true; preview_pressed: true; }
+            CardStateSample { horizontal-stretch: 1; label: "Elevated"; elevated: true; }
+            CardStateSample { horizontal-stretch: 1; label: "Selected"; selected: true; }
+            CardStateSample { horizontal-stretch: 1; label: "Keyboard focus"; interactive: true; preview_focus: true; }
+            CardStateSample { horizontal-stretch: 1; label: "Disabled"; interactive: true; enabled: false; }
+        }
+    }
+}

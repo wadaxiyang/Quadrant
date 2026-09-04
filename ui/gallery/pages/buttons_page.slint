@@ -1,0 +1,38 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { UiConstants } from "../../constants.slint";
+import { FluentButton, SegmentButton, SurfaceCard } from "../../components/common.slint";
+import { GalleryLabel } from "../shared/gallery_label.slint";
+import { StateSpecimen } from "../shared/state_specimen.slint";
+
+export component ButtonsPage inherits SurfaceCard {
+    preferred-height: button_states.preferred-height;
+
+    button_states := VerticalLayout {
+        padding: UiConstants.space_16;
+        spacing: UiConstants.space_12;
+
+        GalleryLabel { text: "Button interaction states"; }
+
+        HorizontalLayout {
+            spacing: UiConstants.space_12;
+            StateSpecimen { horizontal-stretch: 1; label: "Normal"; FluentButton { text: "Button"; } }
+            StateSpecimen { horizontal-stretch: 1; label: "Hover"; FluentButton { text: "Button"; preview_hover: true; } }
+            StateSpecimen { horizontal-stretch: 1; label: "Pressed"; FluentButton { text: "Button"; preview_pressed: true; } }
+            StateSpecimen { horizontal-stretch: 1; label: "Keyboard focus"; FluentButton { text: "Button"; preview_focus: true; } }
+            StateSpecimen { horizontal-stretch: 1; label: "Disabled"; FluentButton { text: "Button"; enabled: false; } }
+            StateSpecimen { horizontal-stretch: 1; label: "Danger"; FluentButton { text: "Delete"; danger: true; primary: true; } }
+        }
+
+        HorizontalLayout {
+            spacing: UiConstants.space_8;
+            GalleryLabel { text: "Segment"; width: 72px; vertical-alignment: center; }
+            SegmentButton { text: "Selected"; selected: true; }
+            SegmentButton { text: "Hover"; preview_hover: true; }
+            SegmentButton { text: "Pressed"; preview_pressed: true; }
+            SegmentButton { text: "Focus"; preview_focus: true; }
+            Rectangle { horizontal-stretch: 1; }
+        }
+    }
+}

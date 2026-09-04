@@ -1,0 +1,20 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme, Typography } from "../../theme.slint";
+import { SurfaceCard } from "../../components/common.slint";
+
+export component CardStateSample inherits SurfaceCard {
+    in property <string> label;
+    min-height: 56px;
+    accessible_name: root.label;
+
+    Text {
+        text: root.label;
+        color: Theme.text_primary;
+        font-size: Typography.caption;
+        font-weight: Typography.semibold;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}

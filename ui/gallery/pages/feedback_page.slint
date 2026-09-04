@@ -1,0 +1,102 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { UiConstants } from "../../constants.slint";
+import { BadgeKind, FluentButton, SurfaceCard } from "../../components/common.slint";
+import { SectionHeader } from "../../components/page_shell.slint";
+import { ToastHost, ToastKind } from "../../components/toast.slint";
+import { GalleryLabel } from "../shared/gallery_label.slint";
+import { ModalTextSample } from "../shared/modal_text_sample.slint";
+
+export component FeedbackPage inherits Rectangle {
+    callback modal_requested(int);
+    preferred-height: feedback_layout.preferred-height;
+    vertical-stretch: 0;
+
+    feedback_layout := VerticalLayout {
+        spacing: UiConstants.space_20;
+
+        SurfaceCard {
+            preferred-height: toast_gallery_layout.preferred-height;
+            vertical-stretch: 0;
+
+            toast_gallery_layout := VerticalLayout {
+                padding: UiConstants.space_16;
+                spacing: UiConstants.space_12;
+                GalleryLabel { text: "Toast states"; }
+
+                Rectangle {
+                    height: 56px;
+                    ToastHost {
+                        width: min(parent.width, 420px);
+                        shown: true;
+                        message: "Information uses the shared SVG and type scale.";
+                        kind: ToastKind.info;
+                        auto_dismiss: false;
+                    }
+                }
+
+                Rectangle {
+                    height: 56px;
+                    ToastHost {
+                        width: min(parent.width, 420px);
+                        shown: true;
+                        message: "The task was completed successfully.";
+                        kind: ToastKind.success;
+                        auto_dismiss: false;
+                    }
+                }
+
+                Rectangle {
+                    height: 76px;
+                    ToastHost {
+                        width: min(parent.width, 420px);
+                        shown: true;
+                        message: "This deliberately long error wraps onto a second line so critical details remain visible at the maximum toast width.";
+                        kind: ToastKind.error;
+                        auto_dismiss: false;
+                    }
+                }
+            }
+        }
+
+        SurfaceCard {
+            preferred-height: modal_gallery_layout.preferred-height;
+            vertical-stretch: 0;
+
+            modal_gallery_layout := VerticalLayout {
+                padding: UiConstants.space_16;
+                spacing: UiConstants.space_12;
+
+                SectionHeader {
+                    title: "Modal states";
+                    description: "Interactive info, warning, and destructive confirmation coverage.";
+                    badge_text: "Enter / Esc";
+                    badge_kind: BadgeKind.accent;
+                }
+
+                HorizontalLayout {
+                    spacing: UiConstants.space_8;
+                    FluentButton { text: "Show info"; clicked => { root.modal_requested(0); } }
+                    FluentButton { text: "Show warning"; clicked => { root.modal_requested(1); } }
+                    FluentButton { text: "Show danger"; danger: true; clicked => { root.modal_requested(2); } }
+                    Rectangle { horizontal-stretch: 1; }
+                }
+
+                HorizontalLayout {
+                    spacing: UiConstants.space_16;
+                    ModalTextSample {
+                        horizontal-stretch: 1;
+                        sample_title: "Short confirmation";
+                        sample_message: "Save these changes?";
+                    }
+                    ModalTextSample {
+                        horizontal-stretch: 1;
+                        sample_title: "Long wrapped confirmation";
+                        sample_message: "This longer modal copy demonstrates content-driven height when a decision needs enough context to remain clear without clipping or relying on a fixed dialog height.";
+                    }
+                }
+            }
+        }
+    }
+}
