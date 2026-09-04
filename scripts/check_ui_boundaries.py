@@ -479,6 +479,48 @@ def product_gallery_findings() -> list[Finding]:
     return findings
 
 
+def product_kit_import_findings() -> list[Finding]:
+    compatibility_facades = {
+        (UI_ROOT / "theme.slint").resolve(),
+        (UI_ROOT / "constants.slint").resolve(),
+        (UI_ROOT / "icons.slint").resolve(),
+        (UI_ROOT / "components" / "common.slint").resolve(),
+        (UI_ROOT / "components" / "icon.slint").resolve(),
+        (UI_ROOT / "components" / "page_shell.slint").resolve(),
+        (UI_ROOT / "components" / "toast.slint").resolve(),
+        (UI_ROOT / "components" / "modal_manager.slint").resolve(),
+    }
+    product_files = [UI_ROOT / "app.slint", *slint_files(UI_ROOT / "views")]
+    product_files.extend(
+        path
+        for path in slint_files(UI_ROOT / "components")
+        if path.resolve() not in compatibility_facades
+    )
+    kit_root = UI_ROOT / "kit"
+    kit_public = (kit_root / "kit.slint").resolve()
+
+    findings: list[Finding] = []
+    for path in product_files:
+        for source, target in import_targets(path):
+            if target in compatibility_facades:
+                findings.append(
+                    Finding(
+                        "PROD002",
+                        relative(path),
+                        f'Product still imports compatibility facade: "{source}"',
+                    )
+                )
+            elif target is not None and is_within(target, kit_root) and target != kit_public:
+                findings.append(
+                    Finding(
+                        "PROD003",
+                        relative(path),
+                        f'Product bypasses kit.slint: "{source}"',
+                    )
+                )
+    return findings
+
+
 def cargo_dependency_names(path: Path) -> set[str]:
     names: set[str] = set()
     section = ""
@@ -553,6 +595,7 @@ def main() -> int:
         ("Pattern/Overlay ownership", pattern_overlay_ownership_findings),
         ("Kit imports", kit_import_findings),
         ("Gallery imports", gallery_import_findings),
+        ("Product Kit imports", product_kit_import_findings),
         ("Product/Gallery separation", product_gallery_findings),
         ("Cargo dependencies", cargo_findings),
         ("SPDX headers", spdx_findings),

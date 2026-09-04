@@ -2,12 +2,22 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { Date, DatePickerPopup, Palette, ScrollView, Time, TimePickerPopup } from "std-widgets.slint";
-import { Theme, ThemeMode, Typography } from "../theme.slint";
-import { UiConstants } from "../constants.slint";
-import { Icons } from "../icons.slint";
-import { FluentButton, FluentTextArea, FluentTextField, SegmentButton, SurfaceCard } from "common.slint";
-import { FluentIcon, IconButton } from "icon.slint";
-import { SectionHeader } from "page_shell.slint";
+import {
+    Branding,
+    FluentButton,
+    FluentIcon,
+    FluentIcons as Icons,
+    FluentTextArea,
+    FluentTextField,
+    IconButton,
+    SectionHeader,
+    SegmentButton,
+    SurfaceCard,
+    Theme,
+    ThemeMode,
+    Typography,
+    UiConstants,
+} from "../kit/kit.slint";
 
 component FieldLabel inherits Text {
     color: Theme.text_secondary;
@@ -26,7 +36,7 @@ component FieldError inherits Text {
 
 export component TaskEditorWindow inherits Window {
     title: "Edit Task — Quadrant";
-    icon: Icons.app_mark;
+    icon: Branding.app_mark;
     preferred-width: 760px;
     preferred-height: 720px;
     min-width: 620px;

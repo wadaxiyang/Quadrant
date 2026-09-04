@@ -2,12 +2,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { ScrollView } from "std-widgets.slint";
-import { Theme, Typography } from "../theme.slint";
-import { UiConstants } from "../constants.slint";
-import { PageHeader, SectionHeader } from "../components/page_shell.slint";
-import { Badge, BadgeKind, FluentButton, SettingRow, SurfaceCard } from "../components/common.slint";
-import { FluentIcon } from "../components/icon.slint";
-import { Icons } from "../icons.slint";
+import {
+    Badge,
+    BadgeKind,
+    Branding,
+    FluentButton,
+    FluentIcon,
+    FluentIcons as Icons,
+    PageHeader,
+    SectionHeader,
+    SettingRow,
+    SurfaceCard,
+    Theme,
+    Typography,
+    UiConstants,
+} from "../kit/kit.slint";
 
 component AppMark inherits Rectangle {
     width: 48px;
@@ -17,7 +26,7 @@ component AppMark inherits Rectangle {
     accessible-label: "Quadrant app mark";
 
     Image {
-        source: Icons.app_mark;
+        source: Branding.app_mark;
         image-fit: contain;
         accessible-role: none;
     }

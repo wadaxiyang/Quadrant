@@ -2,10 +2,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { ScrollView, Switch } from "std-widgets.slint";
-import { Theme, ThemeMode, Typography } from "../theme.slint";
-import { UiConstants } from "../constants.slint";
-import { PageHeader, SectionHeader } from "../components/page_shell.slint";
-import { Badge, BadgeKind, FluentButton, SegmentButton, SettingRow, SurfaceCard } from "../components/common.slint";
+import {
+    Badge,
+    BadgeKind,
+    FluentButton,
+    PageHeader,
+    SectionHeader,
+    SegmentButton,
+    SettingRow,
+    SurfaceCard,
+    Theme,
+    ThemeMode,
+    Typography,
+    UiConstants,
+} from "../kit/kit.slint";
 
 export component SettingsView inherits Rectangle {
     in property <ThemeMode> theme_mode: ThemeMode.system;

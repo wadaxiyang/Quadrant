@@ -5,11 +5,16 @@
 // Derived from wsl-dashboard src/ui/components/sidebar.slint at
 // 948589a255a4bd8a3ff9c3de49e2e13109378fcd; navigation and icons adapted for Quadrant.
 
-import { Theme, Motion, Typography } from "../theme.slint";
-import { UiConstants } from "../constants.slint";
-import { Icons } from "../icons.slint";
-import { SidebarItem } from "common.slint";
-import { FluentIcon, TooltipHost } from "icon.slint";
+import {
+    FluentIcon,
+    FluentIcons as Icons,
+    Motion,
+    SidebarItem,
+    Theme,
+    TooltipHost,
+    Typography,
+    UiConstants,
+} from "../kit/kit.slint";
 
 export component Sidebar inherits Rectangle {
     in-out property <bool> collapsed: false;

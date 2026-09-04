@@ -1,15 +1,20 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { Theme, ThemeMode } from "theme.slint";
-import { Typography } from "theme.slint";
 import { Palette } from "std-widgets.slint";
-import { UiConstants } from "constants.slint";
-import { Icons } from "icons.slint";
+import {
+    Branding,
+    ModalKind,
+    ModalManager,
+    Theme,
+    ThemeMode,
+    ToastHost,
+    ToastKind,
+    Typography,
+    UiConstants,
+} from "kit/kit.slint";
 import { Sidebar } from "components/sidebar.slint";
 import { TitleBar } from "components/title_bar.slint";
-import { ModalKind, ModalManager } from "components/modal_manager.slint";
-import { ToastHost, ToastKind } from "components/toast.slint";
 import { QuadrantsView, TaskRow } from "views/quadrants.slint";
 import { TodayTaskRow, TodayView } from "views/today.slint";
 import { FocusTaskRow, FocusView } from "views/focus.slint";
@@ -24,7 +29,7 @@ export { DesignGalleryWindow } from "dev/design_gallery.slint";
 
 export component MainWindow inherits Window {
     title: "Quadrant";
-    icon: Icons.app_mark;
+    icon: Branding.app_mark;
     preferred-width: 1100px;
     preferred-height: 720px;
     min-width: 760px;

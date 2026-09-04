@@ -2,12 +2,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { ScrollView } from "std-widgets.slint";
-import { Theme, Typography } from "../theme.slint";
-import { UiConstants } from "../constants.slint";
-import { EmptyState, PageHeader } from "../components/page_shell.slint";
-import { FluentButton, SurfaceCard, TaskRowShell } from "../components/common.slint";
-import { IconButton } from "../components/icon.slint";
-import { Icons } from "../icons.slint";
+import {
+    EmptyState,
+    FluentButton,
+    FluentIcons as Icons,
+    IconButton,
+    PageHeader,
+    SurfaceCard,
+    TaskRowShell,
+    Theme,
+    Typography,
+    UiConstants,
+} from "../kit/kit.slint";
 
 export struct CompletedTaskRow {
     id: string,

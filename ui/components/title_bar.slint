@@ -6,11 +6,17 @@
 // 948589a255a4bd8a3ff9c3de49e2e13109378fcd. Product-specific mail/pin actions
 // and Segoe icon glyphs were removed; theme selection is tri-state.
 
-import { Theme, ThemeMode, Typography } from "../theme.slint";
-import { UiConstants } from "../constants.slint";
-import { WindowControlButton } from "common.slint";
-import { FluentIcon, IconButton } from "icon.slint";
-import { Icons } from "../icons.slint";
+import {
+    Branding,
+    FluentIcon,
+    FluentIcons as Icons,
+    IconButton,
+    Theme,
+    ThemeMode,
+    Typography,
+    UiConstants,
+    WindowControlButton,
+} from "../kit/kit.slint";
 
 component ThemeModeControl inherits IconButton {
     in property <ThemeMode> mode: ThemeMode.system;
@@ -58,7 +64,7 @@ export component TitleBar inherits Rectangle {
 
             Image {
                 y: (parent.height - self.height) / 2;
-                source: Icons.app_mark;
+                source: Branding.app_mark;
                 width: 16px;
                 height: 16px;
                 image-fit: contain;

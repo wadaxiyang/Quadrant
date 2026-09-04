@@ -1,15 +1,21 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { Theme, ThemeMode, Typography } from "../theme.slint";
-import { UiConstants } from "../constants.slint";
-import { Icons } from "../icons.slint";
 import { Palette } from "std-widgets.slint";
-import { FluentButton, FluentTextField, SegmentButton } from "common.slint";
+import {
+    Branding,
+    FluentButton,
+    FluentTextField,
+    SegmentButton,
+    Theme,
+    ThemeMode,
+    Typography,
+    UiConstants,
+} from "../kit/kit.slint";
 
 export component QuickAddWindow inherits Window {
     title: "Quick Add — Quadrant";
-    icon: Icons.app_mark;
+    icon: Branding.app_mark;
     preferred-width: 520px;
     preferred-height: 252px;
     min-width: 440px;
