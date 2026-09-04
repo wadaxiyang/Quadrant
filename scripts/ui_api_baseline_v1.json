@@ -1,0 +1,240 @@
+{
+  "schema_version": 1,
+  "license": "GPL-3.0-only",
+  "captured_at": "2026-09-04",
+  "captured_commit": "51e5de3",
+  "exports": {
+    "SidebarItem": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <image> icon;",
+        "in property <image> selected_icon: root.icon;",
+        "in property <string> text;",
+        "in property <color> icon_color: Theme.icon_neutral;",
+        "in property <bool> selected: false;",
+        "in property <bool> collapsed: false;",
+        "callback clicked;"
+      ]
+    },
+    "FluentButton": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <string> text;",
+        "in property <image> icon;",
+        "in property <bool> show_icon: false;",
+        "in property <bool> primary: false;",
+        "in property <bool> accent: false;",
+        "in property <bool> danger: false;",
+        "in property <bool> enabled: true;",
+        "in property <bool> preview_hover: false;",
+        "in property <bool> preview_pressed: false;",
+        "in property <bool> preview_focus: false;",
+        "callback clicked;"
+      ]
+    },
+    "WindowControlButton": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <image> icon;",
+        "in property <string> symbol;",
+        "in property <string> label;",
+        "in property <bool> close_button: false;",
+        "callback clicked;"
+      ]
+    },
+    "FluentTextField": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in-out property <string> text;",
+        "in property <string> placeholder_text;",
+        "in property <bool> enabled: true;",
+        "in property <string> error_text;",
+        "in property <bool> preview_focus: false;",
+        "callback accepted(string);",
+        "callback edited(string);"
+      ]
+    },
+    "FluentTextArea": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in-out property <string> text;",
+        "in property <string> placeholder_text;",
+        "in property <bool> enabled: true;",
+        "callback edited(string);"
+      ]
+    },
+    "SegmentButton": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <string> text;",
+        "in property <bool> selected: false;",
+        "in property <bool> enabled: true;",
+        "in property <bool> preview_hover: false;",
+        "in property <bool> preview_pressed: false;",
+        "in property <bool> preview_focus: false;",
+        "callback clicked;"
+      ]
+    },
+    "SurfaceCard": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <bool> interactive: false;",
+        "in property <bool> elevated: false;",
+        "in property <bool> selected: false;",
+        "in property <bool> enabled: true;",
+        "in property <bool> preview_hover: false;",
+        "in property <bool> preview_pressed: false;",
+        "in property <bool> preview_focus: false;",
+        "in property <string> accessible_name;",
+        "callback clicked;"
+      ]
+    },
+    "TaskRowShell": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <length> row_height: 60px;",
+        "in property <bool> hovered: row_touch.has-hover;"
+      ]
+    },
+    "BadgeKind": {
+      "kind": "enum",
+      "inherits": null,
+      "api": ["neutral", "accent", "success", "warning", "danger"]
+    },
+    "Badge": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <string> text;",
+        "in property <BadgeKind> kind: BadgeKind.neutral;"
+      ]
+    },
+    "SettingRow": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <string> title;",
+        "in property <string> description;",
+        "in property <bool> enabled: true;"
+      ]
+    },
+    "FluentIcon": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <image> source;",
+        "in property <length> size: 16px;",
+        "in property <brush> icon_color: Theme.icon_neutral;",
+        "in property <length> optical_offset_x: 0px;",
+        "in property <length> optical_offset_y: 0px;"
+      ]
+    },
+    "TooltipHost": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <string> text;",
+        "in property <bool> shown: false;"
+      ]
+    },
+    "IconButton": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <image> icon;",
+        "in property <string> tooltip;",
+        "in property <bool> danger: false;",
+        "in property <bool> enabled: true;",
+        "in property <bool> preview_hover: false;",
+        "in property <bool> preview_pressed: false;",
+        "in property <bool> preview_focus: false;",
+        "callback clicked;"
+      ]
+    },
+    "PageHeader": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <string> title;",
+        "in property <string> subtitle;",
+        "in property <bool> show_action: false;",
+        "in property <string> action_text;",
+        "callback action_clicked;"
+      ]
+    },
+    "EmptyState": {
+      "kind": "component",
+      "inherits": "SurfaceCard",
+      "api": [
+        "in property <string> title;",
+        "in property <string> message;",
+        "in property <image> icon: Icons.status_info;",
+        "in property <string> milestone;"
+      ]
+    },
+    "MetricCard": {
+      "kind": "component",
+      "inherits": "SurfaceCard",
+      "api": [
+        "in property <string> label;",
+        "in property <string> value: \"—\";",
+        "in property <string> hint;"
+      ]
+    },
+    "SectionHeader": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <string> title;",
+        "in property <string> description;",
+        "in property <string> badge_text;",
+        "in property <BadgeKind> badge_kind: BadgeKind.neutral;"
+      ]
+    },
+    "ModalKind": {
+      "kind": "enum",
+      "inherits": null,
+      "api": ["info", "warning", "danger"]
+    },
+    "ModalManager": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <bool> shown: false;",
+        "in property <string> title;",
+        "in property <string> message;",
+        "in property <string> primary_text: \"OK\";",
+        "in property <string> secondary_text: \"Cancel\";",
+        "in property <bool> show_secondary: false;",
+        "in property <ModalKind> kind: ModalKind.info;",
+        "in property <bool> danger_primary: false;",
+        "callback accepted;",
+        "callback dismissed;"
+      ]
+    },
+    "ToastKind": {
+      "kind": "enum",
+      "inherits": null,
+      "api": ["info", "success", "error"]
+    },
+    "ToastHost": {
+      "kind": "component",
+      "inherits": "Rectangle",
+      "api": [
+        "in property <bool> shown: false;",
+        "in property <string> message;",
+        "in property <ToastKind> kind: ToastKind.info;",
+        "in property <bool> auto_dismiss: true;",
+        "callback dismissed;"
+      ]
+    }
+  }
+}
