@@ -30,6 +30,16 @@ cargo run --locked -p quadrant-ui-gallery
 Use `scripts/capture_gallery_baseline.ps1` to create its deterministic renderer
 snapshot smoke or matrix outputs.
 
+The UI dependency guard is enforced and uses only the Python standard library:
+
+```console
+python scripts/check_ui_boundaries.py
+```
+
+It fails on public-API drift, duplicate component definitions, obsolete facade
+paths, invalid Kit/Gallery/Product imports, forbidden Cargo dependencies, or
+missing Slint SPDX headers.
+
 The Gallery provides keyboard-accessible catalog navigation, category filters,
 Light/Dark/System themes, Compact/Medium/Wide preview containers, live component
 properties, accessibility notes, and Kit-only code samples. Snapshot automation

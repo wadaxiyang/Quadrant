@@ -2,13 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
 # SPDX-License-Identifier: GPL-3.0-only
 
-"""Report Quadrant UI dependency-boundary and frozen-API findings.
-
-Stage 0 intentionally keeps this check non-blocking. It always exits successfully
-after printing findings so the current migration debt is visible before files move.
-Stage 9 may promote the same checks to enforcement after compatibility facades are
-removed.
-"""
+"""Enforce Quadrant UI dependency boundaries and the frozen shared API."""
 
 from __future__ import annotations
 
@@ -216,37 +210,6 @@ def foundation_ownership_findings() -> list[Finding]:
             Finding("FND002", str(fluent[0]["file"]), "FluentIcons must not expose Branding.app_mark")
         )
 
-    icons_facade = UI_ROOT / "icons.slint"
-    if icons_facade.exists():
-        facade_definitions = {
-            str(item["name"]): item for item in exported_definitions(icons_facade)
-        }
-        icons = facade_definitions.get("Icons")
-        if icons is None:
-            findings.append(
-                Finding("FND003", relative(icons_facade), "compatibility Icons global is missing")
-            )
-        else:
-            for declaration in icons["api"]:
-                match = re.fullmatch(
-                    r"out property <image> ([A-Za-z0-9_]+): (Branding|FluentIcons)\.([A-Za-z0-9_]+);",
-                    str(declaration),
-                )
-                if match is None:
-                    findings.append(
-                        Finding("FND004", relative(icons_facade), f"invalid Icons proxy: {declaration}")
-                    )
-                    continue
-                name, source, member = match.groups()
-                expected_source = "Branding" if name == "app_mark" else "FluentIcons"
-                if source != expected_source or member != name:
-                    findings.append(
-                        Finding(
-                            "FND004",
-                            relative(icons_facade),
-                            f"Icons.{name} must proxy {expected_source}.{name}",
-                        )
-                    )
     return findings
 
 
@@ -282,19 +245,7 @@ def primitive_ownership_findings() -> list[Finding]:
                 )
             )
 
-    expected_reexports = {
-        "ui/kit/kit.slint": set(expected_locations),
-        "ui/components/icon.slint": {"FluentIcon", "IconButton", "TooltipHost"},
-        "ui/components/common.slint": {
-            "Badge",
-            "BadgeKind",
-            "FluentButton",
-            "FluentTextArea",
-            "FluentTextField",
-            "SegmentButton",
-            "SurfaceCard",
-        },
-    }
+    expected_reexports = {"ui/kit/kit.slint": set(expected_locations)}
     for facade, expected_names in expected_reexports.items():
         path = REPO_ROOT / facade
         reexports: set[str] = set()
@@ -310,20 +261,6 @@ def primitive_ownership_findings() -> list[Finding]:
                 )
             )
 
-    for facade in (UI_ROOT / "components" / "common.slint", UI_ROOT / "components" / "icon.slint"):
-        duplicate_names = sorted(
-            str(item["name"])
-            for item in exported_definitions(facade)
-            if str(item["name"]) in expected_locations
-        )
-        if duplicate_names:
-            findings.append(
-                Finding(
-                    "PRM003",
-                    relative(facade),
-                    f"compatibility facade still defines Primitive(s): {', '.join(duplicate_names)}",
-                )
-            )
     return findings
 
 
@@ -363,23 +300,7 @@ def pattern_overlay_ownership_findings() -> list[Finding]:
                 )
             )
 
-    expected_reexports = {
-        "ui/kit/kit.slint": set(expected_locations),
-        "ui/components/common.slint": {
-            "SettingRow",
-            "SidebarItem",
-            "TaskRowShell",
-            "WindowControlButton",
-        },
-        "ui/components/page_shell.slint": {
-            "EmptyState",
-            "MetricCard",
-            "PageHeader",
-            "SectionHeader",
-        },
-        "ui/components/toast.slint": {"ToastHost", "ToastKind"},
-        "ui/components/modal_manager.slint": {"ModalKind", "ModalManager"},
-    }
+    expected_reexports = {"ui/kit/kit.slint": set(expected_locations)}
     for facade, expected_names in expected_reexports.items():
         path = REPO_ROOT / facade
         reexports: set[str] = set()
@@ -395,26 +316,6 @@ def pattern_overlay_ownership_findings() -> list[Finding]:
                 )
             )
 
-    facade_paths = (
-        UI_ROOT / "components" / "common.slint",
-        UI_ROOT / "components" / "page_shell.slint",
-        UI_ROOT / "components" / "toast.slint",
-        UI_ROOT / "components" / "modal_manager.slint",
-    )
-    for facade in facade_paths:
-        duplicate_names = sorted(
-            str(item["name"])
-            for item in exported_definitions(facade)
-            if str(item["name"]) in expected_locations
-        )
-        if duplicate_names:
-            findings.append(
-                Finding(
-                    "PAT003",
-                    relative(facade),
-                    f"compatibility facade still defines Pattern/Overlay(s): {', '.join(duplicate_names)}",
-                )
-            )
     return findings
 
 
@@ -428,6 +329,68 @@ def kit_import_findings() -> list[Finding]:
                     Finding("KIT001", relative(path), f'Kit import leaves ui/kit: "{source}"')
                 )
     return findings
+
+
+def kit_layer_findings() -> list[Finding]:
+    kit_root = UI_ROOT / "kit"
+
+    def layer(path: Path) -> int | None:
+        relative_parts = path.resolve().relative_to(kit_root.resolve()).parts
+        if not relative_parts:
+            return None
+        return {
+            "foundation": 0,
+            "primitives": 1,
+            "patterns": 2,
+            "overlays": 2,
+        }.get(relative_parts[0])
+
+    findings: list[Finding] = []
+    for path in slint_files(kit_root):
+        source_layer = layer(path)
+        if source_layer is None:
+            continue
+        for source, target in import_targets(path):
+            if target is None or not is_within(target, kit_root):
+                continue
+            target_layer = layer(target)
+            if target == (kit_root / "kit.slint").resolve():
+                findings.append(
+                    Finding(
+                        "KIT002",
+                        relative(path),
+                        f'Kit implementation imports its public barrel: "{source}"',
+                    )
+                )
+            elif target_layer is not None and target_layer > source_layer:
+                findings.append(
+                    Finding(
+                        "KIT003",
+                        relative(path),
+                        f'Kit layer imports a higher layer: "{source}"',
+                    )
+                )
+    return findings
+
+
+def migration_scaffold_findings() -> list[Finding]:
+    obsolete_paths = (
+        UI_ROOT / "theme.slint",
+        UI_ROOT / "constants.slint",
+        UI_ROOT / "icons.slint",
+        UI_ROOT / "components" / "common.slint",
+        UI_ROOT / "components" / "icon.slint",
+        UI_ROOT / "components" / "page_shell.slint",
+        UI_ROOT / "components" / "toast.slint",
+        UI_ROOT / "components" / "modal_manager.slint",
+        UI_ROOT / "dev" / "design_gallery.slint",
+        CRATES_ROOT / "quadrant-ui" / "examples" / "design_gallery.rs",
+    )
+    return [
+        Finding("MIG001", relative(path), "obsolete migration facade/example still exists")
+        for path in obsolete_paths
+        if path.exists()
+    ]
 
 
 def gallery_import_findings() -> list[Finding]:
@@ -467,17 +430,23 @@ def gallery_import_findings() -> list[Finding]:
 
 
 def product_gallery_findings() -> list[Finding]:
-    app_root = UI_ROOT / "app.slint"
+    product_files = [UI_ROOT / "app.slint", *slint_files(UI_ROOT / "views")]
+    product_files.extend(slint_files(UI_ROOT / "components"))
     findings: list[Finding] = []
-    if not app_root.exists():
-        return findings
-    for source, target in import_targets(app_root):
-        if target is not None and (
-            is_within(target, UI_ROOT / "gallery") or is_within(target, UI_ROOT / "dev")
-        ):
-            findings.append(
-                Finding("PROD001", relative(app_root), f'Product root references Gallery: "{source}"')
-            )
+    for path in product_files:
+        if not path.exists():
+            continue
+        for source, target in import_targets(path):
+            if target is not None and (
+                is_within(target, UI_ROOT / "gallery") or is_within(target, UI_ROOT / "dev")
+            ):
+                findings.append(
+                    Finding(
+                        "PROD001",
+                        relative(path),
+                        f'Product UI references Gallery: "{source}"',
+                    )
+                )
     return findings
 
 
@@ -590,12 +559,14 @@ def spdx_findings() -> list[Finding]:
 
 def main() -> int:
     checks = [
+        ("Migration scaffolding", migration_scaffold_findings),
         ("Frozen public API", frozen_api_findings),
         ("Duplicate exports", duplicate_export_findings),
         ("Foundation ownership", foundation_ownership_findings),
         ("Primitive ownership", primitive_ownership_findings),
         ("Pattern/Overlay ownership", pattern_overlay_ownership_findings),
         ("Kit imports", kit_import_findings),
+        ("Kit layer direction", kit_layer_findings),
         ("Gallery imports", gallery_import_findings),
         ("Product Kit imports", product_kit_import_findings),
         ("Product/Gallery separation", product_gallery_findings),
@@ -603,7 +574,7 @@ def main() -> int:
         ("SPDX headers", spdx_findings),
     ]
     all_findings: list[Finding] = []
-    print("Quadrant UI boundary audit (report-only mode; introduced in Stage 0)")
+    print("Quadrant UI boundary audit (enforced mode; enabled in Stage 9)")
     for title, check in checks:
         findings = check()
         all_findings.extend(findings)
@@ -611,9 +582,10 @@ def main() -> int:
         for finding in findings:
             print(f"  [{finding.code}] {finding.location}: {finding.message}")
 
-    print(
-        f"\nREPORT ONLY: {len(all_findings)} finding(s); exit status remains 0 until Stage 9."
-    )
+    if all_findings:
+        print(f"\nFAILED: {len(all_findings)} boundary finding(s).")
+        return 1
+    print("\nPASSED: 0 boundary findings.")
     return 0
 
 
