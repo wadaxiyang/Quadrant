@@ -1,0 +1,85 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from wsl-dashboard src/ui/components/common.slint at
+// 948589a255a4bd8a3ff9c3de49e2e13109378fcd.
+
+import { Theme, Typography } from "../foundation/theme.slint";
+import { UiConstants } from "../foundation/constants.slint";
+import { FluentIcon } from "fluent_icon.slint";
+
+export component FluentButton inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> show_icon: false;
+    in property <bool> primary: false;
+    in property <bool> accent: false;
+    in property <bool> danger: false;
+    in property <bool> enabled: true;
+    // Development-gallery overrides; false in product surfaces.
+    in property <bool> preview_hover: false;
+    in property <bool> preview_pressed: false;
+    in property <bool> preview_focus: false;
+    callback clicked;
+
+    min-width: max(72px, button_content.min-width);
+    height: UiConstants.button_height;
+    border-radius: UiConstants.control_radius;
+    border-width: (button_focus.has-focus || root.preview_focus) ? 2px : (root.primary ? 0px : 1px);
+    border-color: (button_focus.has-focus || root.preview_focus) ? Theme.focus_ring :
+                  root.danger ? Theme.danger :
+                  root.accent ? Theme.accent : Theme.input_border;
+    background: !root.enabled ? Theme.control_bg :
+                root.primary && root.danger ? ((button_touch.pressed || root.preview_pressed) ? Theme.danger : ((button_touch.has-hover || root.preview_hover) ? Theme.danger.with-alpha(0.88) : Theme.danger)) :
+                root.primary ? ((button_touch.pressed || root.preview_pressed) ? Theme.accent_pressed : ((button_touch.has-hover || root.preview_hover) ? Theme.accent_hover : Theme.accent)) :
+                (button_touch.pressed || root.preview_pressed) ? Theme.selected_bg :
+                (button_touch.has-hover || root.preview_hover) ? (root.danger ? Theme.danger_bg : root.accent ? Theme.selected_bg : Theme.control_bg_hover) : Theme.control_bg;
+    opacity: root.enabled ? 1 : 0.55;
+    forward-focus: button_focus;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if (root.enabled) { root.clicked(); } }
+
+    button_content := HorizontalLayout {
+        padding-left: UiConstants.space_12;
+        padding-right: UiConstants.space_12;
+        spacing: root.show_icon ? UiConstants.space_8 : 0px;
+        alignment: center;
+
+        if root.show_icon: FluentIcon {
+            source: root.icon;
+            size: 16px;
+            icon_color: root.primary ? white : (root.danger ? Theme.danger : root.accent ? Theme.accent : Theme.icon_neutral);
+        }
+
+        Text {
+            text: root.text;
+            color: root.primary ? (root.danger ? white : Theme.accent_foreground) :
+                   root.danger ? Theme.danger :
+                   root.accent ? Theme.accent : Theme.text_primary;
+            font-size: Typography.body;
+            font-weight: root.primary ? Typography.semibold : Typography.regular;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    button_focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    button_touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}

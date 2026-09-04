@@ -1,0 +1,62 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from wsl-dashboard src/ui/components/common.slint at
+// 948589a255a4bd8a3ff9c3de49e2e13109378fcd.
+
+import { Elevation, Theme } from "../foundation/theme.slint";
+import { UiConstants } from "../foundation/constants.slint";
+
+export component SurfaceCard inherits Rectangle {
+    in property <bool> interactive: false;
+    in property <bool> elevated: false;
+    in property <bool> selected: false;
+    in property <bool> enabled: true;
+    in property <bool> preview_hover: false;
+    in property <bool> preview_pressed: false;
+    in property <bool> preview_focus: false;
+    in property <string> accessible_name;
+    callback clicked;
+
+    background: root.selected ? Elevation.card_selected_surface :
+                root.interactive && (card_touch.pressed || root.preview_pressed) ? Elevation.card_pressed_surface :
+                root.interactive && (card_touch.has-hover || root.preview_hover) ? Elevation.card_hover_surface : Elevation.card_surface;
+    border-width: (card_focus.has-focus || root.preview_focus) ? 2px : 1px;
+    border-color: (card_focus.has-focus || root.preview_focus) ? Theme.focus_ring :
+                  root.selected ? Elevation.card_selected_border : Elevation.card_border;
+    border-radius: UiConstants.content_radius;
+    drop-shadow-blur: root.elevated ? Elevation.card_blur : 0px;
+    drop-shadow-color: root.elevated ? Elevation.card_shadow : transparent;
+    opacity: root.enabled ? 1 : 0.55;
+    forward-focus: card_focus;
+    accessible-role: none;
+
+    interactive_accessibility := Rectangle {
+        visible: root.interactive;
+        accessible-role: button;
+        accessible-label: root.accessible_name;
+        accessible-enabled: root.enabled;
+        accessible-checkable: true;
+        accessible-checked: root.selected;
+        accessible-action-default => { if (root.enabled) { root.clicked(); } }
+    }
+
+    card_touch := TouchArea {
+        enabled: root.interactive && root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+
+    card_focus := FocusScope {
+        width: 0px;
+        enabled: root.interactive && root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+}

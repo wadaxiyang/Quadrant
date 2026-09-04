@@ -1,0 +1,66 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme } from "../foundation/theme.slint";
+import { UiConstants } from "../foundation/constants.slint";
+import { FluentIcon } from "fluent_icon.slint";
+import { TooltipHost } from "tooltip_host.slint";
+
+export component IconButton inherits Rectangle {
+    in property <image> icon;
+    in property <string> tooltip;
+    in property <bool> danger: false;
+    in property <bool> enabled: true;
+    // Development-gallery overrides; false in product surfaces.
+    in property <bool> preview_hover: false;
+    in property <bool> preview_pressed: false;
+    in property <bool> preview_focus: false;
+    callback clicked;
+
+    width: UiConstants.icon_button_size;
+    height: UiConstants.icon_button_size;
+    border-radius: UiConstants.control_radius;
+    border-width: (keyboard_focus.has-focus || root.preview_focus) ? 2px : 0px;
+    border-color: Theme.focus_ring;
+    background: !root.enabled ? transparent :
+                (button_touch.pressed || root.preview_pressed) ? (root.danger ? Theme.danger_bg : Theme.selected_bg) :
+                (button_touch.has-hover || root.preview_hover) ? (root.danger ? Theme.danger_bg : Theme.control_bg_hover) : transparent;
+    opacity: root.enabled ? 1 : 0.45;
+    forward-focus: keyboard_focus;
+    accessible-role: button;
+    accessible-label: root.tooltip;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if (root.enabled) { root.clicked(); } }
+
+    FluentIcon {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        source: root.icon;
+        icon_color: root.danger ? Theme.danger :
+                    (button_touch.has-hover || root.preview_hover) ? Theme.text_primary : Theme.icon_neutral;
+    }
+
+    keyboard_focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    button_touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+
+    TooltipHost {
+        x: (parent.width - self.width) / 2;
+        y: parent.height + UiConstants.space_4;
+        text: root.tooltip;
+        shown: button_touch.has-hover;
+    }
+}

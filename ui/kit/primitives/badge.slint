@@ -1,0 +1,43 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from wsl-dashboard src/ui/components/common.slint at
+// 948589a255a4bd8a3ff9c3de49e2e13109378fcd.
+
+import { Theme, Typography } from "../foundation/theme.slint";
+import { UiConstants } from "../foundation/constants.slint";
+
+export enum BadgeKind { neutral, accent, success, warning, danger }
+
+export component Badge inherits Rectangle {
+    in property <string> text;
+    in property <BadgeKind> kind: BadgeKind.neutral;
+
+    min-width: badge_label.preferred-width + UiConstants.space_16;
+    height: 24px;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: root.kind == BadgeKind.accent ? Theme.accent :
+                  root.kind == BadgeKind.success ? Theme.success :
+                  root.kind == BadgeKind.warning ? Theme.warning :
+                  root.kind == BadgeKind.danger ? Theme.danger : Theme.input_border;
+    background: root.kind == BadgeKind.accent ? Theme.selected_bg :
+                root.kind == BadgeKind.success ? Theme.success.with-alpha(0.10) :
+                root.kind == BadgeKind.warning ? Theme.warning.with-alpha(0.12) :
+                root.kind == BadgeKind.danger ? Theme.danger_bg : Theme.card_bg_muted;
+    accessible-role: none;
+    accessible-label: root.text;
+
+    badge_label := Text {
+        text: root.text;
+        color: root.kind == BadgeKind.accent ? Theme.accent :
+               root.kind == BadgeKind.success ? Theme.success :
+               root.kind == BadgeKind.warning ? Theme.warning :
+               root.kind == BadgeKind.danger ? Theme.danger : Theme.text_secondary;
+        font-size: Typography.caption;
+        font-weight: Typography.semibold;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}

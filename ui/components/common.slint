@@ -6,10 +6,19 @@
 // 948589a255a4bd8a3ff9c3de49e2e13109378fcd. Font glyph icons and WSL-only
 // controls were replaced by semantic SVG images.
 
-import { Elevation, Theme, Typography, Motion } from "../theme.slint";
-import { UiConstants } from "../constants.slint";
+// Compatibility facade for Primitives; Stage 4 Patterns remain canonical here.
+export {
+    Badge,
+    BadgeKind,
+    FluentButton,
+    FluentTextArea,
+    FluentTextField,
+    SegmentButton,
+    SurfaceCard,
+} from "../kit/kit.slint";
+
+import { Motion, Theme, Typography, UiConstants } from "../kit/kit.slint";
 import { FluentIcon, TooltipHost } from "icon.slint";
-import { LineEdit, TextEdit } from "std-widgets.slint";
 
 export component SidebarItem inherits Rectangle {
     in property <image> icon;
@@ -113,81 +122,6 @@ export component SidebarItem inherits Rectangle {
     }
 }
 
-export component FluentButton inherits Rectangle {
-    in property <string> text;
-    in property <image> icon;
-    in property <bool> show_icon: false;
-    in property <bool> primary: false;
-    in property <bool> accent: false;
-    in property <bool> danger: false;
-    in property <bool> enabled: true;
-    // Development-gallery overrides; false in product surfaces.
-    in property <bool> preview_hover: false;
-    in property <bool> preview_pressed: false;
-    in property <bool> preview_focus: false;
-    callback clicked;
-
-    min-width: max(72px, button_content.min-width);
-    height: UiConstants.button_height;
-    border-radius: UiConstants.control_radius;
-    border-width: (button_focus.has-focus || root.preview_focus) ? 2px : (root.primary ? 0px : 1px);
-    border-color: (button_focus.has-focus || root.preview_focus) ? Theme.focus_ring :
-                  root.danger ? Theme.danger :
-                  root.accent ? Theme.accent : Theme.input_border;
-    background: !root.enabled ? Theme.control_bg :
-                root.primary && root.danger ? ((button_touch.pressed || root.preview_pressed) ? Theme.danger : ((button_touch.has-hover || root.preview_hover) ? Theme.danger.with-alpha(0.88) : Theme.danger)) :
-                root.primary ? ((button_touch.pressed || root.preview_pressed) ? Theme.accent_pressed : ((button_touch.has-hover || root.preview_hover) ? Theme.accent_hover : Theme.accent)) :
-                (button_touch.pressed || root.preview_pressed) ? Theme.selected_bg :
-                (button_touch.has-hover || root.preview_hover) ? (root.danger ? Theme.danger_bg : root.accent ? Theme.selected_bg : Theme.control_bg_hover) : Theme.control_bg;
-    opacity: root.enabled ? 1 : 0.55;
-    forward-focus: button_focus;
-    accessible-role: button;
-    accessible-label: root.text;
-    accessible-enabled: root.enabled;
-    accessible-action-default => { if (root.enabled) { root.clicked(); } }
-
-    button_content := HorizontalLayout {
-        padding-left: UiConstants.space_12;
-        padding-right: UiConstants.space_12;
-        spacing: root.show_icon ? UiConstants.space_8 : 0px;
-        alignment: center;
-
-        if root.show_icon: FluentIcon {
-            source: root.icon;
-            size: 16px;
-            icon_color: root.primary ? white : (root.danger ? Theme.danger : root.accent ? Theme.accent : Theme.icon_neutral);
-        }
-
-        Text {
-            text: root.text;
-            color: root.primary ? (root.danger ? white : Theme.accent_foreground) :
-                   root.danger ? Theme.danger :
-                   root.accent ? Theme.accent : Theme.text_primary;
-            font-size: Typography.body;
-            font-weight: root.primary ? Typography.semibold : Typography.regular;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
-    }
-
-    button_focus := FocusScope {
-        enabled: root.enabled;
-        key-pressed(event) => {
-            if (event.text == Key.Return || event.text == Key.Space) {
-                root.clicked();
-                return accept;
-            }
-            return reject;
-        }
-    }
-
-    button_touch := TouchArea {
-        enabled: root.enabled;
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-}
-
 export component WindowControlButton inherits Rectangle {
     in property <image> icon;
     in property <string> symbol;
@@ -231,191 +165,6 @@ export component WindowControlButton inherits Rectangle {
     }
 }
 
-export component FluentTextField inherits Rectangle {
-    in-out property <string> text;
-    in property <string> placeholder_text;
-    in property <bool> enabled: true;
-    in property <string> error_text;
-    in property <bool> preview_focus: false;
-    callback accepted(string);
-    callback edited(string);
-
-    forward-focus: field_input;
-    min-height: UiConstants.input_height;
-    preferred-height: root.error_text == "" ? UiConstants.input_height : UiConstants.input_height + UiConstants.space_4 + error_label.preferred-height;
-    background: transparent;
-
-    field_input := LineEdit {
-        width: 100%;
-        height: UiConstants.input_height;
-        text <=> root.text;
-        placeholder-text: root.placeholder_text;
-        font-size: Typography.body;
-        enabled: root.enabled;
-        accepted => { root.accepted(self.text); }
-        edited => { root.edited(self.text); }
-    }
-
-    if root.error_text != "": Rectangle {
-        width: 100%;
-        height: UiConstants.input_height;
-        border-width: 2px;
-        border-color: Theme.danger;
-        border-radius: UiConstants.control_radius;
-        background: transparent;
-    }
-
-
-    if root.error_text == "" && root.preview_focus: Rectangle {
-        width: 100%;
-        height: UiConstants.input_height;
-        border-width: 2px;
-        border-color: Theme.focus_ring;
-        border-radius: UiConstants.control_radius;
-        background: transparent;
-    }
-
-    error_label := Text {
-        visible: root.error_text != "";
-        y: UiConstants.input_height + UiConstants.space_4;
-        width: 100%;
-        text: root.error_text;
-        color: Theme.danger;
-        font-size: Typography.caption;
-        wrap: word-wrap;
-    }
-}
-
-export component FluentTextArea inherits Rectangle {
-    in-out property <string> text;
-    in property <string> placeholder_text;
-    in property <bool> enabled: true;
-    callback edited(string);
-
-    forward-focus: area_input;
-    min-height: 76px;
-    background: transparent;
-
-    area_input := TextEdit {
-        width: 100%;
-        height: 100%;
-        text <=> root.text;
-        placeholder-text: root.placeholder_text;
-        font-size: Typography.body;
-        wrap: word-wrap;
-        enabled: root.enabled;
-        edited => { root.edited(self.text); }
-    }
-}
-
-export component SegmentButton inherits Rectangle {
-    in property <string> text;
-    in property <bool> selected: false;
-    in property <bool> enabled: true;
-    // Development-gallery overrides; false in product surfaces.
-    in property <bool> preview_hover: false;
-    in property <bool> preview_pressed: false;
-    in property <bool> preview_focus: false;
-    callback clicked;
-
-    min-width: 54px;
-    height: UiConstants.button_height;
-    border-radius: UiConstants.control_radius;
-    border-width: (segment_focus.has-focus || root.preview_focus) ? 2px : 1px;
-    border-color: (segment_focus.has-focus || root.preview_focus) ? Theme.focus_ring : (root.selected ? Theme.accent : Theme.input_border);
-    background: !root.enabled ? Theme.control_bg :
-                (segment_touch.pressed || root.preview_pressed) ? Theme.selected_bg :
-                root.selected ? Theme.selected_bg :
-                (segment_touch.has-hover || root.preview_hover) ? Theme.control_bg_hover : Theme.control_bg;
-    opacity: root.enabled ? 1 : 0.5;
-    forward-focus: segment_focus;
-    accessible-role: button;
-    accessible-label: root.text;
-    accessible-enabled: root.enabled;
-    accessible-checkable: true;
-    accessible-checked: root.selected;
-    accessible-action-default => { if (root.enabled) { root.clicked(); } }
-
-    Text {
-        text: root.text;
-        color: root.selected ? Theme.accent : Theme.text_primary;
-        font-size: Typography.body;
-        font-weight: root.selected ? Typography.semibold : Typography.regular;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-    }
-
-    segment_focus := FocusScope {
-        enabled: root.enabled;
-        key-pressed(event) => {
-            if (event.text == Key.Return || event.text == Key.Space) {
-                root.clicked();
-                return accept;
-            }
-            return reject;
-        }
-    }
-
-    segment_touch := TouchArea {
-        enabled: root.enabled;
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-}
-
-export component SurfaceCard inherits Rectangle {
-    in property <bool> interactive: false;
-    in property <bool> elevated: false;
-    in property <bool> selected: false;
-    in property <bool> enabled: true;
-    in property <bool> preview_hover: false;
-    in property <bool> preview_pressed: false;
-    in property <bool> preview_focus: false;
-    in property <string> accessible_name;
-    callback clicked;
-
-    background: root.selected ? Elevation.card_selected_surface :
-                root.interactive && (card_touch.pressed || root.preview_pressed) ? Elevation.card_pressed_surface :
-                root.interactive && (card_touch.has-hover || root.preview_hover) ? Elevation.card_hover_surface : Elevation.card_surface;
-    border-width: (card_focus.has-focus || root.preview_focus) ? 2px : 1px;
-    border-color: (card_focus.has-focus || root.preview_focus) ? Theme.focus_ring :
-                  root.selected ? Elevation.card_selected_border : Elevation.card_border;
-    border-radius: UiConstants.content_radius;
-    drop-shadow-blur: root.elevated ? Elevation.card_blur : 0px;
-    drop-shadow-color: root.elevated ? Elevation.card_shadow : transparent;
-    opacity: root.enabled ? 1 : 0.55;
-    forward-focus: card_focus;
-    accessible-role: none;
-
-    interactive_accessibility := Rectangle {
-        visible: root.interactive;
-        accessible-role: button;
-        accessible-label: root.accessible_name;
-        accessible-enabled: root.enabled;
-        accessible-checkable: true;
-        accessible-checked: root.selected;
-        accessible-action-default => { if (root.enabled) { root.clicked(); } }
-    }
-
-    card_touch := TouchArea {
-        enabled: root.interactive && root.enabled;
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-
-    card_focus := FocusScope {
-        width: 0px;
-        enabled: root.interactive && root.enabled;
-        key-pressed(event) => {
-            if (event.text == Key.Return || event.text == Key.Space) {
-                root.clicked();
-                return accept;
-            }
-            return reject;
-        }
-    }
-}
-
 export component TaskRowShell inherits Rectangle {
     in property <length> row_height: 60px;
     in property <bool> hovered: row_touch.has-hover;
@@ -427,40 +176,6 @@ export component TaskRowShell inherits Rectangle {
     border-radius: UiConstants.control_radius;
 
     row_touch := TouchArea { }
-}
-
-export enum BadgeKind { neutral, accent, success, warning, danger }
-
-export component Badge inherits Rectangle {
-    in property <string> text;
-    in property <BadgeKind> kind: BadgeKind.neutral;
-
-    min-width: badge_label.preferred-width + UiConstants.space_16;
-    height: 24px;
-    border-radius: 12px;
-    border-width: 1px;
-    border-color: root.kind == BadgeKind.accent ? Theme.accent :
-                  root.kind == BadgeKind.success ? Theme.success :
-                  root.kind == BadgeKind.warning ? Theme.warning :
-                  root.kind == BadgeKind.danger ? Theme.danger : Theme.input_border;
-    background: root.kind == BadgeKind.accent ? Theme.selected_bg :
-                root.kind == BadgeKind.success ? Theme.success.with-alpha(0.10) :
-                root.kind == BadgeKind.warning ? Theme.warning.with-alpha(0.12) :
-                root.kind == BadgeKind.danger ? Theme.danger_bg : Theme.card_bg_muted;
-    accessible-role: none;
-    accessible-label: root.text;
-
-    badge_label := Text {
-        text: root.text;
-        color: root.kind == BadgeKind.accent ? Theme.accent :
-               root.kind == BadgeKind.success ? Theme.success :
-               root.kind == BadgeKind.warning ? Theme.warning :
-               root.kind == BadgeKind.danger ? Theme.danger : Theme.text_secondary;
-        font-size: Typography.caption;
-        font-weight: Typography.semibold;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-    }
 }
 
 export component SettingRow inherits Rectangle {

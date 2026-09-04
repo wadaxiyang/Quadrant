@@ -1,0 +1,64 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from wsl-dashboard src/ui/components/common.slint at
+// 948589a255a4bd8a3ff9c3de49e2e13109378fcd.
+
+import { Theme, Typography } from "../foundation/theme.slint";
+import { UiConstants } from "../foundation/constants.slint";
+import { LineEdit } from "std-widgets.slint";
+
+export component FluentTextField inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder_text;
+    in property <bool> enabled: true;
+    in property <string> error_text;
+    in property <bool> preview_focus: false;
+    callback accepted(string);
+    callback edited(string);
+
+    forward-focus: field_input;
+    min-height: UiConstants.input_height;
+    preferred-height: root.error_text == "" ? UiConstants.input_height : UiConstants.input_height + UiConstants.space_4 + error_label.preferred-height;
+    background: transparent;
+
+    field_input := LineEdit {
+        width: 100%;
+        height: UiConstants.input_height;
+        text <=> root.text;
+        placeholder-text: root.placeholder_text;
+        font-size: Typography.body;
+        enabled: root.enabled;
+        accepted => { root.accepted(self.text); }
+        edited => { root.edited(self.text); }
+    }
+
+    if root.error_text != "": Rectangle {
+        width: 100%;
+        height: UiConstants.input_height;
+        border-width: 2px;
+        border-color: Theme.danger;
+        border-radius: UiConstants.control_radius;
+        background: transparent;
+    }
+
+    if root.error_text == "" && root.preview_focus: Rectangle {
+        width: 100%;
+        height: UiConstants.input_height;
+        border-width: 2px;
+        border-color: Theme.focus_ring;
+        border-radius: UiConstants.control_radius;
+        background: transparent;
+    }
+
+    error_label := Text {
+        visible: root.error_text != "";
+        y: UiConstants.input_height + UiConstants.space_4;
+        width: 100%;
+        text: root.error_text;
+        color: Theme.danger;
+        font-size: Typography.caption;
+        wrap: word-wrap;
+    }
+}

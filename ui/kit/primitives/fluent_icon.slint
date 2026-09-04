@@ -1,0 +1,28 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme } from "../foundation/theme.slint";
+
+export component FluentIcon inherits Rectangle {
+    in property <image> source;
+    in property <length> size: 16px;
+    in property <brush> icon_color: Theme.icon_neutral;
+    in property <length> optical_offset_x: 0px;
+    in property <length> optical_offset_y: 0px;
+
+    width: root.size;
+    height: root.size;
+    background: transparent;
+    accessible-role: none;
+
+    Image {
+        x: root.optical_offset_x;
+        y: root.optical_offset_y;
+        width: root.size;
+        height: root.size;
+        source: root.source;
+        colorize: root.icon_color;
+        image-fit: contain;
+        accessible-role: none;
+    }
+}

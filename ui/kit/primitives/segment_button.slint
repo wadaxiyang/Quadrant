@@ -1,0 +1,64 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-FileCopyrightText: Copyright (c) 2026 Quadrant contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Derived from wsl-dashboard src/ui/components/common.slint at
+// 948589a255a4bd8a3ff9c3de49e2e13109378fcd.
+
+import { Theme, Typography } from "../foundation/theme.slint";
+import { UiConstants } from "../foundation/constants.slint";
+
+export component SegmentButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> selected: false;
+    in property <bool> enabled: true;
+    // Development-gallery overrides; false in product surfaces.
+    in property <bool> preview_hover: false;
+    in property <bool> preview_pressed: false;
+    in property <bool> preview_focus: false;
+    callback clicked;
+
+    min-width: 54px;
+    height: UiConstants.button_height;
+    border-radius: UiConstants.control_radius;
+    border-width: (segment_focus.has-focus || root.preview_focus) ? 2px : 1px;
+    border-color: (segment_focus.has-focus || root.preview_focus) ? Theme.focus_ring : (root.selected ? Theme.accent : Theme.input_border);
+    background: !root.enabled ? Theme.control_bg :
+                (segment_touch.pressed || root.preview_pressed) ? Theme.selected_bg :
+                root.selected ? Theme.selected_bg :
+                (segment_touch.has-hover || root.preview_hover) ? Theme.control_bg_hover : Theme.control_bg;
+    opacity: root.enabled ? 1 : 0.5;
+    forward-focus: segment_focus;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-checkable: true;
+    accessible-checked: root.selected;
+    accessible-action-default => { if (root.enabled) { root.clicked(); } }
+
+    Text {
+        text: root.text;
+        color: root.selected ? Theme.accent : Theme.text_primary;
+        font-size: Typography.body;
+        font-weight: root.selected ? Typography.semibold : Typography.regular;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    segment_focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    segment_touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}

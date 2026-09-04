@@ -31,6 +31,9 @@ EXPORT_RE = re.compile(
     r"(?:\s+inherits\s+([^\s{]+))?",
     re.MULTILINE,
 )
+REEXPORT_RE = re.compile(
+    r"export\s*\{(.*?)\}\s*from\s*\"([^\"]+)\"\s*;", re.DOTALL
+)
 API_DECL_RE = re.compile(
     r"^(?:(?:in|out|in-out)\s+property\s+<[^>]+>\s+[A-Za-z_][A-Za-z0-9_]*"
     r"(?:\s*:[^;]+)?|callback\s+[A-Za-z_][A-Za-z0-9_]*(?:\([^;]*\))?"
@@ -247,6 +250,83 @@ def foundation_ownership_findings() -> list[Finding]:
     return findings
 
 
+def primitive_ownership_findings() -> list[Finding]:
+    expected_locations = {
+        "FluentIcon": "ui/kit/primitives/fluent_icon.slint",
+        "TooltipHost": "ui/kit/primitives/tooltip_host.slint",
+        "SurfaceCard": "ui/kit/primitives/surface_card.slint",
+        "BadgeKind": "ui/kit/primitives/badge.slint",
+        "Badge": "ui/kit/primitives/badge.slint",
+        "FluentButton": "ui/kit/primitives/fluent_button.slint",
+        "IconButton": "ui/kit/primitives/icon_button.slint",
+        "SegmentButton": "ui/kit/primitives/segment_button.slint",
+        "FluentTextField": "ui/kit/primitives/text_field.slint",
+        "FluentTextArea": "ui/kit/primitives/text_area.slint",
+    }
+    definitions: dict[str, list[str]] = {}
+    for path in slint_files(UI_ROOT):
+        for definition in exported_definitions(path):
+            definitions.setdefault(str(definition["name"]), []).append(
+                str(definition["file"])
+            )
+
+    findings: list[Finding] = []
+    for name, expected_file in expected_locations.items():
+        locations = definitions.get(name, [])
+        if locations != [expected_file]:
+            findings.append(
+                Finding(
+                    "PRM001",
+                    name,
+                    f"canonical Primitive definition must be only in {expected_file}; found {locations}",
+                )
+            )
+
+    expected_reexports = {
+        "ui/kit/kit.slint": set(expected_locations),
+        "ui/components/icon.slint": {"FluentIcon", "IconButton", "TooltipHost"},
+        "ui/components/common.slint": {
+            "Badge",
+            "BadgeKind",
+            "FluentButton",
+            "FluentTextArea",
+            "FluentTextField",
+            "SegmentButton",
+            "SurfaceCard",
+        },
+    }
+    for facade, expected_names in expected_reexports.items():
+        path = REPO_ROOT / facade
+        reexports: set[str] = set()
+        for names, _source in REEXPORT_RE.findall(path.read_text(encoding="utf-8")):
+            reexports.update(name.strip() for name in names.split(",") if name.strip())
+        missing = sorted(expected_names - reexports)
+        if missing:
+            findings.append(
+                Finding(
+                    "PRM002",
+                    facade,
+                    f"missing Primitive re-export(s): {', '.join(missing)}",
+                )
+            )
+
+    for facade in (UI_ROOT / "components" / "common.slint", UI_ROOT / "components" / "icon.slint"):
+        duplicate_names = sorted(
+            str(item["name"])
+            for item in exported_definitions(facade)
+            if str(item["name"]) in expected_locations
+        )
+        if duplicate_names:
+            findings.append(
+                Finding(
+                    "PRM003",
+                    relative(facade),
+                    f"compatibility facade still defines Primitive(s): {', '.join(duplicate_names)}",
+                )
+            )
+    return findings
+
+
 def kit_import_findings() -> list[Finding]:
     kit_root = UI_ROOT / "kit"
     findings: list[Finding] = []
@@ -380,6 +460,7 @@ def main() -> int:
         ("Frozen public API", frozen_api_findings),
         ("Duplicate exports", duplicate_export_findings),
         ("Foundation ownership", foundation_ownership_findings),
+        ("Primitive ownership", primitive_ownership_findings),
         ("Kit imports", kit_import_findings),
         ("Gallery imports", gallery_import_findings),
         ("Product/Gallery separation", product_gallery_findings),
