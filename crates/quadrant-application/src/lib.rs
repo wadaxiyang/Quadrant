@@ -633,7 +633,7 @@ impl Default for DesktopSettings {
         Self {
             launch_at_startup: false,
             start_hidden: false,
-            close_behavior: WindowCloseBehavior::HideToTray,
+            close_behavior: WindowCloseBehavior::CloseGuiKeepAgent,
             minimize_behavior: WindowMinimizeBehavior::Taskbar,
         }
     }
@@ -645,8 +645,10 @@ pub enum WindowCloseBehavior {
     /// End the application through its normal shutdown path.
     Quit,
     /// Exit the GUI process and keep the resident Agent running.
+    /// The legacy serialized name is retained for IPC v1 compatibility.
     #[default]
-    HideToTray,
+    #[serde(rename = "HideToTray")]
+    CloseGuiKeepAgent,
 }
 
 /// Main-window Minimize behavior.

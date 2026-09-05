@@ -21,6 +21,9 @@ pub(crate) struct Services {
     maintenance: MaintenanceApplication,
     pub clock: Arc<dyn Clock>,
     pub gate: Arc<ExecutionGate>,
+    // Per-service instrumentation shared across broker clones, absent in production.
+    #[cfg(test)]
+    pub snapshot_calls: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl Services {
@@ -56,10 +59,15 @@ impl Services {
             maintenance,
             clock: host.clock.clone(),
             gate: Arc::default(),
+            #[cfg(test)]
+            snapshot_calls: Arc::default(),
         })
     }
 
     pub fn snapshot(&self, capabilities: PlatformCapabilities) -> Result<AppSnapshot, AgentError> {
+        #[cfg(test)]
+        self.snapshot_calls
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         self.gate.run(|| {
             Ok(AppSnapshot {
                 captured_at: self.clock.now(),

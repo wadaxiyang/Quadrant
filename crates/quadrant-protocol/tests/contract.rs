@@ -92,6 +92,10 @@ fn handshake_prioritizes_wire_version_over_app_version_and_existing_session() {
 #[test]
 fn snapshot_fixture_preserves_all_state_and_live_focus_time_anchors() {
     let snapshot = snapshot();
+    assert_eq!(
+        snapshot.desktop_settings.close_behavior,
+        WindowCloseBehavior::CloseGuiKeepAgent
+    );
     let expected: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/snapshot_v1.json")).unwrap();
     assert_eq!(serde_json::to_value(&snapshot).unwrap(), expected);

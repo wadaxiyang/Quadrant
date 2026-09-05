@@ -128,27 +128,11 @@ impl GuiClient {
         allow_start: bool,
         start: impl FnOnce() -> std::io::Result<()>,
     ) -> Result<Option<(Self, ClientHandle)>, ClientError> {
-        match Self::connect(endpoint.clone(), mode).await {
-            Err(error) if allow_start && error.agent_absent() => {
-                start()?;
-                tokio::time::timeout(std::time::Duration::from_secs(15), async {
-                    loop {
-                        match Self::connect(endpoint.clone(), mode).await {
-                            Err(error) if error.agent_absent() => {
-                                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                            }
-                            result => break result,
-                        }
-                    }
-                })
-                .await
-                .map_err(|_| ClientError::Timeout)?
-            }
-            result => result,
-        }
+        connect_or_start_with(allow_start, start, || Self::connect(endpoint.clone(), mode)).await
     }
 
-    /// Connects, negotiates, and loads the snapshot before any Slint construction.
+    /// Tries once to connect, negotiate, and load the snapshot before Slint construction.
+    /// Startup and recovery callers own their separate bounded retry policies.
     /// `None` means the Agent activated an existing GUI and this invocation exits.
     /// # Errors
     /// Returns incompatible protocol, invalid response or bounded connection failure.
@@ -156,7 +140,7 @@ impl GuiClient {
         endpoint: AgentEndpoint,
         mode: GuiLaunchMode,
     ) -> Result<Option<(Self, ClientHandle)>, ClientError> {
-        let Some(connection) = connect_with_retry(&endpoint, mode).await? else {
+        let Some(connection) = Connection::open(&endpoint, mode).await? else {
             return Ok(None);
         };
         let (sender, receiver) = mpsc::channel(1);
@@ -180,6 +164,8 @@ impl GuiClient {
     }
 
     /// Runs until GUI shutdown, Agent full exit, redirect, or exhausted recovery.
+    /// The caller initializes its shell from `snapshot()` before starting this worker;
+    /// only a successful reconnect publishes a replacement snapshot to the sink.
     /// A dedicated shutdown signal works even when callbacks retain submission handles.
     pub async fn run(self, sink: UpdateSink, mut shutdown: oneshot::Receiver<()>) {
         let Self {
@@ -191,7 +177,6 @@ impl GuiClient {
         } = self;
         let mut epoch = 4_u64;
         loop {
-            sink(ClientUpdate::Snapshot(connection.snapshot.clone()));
             admission.store(epoch | 1, Ordering::SeqCst);
             status(&sink, ConnectionState::Ready, "");
             let result = connection
@@ -231,6 +216,9 @@ impl GuiClient {
                         return;
                     };
                     epoch = next_epoch;
+                    // Bootstrap already initialized the shell. Only reconnect must
+                    // hydrate the existing GUI, before Ready and queued peer events.
+                    sink(ClientUpdate::Snapshot(connection.snapshot.clone()));
                 }
                 Ok(None) => {
                     if mode == GuiLaunchMode::QuickAdd {
@@ -268,6 +256,40 @@ pub(crate) fn status(sink: &UpdateSink, state: ConnectionState, message: &str) {
     });
 }
 
+// The injected single attempt keeps startup policy testable with exact I/O errors
+// and a controlled clock, without native ACL changes or real process spawning.
+async fn connect_or_start_with<T, F>(
+    allow_start: bool,
+    start: impl FnOnce() -> std::io::Result<()>,
+    mut connect: impl FnMut() -> F,
+) -> Result<T, ClientError>
+where
+    F: std::future::Future<Output = Result<T, ClientError>>,
+{
+    match connect().await {
+        Err(error) if allow_start && error.agent_absent() => start()?,
+        result => return result,
+    }
+    // Spawn exactly once, immediately after a confirmed absent endpoint. Bound
+    // the entire readiness wait, including Hello/snapshot negotiation time.
+    tokio::time::timeout(std::time::Duration::from_secs(15), async {
+        let mut delay = 25;
+        loop {
+            match connect().await {
+                Err(error) if error.agent_absent() => {
+                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+                    delay = (delay * 2).min(400);
+                }
+                result => return result,
+            }
+        }
+    })
+    .await
+    .map_err(|_| ClientError::Timeout)?
+}
+
+// Established-session recovery only. Never use this backoff before deciding
+// whether an explicit GUI launch needs to start a missing Agent.
 async fn connect_with_retry(
     endpoint: &AgentEndpoint,
     mode: GuiLaunchMode,

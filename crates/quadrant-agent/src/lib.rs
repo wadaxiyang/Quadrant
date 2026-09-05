@@ -9,6 +9,8 @@ mod broker;
 mod lifecycle;
 mod log;
 mod services;
+#[cfg(test)]
+mod startup_tests;
 mod transport;
 
 use quadrant_application::{
@@ -149,7 +151,8 @@ impl Agent {
                 "The saved startup registration could not be refreshed.",
             ));
         }
-        services.snapshot(PlatformCapabilities::default())?;
+        // Storage initialization and required desktop settings are validated above.
+        // Full UI projections are loaded only when a GUI requests its snapshot.
         let endpoint = AgentEndpoint::for_database(database_path)?;
         let listener = instance.bind_agent_listener(&endpoint)?;
         log.event("ipc_listening");

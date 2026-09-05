@@ -344,7 +344,7 @@ fn bind_main_window(main_window: &MainWindow, intent_handler: &Rc<dyn Fn(UiInten
                 launch_at_startup,
                 start_hidden,
                 close_behavior: if close_to_tray {
-                    WindowCloseBehavior::HideToTray
+                    WindowCloseBehavior::CloseGuiKeepAgent
                 } else {
                     WindowCloseBehavior::Quit
                 },
@@ -1301,7 +1301,7 @@ const fn placement_label(placement: TaskPlacement) -> &'static str {
 fn apply_desktop_settings(main: &MainWindow, settings: DesktopSettings) {
     main.set_launch_at_startup(settings.launch_at_startup);
     main.set_start_hidden(settings.start_hidden);
-    main.set_close_to_tray(settings.close_behavior == WindowCloseBehavior::HideToTray);
+    main.set_close_to_tray(settings.close_behavior == WindowCloseBehavior::CloseGuiKeepAgent);
     main.set_minimize_to_tray(false);
 }
 

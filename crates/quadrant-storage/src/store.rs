@@ -510,9 +510,9 @@ impl SettingsRepository for SqliteStore {
             start_hidden: load_bool_setting(&connection, "desktop.start_hidden", operation)?
                 .unwrap_or(defaults.start_hidden),
             close_behavior: if load_bool_setting(&connection, "desktop.close_to_tray", operation)?
-                .unwrap_or(defaults.close_behavior == WindowCloseBehavior::HideToTray)
+                .unwrap_or(defaults.close_behavior == WindowCloseBehavior::CloseGuiKeepAgent)
             {
-                WindowCloseBehavior::HideToTray
+                WindowCloseBehavior::CloseGuiKeepAgent
             } else {
                 WindowCloseBehavior::Quit
             },
@@ -534,7 +534,7 @@ impl SettingsRepository for SqliteStore {
             ("desktop.start_hidden", settings.start_hidden),
             (
                 "desktop.close_to_tray",
-                settings.close_behavior == WindowCloseBehavior::HideToTray,
+                settings.close_behavior == WindowCloseBehavior::CloseGuiKeepAgent,
             ),
             ("desktop.minimize_to_tray", false),
         ];
@@ -1350,6 +1350,45 @@ mod tests {
                 .expect("desktop settings query"),
             settings
         );
+    }
+
+    #[test]
+    fn close_behavior_keeps_existing_boolean_storage_format() {
+        let store = SqliteStore::open_in_memory().unwrap();
+        let schema_version = store.schema_version().unwrap();
+        for (stored_bool, behavior) in [
+            ("true", WindowCloseBehavior::CloseGuiKeepAgent),
+            ("false", WindowCloseBehavior::Quit),
+        ] {
+            // Seed exactly the existing persisted representation, not the Rust enum.
+            store
+                .connection
+                .lock()
+                .unwrap()
+                .execute(
+                    "INSERT OR REPLACE INTO settings(key, value_json, updated_at_utc)
+                 VALUES ('desktop.close_to_tray', ?1, 1)",
+                    [stored_bool],
+                )
+                .unwrap();
+            let settings = store.load_desktop_settings().unwrap();
+            assert_eq!(settings.close_behavior, behavior);
+            store
+                .save_desktop_settings(settings, UtcTimestamp::from_unix_seconds(2))
+                .unwrap();
+            let stored: String = store
+                .connection
+                .lock()
+                .unwrap()
+                .query_row(
+                    "SELECT value_json FROM settings WHERE key = 'desktop.close_to_tray'",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(stored, stored_bool);
+        }
+        assert_eq!(store.schema_version().unwrap(), schema_version);
     }
 
     #[test]

@@ -36,7 +36,10 @@ confirmed save. Reopening a visible window keeps its draft; closing it discards
 unsaved input. Saves that fail or lose their connection keep the current form.
 
 The GUI communicates only through local IPC and never opens SQLite. Keep both
-executables together. For Agent startup-policy testing, use
+executables together. Before updating, use tray **Exit** to stop the resident Agent
+and all GUI windows, then replace both executables from the same package. This is
+required when upgrading from builds with the older profile identity algorithm.
+For Agent startup-policy testing, use
 `cargo run --locked -p quadrant-agent -- --background`.
 
 For both optimized executables:

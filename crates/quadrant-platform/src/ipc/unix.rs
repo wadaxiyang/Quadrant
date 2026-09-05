@@ -54,7 +54,8 @@ pub(super) fn bind(endpoint: &AgentEndpoint) -> io::Result<Listener> {
             "IPC directory must be private and owned by the current user",
         ));
     }
-    // The caller holds the same profile lock used by both Agent and old app.
+    // The caller holds the current Agent profile lock, using the same stable
+    // identity function as this socket name.
     // Remove only a stale socket owned by this user, never a symlink/regular file.
     match fs::symlink_metadata(&socket) {
         Ok(metadata) if metadata.file_type().is_socket() && metadata.uid() == effective_uid() => {

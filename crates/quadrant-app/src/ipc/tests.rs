@@ -83,6 +83,146 @@ fn snapshot() -> AppSnapshot {
     .unwrap()
 }
 
+#[tokio::test(start_paused = true)]
+async fn missing_agent_is_spawned_immediately() {
+    use std::{cell::Cell, io::ErrorKind};
+    use tokio::time::Instant;
+
+    for kind in [ErrorKind::NotFound, ErrorKind::ConnectionRefused] {
+        let began = Instant::now();
+        let attempts = Cell::new(0);
+        let starts = Cell::new(0);
+        let connected = connect_or_start_with(
+            true,
+            || {
+                assert_eq!(attempts.get(), 1, "start after the first absent result");
+                assert_eq!(Instant::now(), began, "no pre-spawn backoff");
+                starts.set(starts.get() + 1);
+                Ok(())
+            },
+            || {
+                attempts.set(attempts.get() + 1);
+                std::future::ready(if began.elapsed() < Duration::from_millis(150) {
+                    Err(ClientError::Io(std::io::Error::from(kind)))
+                } else {
+                    Ok("ready")
+                })
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(connected, "ready");
+        assert_eq!(starts.get(), 1);
+        assert!(began.elapsed() >= Duration::from_millis(150));
+        assert!(began.elapsed() < Duration::from_millis(400));
+    }
+}
+
+fn non_absent_errors() -> Vec<ClientError> {
+    use std::io::{Error, ErrorKind};
+    vec![
+        Error::from(ErrorKind::PermissionDenied).into(),
+        ClientError::Incompatible,
+        ClientError::Protocol,
+        quadrant_protocol::codec::CodecError::InvalidLength(0).into(),
+        ClientError::Timeout,
+        Error::from(ErrorKind::TimedOut).into(),
+        Error::from(ErrorKind::ConnectionReset).into(),
+        // An absent-looking error inside a frame is not endpoint absence.
+        quadrant_protocol::codec::CodecError::Io(Error::from(ErrorKind::NotFound)).into(),
+    ]
+}
+
+#[tokio::test(start_paused = true)]
+async fn non_absent_startup_failures_never_spawn_or_retry() {
+    for error in non_absent_errors() {
+        let expected = std::mem::discriminant(&error);
+        let mut first = Some(error);
+        let result = connect_or_start_with(
+            true,
+            || panic!("only endpoint absence may start Agent"),
+            || std::future::ready(Err::<(), _>(first.take().expect("one attempt only"))),
+        )
+        .await;
+        assert_eq!(std::mem::discriminant(&result.unwrap_err()), expected);
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn readiness_stops_on_non_absent_failure_without_spawning_again() {
+    for error in non_absent_errors() {
+        let expected = std::mem::discriminant(&error);
+        let mut results = [
+            Err::<(), _>(std::io::Error::from(std::io::ErrorKind::NotFound).into()),
+            Err(error),
+        ]
+        .into_iter();
+        let mut starts = 0;
+        let result = connect_or_start_with(
+            true,
+            || {
+                starts += 1;
+                Ok(())
+            },
+            || std::future::ready(results.next().expect("stop on non-absent error")),
+        )
+        .await;
+        assert_eq!(std::mem::discriminant(&result.unwrap_err()), expected);
+        assert_eq!(starts, 1);
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn agent_readiness_has_an_overall_deadline() {
+    // Cover both an endpoint that never appears and a stalled negotiation.
+    for stalled in [false, true] {
+        let began = tokio::time::Instant::now();
+        let mut starts = 0;
+        let mut attempts = 0;
+        let result = connect_or_start_with(
+            true,
+            || {
+                starts += 1;
+                Ok(())
+            },
+            || {
+                attempts += 1;
+                let pending = stalled && attempts > 1;
+                async move {
+                    if pending {
+                        std::future::pending::<()>().await;
+                    }
+                    Err::<(), _>(std::io::Error::from(std::io::ErrorKind::NotFound).into())
+                }
+            },
+        )
+        .await;
+        assert!(matches!(result, Err(ClientError::Timeout)));
+        assert_eq!(starts, 1);
+        assert_eq!(began.elapsed(), Duration::from_secs(15));
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn spawn_failure_is_returned_without_retry() {
+    let mut attempts = 0;
+    let result = connect_or_start_with(
+        true,
+        || Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied)),
+        || {
+            attempts += 1;
+            std::future::ready(Err::<(), _>(
+                std::io::Error::from(std::io::ErrorKind::NotFound).into(),
+            ))
+        },
+    )
+    .await;
+    assert!(
+        matches!(result, Err(ClientError::Io(error)) if error.kind() == std::io::ErrorKind::PermissionDenied)
+    );
+    assert_eq!(attempts, 1);
+}
+
 #[tokio::test]
 async fn user_launch_starts_missing_agent_once_before_loading_snapshot() {
     let directory = std::env::temp_dir().join(format!(
@@ -94,9 +234,18 @@ async fn user_launch_starts_missing_agent_once_before_loading_snapshot() {
     let guard = SingleInstanceCoordinator::claim(&database).unwrap();
     let endpoint = AgentEndpoint::for_database(&database).unwrap();
     let server_endpoint = endpoint.clone();
-    let (started, starting) = oneshot::channel::<Peer>();
+    let (started, starting) = oneshot::channel();
     let server = tokio::spawn(async move {
-        let peer = starting.await.unwrap();
+        starting.await.unwrap();
+        // Simulate storage/service initialization before publishing the real IPC endpoint.
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        let listener = guard.bind_agent_listener(&server_endpoint).unwrap();
+        let peer = Peer {
+            listener,
+            endpoint: server_endpoint,
+            _guard: guard,
+            directory,
+        };
         let mut stream = peer.accept(snapshot()).await;
         assert!(
             read_message_async::<_, ClientMessage>(&mut stream)
@@ -108,17 +257,7 @@ async fn user_launch_starts_missing_agent_once_before_loading_snapshot() {
     let mut calls = 0;
     let result = GuiClient::connect_or_start(endpoint, GuiLaunchMode::Main, true, || {
         calls += 1;
-        let listener = guard.bind_agent_listener(&server_endpoint).unwrap();
-        assert!(
-            started
-                .send(Peer {
-                    listener,
-                    endpoint: server_endpoint,
-                    _guard: guard,
-                    directory
-                })
-                .is_ok()
-        );
+        started.send(()).unwrap();
         Ok(())
     })
     .await
@@ -210,6 +349,101 @@ async fn start_mode(
     ));
     ready(&mut updates).await;
     (handle, updates, stop, worker)
+}
+
+#[tokio::test]
+async fn initial_connection_does_not_republish_snapshot() {
+    for mode in [GuiLaunchMode::Main, GuiLaunchMode::QuickAdd] {
+        let peer = Peer::new();
+        let endpoint = peer.endpoint.clone();
+        let server = tokio::spawn(async move {
+            let mut stream = peer.accept(snapshot()).await;
+            assert!(matches!(
+                read(&mut stream).await,
+                ClientMessage::GuiClosing { .. }
+            ));
+            stream.close().await;
+        });
+        let (client, _handle) = GuiClient::connect(endpoint, mode).await.unwrap().unwrap();
+        // The bootstrap passes this authoritative value directly to GuiShell::new.
+        assert_eq!(client.snapshot(), &snapshot());
+        let (sender, mut updates) = mpsc::unbounded_channel();
+        let (stop, shutdown) = oneshot::channel();
+        let worker = tokio::spawn(client.run(
+            Arc::new(move |event| {
+                let _ = sender.send(event);
+            }),
+            shutdown,
+        ));
+        // Do not use ready(): it discards preceding events and would hide duplicates.
+        assert!(matches!(
+            update(&mut updates).await,
+            ClientUpdate::Connection {
+                state: ConnectionState::Ready,
+                ..
+            }
+        ));
+        stop.send(()).unwrap();
+        worker.await.unwrap();
+        server.await.unwrap();
+        assert!(updates.try_recv().is_err());
+    }
+}
+
+#[tokio::test]
+async fn reconnection_publishes_fresh_snapshot() {
+    let peer = Peer::new();
+    let endpoint = peer.endpoint.clone();
+    let fresh: Vec<_> = [123, 456]
+        .into_iter()
+        .map(|timestamp| {
+            let mut state = snapshot();
+            state.captured_at = UtcTimestamp::from_unix_seconds(timestamp);
+            state.desktop_settings.start_hidden = !state.desktop_settings.start_hidden;
+            state
+        })
+        .collect();
+    let server_snapshots = fresh.clone();
+    let (disconnect, mut disconnected) = mpsc::channel::<()>(1);
+    let server = tokio::spawn(async move {
+        let mut stream = peer.accept(snapshot()).await;
+        for state in server_snapshots {
+            disconnected.recv().await.unwrap();
+            drop(stream);
+            stream = peer.accept(state).await;
+        }
+        assert!(matches!(
+            read(&mut stream).await,
+            ClientMessage::GuiClosing { .. }
+        ));
+        stream.close().await;
+    });
+    let (_handle, mut updates, stop, worker) = start(endpoint).await;
+    for expected in fresh {
+        disconnect.send(()).await.unwrap();
+        assert!(matches!(
+            update(&mut updates).await,
+            ClientUpdate::Connection {
+                state: ConnectionState::Reconnecting,
+                ..
+            }
+        ));
+        let ClientUpdate::Snapshot(actual) = update(&mut updates).await else {
+            panic!("fresh snapshot must precede Ready on every reconnect");
+        };
+        assert_eq!(*actual, expected);
+        assert!(matches!(
+            update(&mut updates).await,
+            ClientUpdate::Connection {
+                state: ConnectionState::Ready,
+                ..
+            }
+        ));
+    }
+    stop.send(()).unwrap();
+    worker.await.unwrap();
+    server.await.unwrap();
+    assert!(updates.try_recv().is_err());
 }
 
 #[tokio::test]
@@ -358,7 +592,10 @@ async fn mismatch_and_existing_gui_redirect_finish_before_presentation() {
             .unwrap();
             stream.close().await;
         });
-        let result = GuiClient::connect(endpoint, GuiLaunchMode::Main).await;
+        let result = GuiClient::connect_or_start(endpoint, GuiLaunchMode::Main, true, || {
+            panic!("an incompatible peer or existing GUI must never spawn Agent")
+        })
+        .await;
         match disposition {
             GuiDisposition::RejectIncompatibleVersion => {
                 assert!(matches!(result, Err(ClientError::Incompatible)));

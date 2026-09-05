@@ -30,6 +30,7 @@ fn run() -> Result<(), quadrant_agent::AgentError> {
         }
     }
     let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
         .thread_name("quadrant-agent")
         .enable_all()
         .build()?;
