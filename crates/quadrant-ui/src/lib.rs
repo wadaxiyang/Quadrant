@@ -9,4 +9,4 @@ slint::include_modules!();
 
 mod shell;
 
-pub use shell::{ApplicationEventSink, UiPlatformCapabilities, UiShell, UiShellConfig};
+pub use shell::{ClientUpdateSink, UiShell};

@@ -10,6 +10,7 @@ build = "build.rs"
 
 [dependencies]
 quadrant-application.workspace = true
+quadrant-protocol.workspace = true
 quadrant-domain.workspace = true
 jiff.workspace = true
 slint.workspace = true
@@ -19,6 +20,7 @@ slint-build.workspace = true
 
 [dev-dependencies]
 png.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

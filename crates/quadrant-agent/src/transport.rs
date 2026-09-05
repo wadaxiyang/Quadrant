@@ -102,6 +102,6 @@ async fn connection_worker(stream: AgentStream, peer: PeerIdentity, sender: mpsc
     };
     // Never cancel and resume a partial frame. Either worker ending closes both halves.
     tokio::select! { () = read => {}, () = write => {} }
-    reader.unsplit(writer).close().await;
     let _ = sender.send(Input::Disconnected(id)).await;
+    reader.unsplit(writer).close().await;
 }

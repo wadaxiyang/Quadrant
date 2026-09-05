@@ -42,6 +42,10 @@ export component MainWindow inherits Window {
     default-font-weight: Typography.regular;
 
     in-out property <string> ui_font_family <=> Theme.ui_font_family;
+    in-out property <bool> agent_connected: false;
+    in-out property <bool> command_pending: false;
+    in-out property <string> connection_message;
+    property <length> connection_banner_height: root.agent_connected && !root.command_pending ? 0px : 48px;
     in-out property <int> current_route: 0;
     in-out property <bool> sidebar_user_collapsed: false;
     in-out property <bool> toast_visible: false;
@@ -176,19 +180,30 @@ export component MainWindow inherits Window {
                 minimize => { root.window_minimize(); }
                 maximize => { root.window_maximize(); }
                 theme_selected(mode) => {
-                    Theme.mode = mode;
-                    Palette.color-scheme = mode == ThemeMode.system ? ColorScheme.unknown :
-                                           mode == ThemeMode.light ? ColorScheme.light : ColorScheme.dark;
                     root.theme_selected(mode);
                 }
                 drag_delta(dx, dy) => { root.window_drag_delta(dx, dy); }
             }
 
-            HorizontalLayout {
+            if root.connection_banner_height > 0px: Rectangle {
                 x: 0px;
                 y: UiConstants.title_bar_height;
                 width: parent.width;
-                height: parent.height - UiConstants.title_bar_height;
+                height: root.connection_banner_height;
+                background: Theme.card_bg;
+                Text {
+                    x: 16px; width: parent.width - 32px; height: parent.height;
+                    text: root.command_pending && root.agent_connected ? "Waiting for the background service…" : root.connection_message;
+                    color: Theme.text_primary;
+                    vertical-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+            HorizontalLayout {
+                x: 0px;
+                y: UiConstants.title_bar_height + root.connection_banner_height;
+                width: parent.width;
+                height: parent.height - UiConstants.title_bar_height - root.connection_banner_height;
                 spacing: 0px;
 
                 Sidebar {
@@ -316,16 +331,9 @@ export component MainWindow inherits Window {
                         update_description: root.update_description;
                         can_open_releases: root.can_open_releases;
                         theme_selected(mode) => {
-                            Theme.mode = mode;
-                            Palette.color-scheme = mode == ThemeMode.system ? ColorScheme.unknown :
-                                                   mode == ThemeMode.light ? ColorScheme.light : ColorScheme.dark;
                             root.theme_selected(mode);
                         }
                         desktop_settings_changed(launch, start_hidden, close_to_tray, minimize_to_tray) => {
-                            root.launch_at_startup = launch;
-                            root.start_hidden = start_hidden;
-                            root.close_to_tray = close_to_tray;
-                            root.minimize_to_tray = minimize_to_tray;
                             root.desktop_settings_changed(launch, start_hidden, close_to_tray, minimize_to_tray);
                         }
                         create_backup_requested => { root.create_backup_requested(); }

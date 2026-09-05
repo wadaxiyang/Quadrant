@@ -10,14 +10,26 @@ The Rust application includes Quadrants, Today, Focus, Review, Completed history
 
 ## Build
 
+The development build now separates the background Agent from the Slint GUI.
+During this migration, start the Agent first in one terminal:
+
 ```console
-cargo run -p quadrant-app
+cargo run --locked -p quadrant-agent
 ```
 
-For an optimized executable:
+Then open the GUI from another terminal:
 
 ```console
-cargo build --locked --release -p quadrant-app
+cargo run --locked -p quadrant-app
+```
+
+The GUI connects through local IPC and never opens SQLite. Automatic process
+launch and the new close/minimize lifecycle are the next migration stage.
+
+For both optimized executables:
+
+```console
+cargo build --locked --release -p quadrant-agent -p quadrant-app
 ```
 
 The Fluent component Gallery is an independent development tool and is not part of
@@ -46,14 +58,12 @@ properties, accessibility notes, and Kit-only code samples. Snapshot automation
 may select a routed page with `QUADRANT_GALLERY_PAGE=0..8` and a preview width with
 `QUADRANT_GALLERY_PREVIEW=0..2`.
 
-The Windows executable is written to `target/release/quadrant-app.exe`. A portable release archive and SHA-256 checksum can be created locally with:
+Windows outputs are `target/release/quadrant-agent.exe` and
+`target/release/quadrant-app.exe`. Existing scripts under `packaging/windows/`,
+`packaging/linux/` and `packaging/macos/` still describe the earlier single-binary
+layout; paired-binary packaging is pending the lifecycle migration. Linux/macOS
+packages must be built and signed/notarized on their native release hosts.
 
-```powershell
-.\packaging\windows\package.ps1
-```
-
-Linux and macOS packaging entry points are `packaging/linux/package.sh` and `packaging/macos/package.sh`; they must be run and signed/notarized on their native release hosts.
-
-Quadrant stores its local database as `quadrant-rust.db` in the platform application-data directory. Settings can create validated backups and stage the latest backup for restore on the next startup. The previous live database is retained under the adjacent `recovery` directory.
+Quadrant stores its local database as `quadrant-rust.db` in the platform application-data directory. Settings can create validated backups and stage the latest backup for restore on the next Agent startup. The previous live database is retained under the adjacent `recovery` directory.
 
 The project is licensed under [GPL-3.0-only](LICENSE). UI primitives are derived from [`owu/wsl-dashboard`](https://github.com/owu/wsl-dashboard), and bundled icons come from [Microsoft Fluent UI System Icons](https://github.com/microsoft/fluentui-system-icons). Release notices are maintained in [`packaging/THIRD-PARTY-NOTICES.txt`](packaging/THIRD-PARTY-NOTICES.txt), with the locked Rust package inventory in [`packaging/DEPENDENCY-LICENSES.txt`](packaging/DEPENDENCY-LICENSES.txt).

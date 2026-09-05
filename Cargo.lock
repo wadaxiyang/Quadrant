@@ -4055,8 +4055,10 @@ version = "0.1.0"
 dependencies = [
  "quadrant-application",
  "quadrant-platform",
- "quadrant-storage",
+ "quadrant-protocol",
  "quadrant-ui",
+ "serde_json",
+ "thiserror 2.0.20",
  "tokio",
  "winresource",
 ]
@@ -4134,6 +4136,8 @@ dependencies = [
  "png",
  "quadrant-application",
  "quadrant-domain",
+ "quadrant-protocol",
+ "serde_json",
  "slint",
  "slint-build",
 ]

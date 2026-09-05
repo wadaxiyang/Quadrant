@@ -81,6 +81,12 @@ pub struct AgentEndpoint {
 }
 
 impl AgentEndpoint {
+    /// Resolves the current user's endpoint without opening application storage.
+    /// # Errors
+    /// Returns profile-directory resolution errors.
+    pub fn for_current_user() -> io::Result<Self> {
+        Self::for_database(&crate::PlatformPaths.database_path()?)
+    }
     /// Resolves a stable profile without relying on the current working directory.
     ///
     /// # Errors

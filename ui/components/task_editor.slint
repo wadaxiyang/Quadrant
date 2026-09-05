@@ -80,6 +80,8 @@ export component TaskEditorWindow inherits Window {
     in-out property <string> reminder_time_zone_error;
     in-out property <string> recurrence_error;
 
+    in-out property <bool> can_submit: true;
+
     callback submitted(string, string, string, int, string, string, string, string, string, int, string);
     callback cancelled;
 
@@ -422,6 +424,7 @@ export component TaskEditorWindow inherits Window {
 
                     FluentButton {
                         text: "Save";
+                        enabled: root.can_submit;
                         primary: true;
                         clicked => {
                             root.planned_on = root.planned_selected ? root.date_text(root.planned_date) : "";

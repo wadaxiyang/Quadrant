@@ -9,13 +9,17 @@ use std::{
 
 use jiff::{Timestamp, civil::DateTime, tz::TimeZone};
 use quadrant_application::{
-    ApplicationEvent, CompletedViewState, DesktopEvent, DesktopSettings, FocusMode, FocusSession,
+    ApplicationEvent, CompletedViewState, DesktopSettings, FocusMode, FocusSession,
     FocusStartRequest, FocusStatus, FocusViewState, MaintenanceState, NavigationRoute,
     PomodoroKind, PomodoroSettings, Quadrant, QuadrantsViewState, QuickAddSubmission,
     RecurrenceChoice, ReorderDirection, ReviewRange, ReviewViewState, SystemTheme, TaskEditorField,
     TaskEditorState, TaskEditorSubmission, TaskId, TaskPlacement,
-    ThemeMode as ApplicationThemeMode, TodayViewState, UiIntent, UpdateViewState, UtcTimestamp,
-    WindowCloseBehavior, WindowMinimizeBehavior,
+    ThemeMode as ApplicationThemeMode, TodayViewState, UiIntent, UtcTimestamp, WindowCloseBehavior,
+    WindowMinimizeBehavior,
+};
+use quadrant_protocol::{
+    AppSnapshot, ClientUpdate, CommandOutcome, ConnectionState, GuiCommand, PlatformCapabilities,
+    ServerEvent,
 };
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, TimerMode, VecModel};
 
@@ -25,54 +29,8 @@ use crate::{
     ThemeMode as SlintThemeMode, Time as SlintTime, ToastKind, TodayTaskRow,
 };
 
-/// Initial state supplied by the composition root.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct UiShellConfig {
-    /// Canonical Cargo package version shown by every UI surface.
-    pub application_version: String,
-    /// Static distribution/update ownership state.
-    pub updates: UpdateViewState,
-    /// User-selected theme behavior.
-    pub theme_mode: ApplicationThemeMode,
-    /// Current normalized platform appearance.
-    pub system_theme: SystemTheme,
-    /// Initial repository-backed active task projection.
-    pub quadrants: QuadrantsViewState,
-    /// Initial repository-backed Today projection.
-    pub today: TodayViewState,
-    /// Initial repository-backed Focus projection.
-    pub focus: FocusViewState,
-    /// Initial repository-backed Review projection.
-    pub review: ReviewViewState,
-    /// Initial bounded Completed projection.
-    pub completed: CompletedViewState,
-    /// Initial backup/restore projection.
-    pub maintenance: MaintenanceState,
-    /// Persisted desktop lifecycle policy.
-    pub desktop_settings: DesktopSettings,
-}
-
-/// Platform capability snapshot normalized by the composition root.
-#[allow(clippy::struct_excessive_bools)] // Independent capabilities, not one lifecycle state.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct UiPlatformCapabilities {
-    /// Whether login startup can be configured.
-    pub autostart: bool,
-    /// Whether hiding windows remains recoverable through a tray/status item.
-    pub tray: bool,
-    /// Whether the global Quick Add shortcut registered successfully.
-    pub global_hotkey: bool,
-    /// Whether native notifications are supported.
-    pub native_notifications: bool,
-    /// Whether activation forwarding is available.
-    pub single_instance: bool,
-}
-
-/// Thread-safe sink used by application-runtime work to enqueue typed UI events.
-pub type ApplicationEventSink = Arc<dyn Fn(ApplicationEvent) + Send + Sync>;
-
-/// Thread-safe sink used by hotkeys, tray, and redirected launches.
-pub type DesktopEventSink = Arc<dyn Fn(DesktopEvent) + Send + Sync>;
+/// Ordered transport-to-presentation sink. Native desktop adapters never own it.
+pub type ClientUpdateSink = Arc<dyn Fn(ClientUpdate) + Send + Sync>;
 
 /// Constructed Slint shell kept on the UI thread.
 pub struct UiShell {
@@ -81,7 +39,6 @@ pub struct UiShell {
     task_editor: TaskEditorWindow,
     focus_session: Arc<Mutex<Option<FocusSession>>>,
     _focus_timer: slint::Timer,
-    initial_desktop_settings: DesktopSettings,
 }
 
 impl UiShell {
@@ -91,16 +48,43 @@ impl UiShell {
     ///
     /// Returns a platform error when a window cannot be created.
     pub fn new(
-        config: &UiShellConfig,
-        on_intent: impl Fn(UiIntent) + 'static,
+        config: &AppSnapshot,
+        application_version: &str,
+        on_intent: impl Fn(UiIntent) -> bool + 'static,
     ) -> Result<Self, slint::PlatformError> {
         let main_window = MainWindow::new()?;
         let quick_add = QuickAddWindow::new()?;
         let task_editor = TaskEditorWindow::new()?;
         let focus_session = Arc::new(Mutex::new(config.focus.session.clone()));
-        let intent_handler: Rc<dyn Fn(UiIntent)> = Rc::new(on_intent);
+        let main_weak = main_window.as_weak();
+        let quick_weak = quick_add.as_weak();
+        let editor_weak = task_editor.as_weak();
+        let intent_handler: Rc<dyn Fn(UiIntent)> = Rc::new(move |intent| {
+            let Some(main) = main_weak.upgrade() else {
+                return;
+            };
+            if !main.get_agent_connected() || main.get_command_pending() || !on_intent(intent) {
+                main.invoke_show_toast(
+                    "Wait for the current operation or reconnect before trying again.".into(),
+                    ToastKind::Error,
+                );
+                return;
+            }
+            main.set_command_pending(true);
+            if let Some(quick) = quick_weak.upgrade() {
+                quick.set_can_submit(false);
+            }
+            if let Some(editor) = editor_weak.upgrade() {
+                editor.set_can_submit(false);
+            }
+        });
 
         initialize_theme(&main_window, &quick_add, &task_editor, config);
+        apply_capabilities(&main_window, config.platform_capabilities);
+        main_window.set_agent_connected(false);
+        main_window.set_connection_message("Connecting to background service…".into());
+        quick_add.set_can_submit(false);
+        task_editor.set_can_submit(false);
         apply_desktop_settings(&main_window, config.desktop_settings);
         apply_quadrants_state(&main_window, &config.quadrants);
         apply_today_state(&main_window, &config.today);
@@ -108,11 +92,11 @@ impl UiShell {
         apply_review_state(&main_window, &config.review);
         apply_completed_state(&main_window, &config.completed);
         apply_maintenance_state(&main_window, &config.maintenance);
+        main_window.set_application_version(SharedString::from(application_version));
         main_window
-            .set_application_version(SharedString::from(config.application_version.as_str()));
-        main_window.set_update_description(SharedString::from(config.updates.description.as_str()));
-        main_window.set_can_open_releases(config.updates.can_open_releases);
-        bind_main_window(&main_window, &quick_add, &task_editor, &intent_handler);
+            .set_update_description(SharedString::from(config.update_state.description.as_str()));
+        main_window.set_can_open_releases(config.update_state.can_open_releases);
+        bind_main_window(&main_window, &intent_handler);
         bind_quick_add(&quick_add, Rc::clone(&intent_handler));
         bind_task_editor(&task_editor, intent_handler);
 
@@ -123,58 +107,28 @@ impl UiShell {
             task_editor,
             focus_session,
             _focus_timer: focus_timer,
-            initial_desktop_settings: config.desktop_settings,
         })
     }
 
-    /// Creates a cross-thread event sink that wakes the Slint event loop without polling.
+    /// Marshals the client's ordered updates onto the Slint event loop.
     #[must_use]
-    pub fn event_sink(&self) -> ApplicationEventSink {
-        let main_weak = self.main_window.as_weak();
-        let editor_weak = self.task_editor.as_weak();
-        let focus_session = Arc::clone(&self.focus_session);
-        Arc::new(move |event| {
-            let editor_weak = editor_weak.clone();
-            let focus_session = Arc::clone(&focus_session);
-            drop(main_weak.upgrade_in_event_loop(move |main| {
-                apply_application_event(&main, &editor_weak, &focus_session, event);
+    pub fn update_sink(&self) -> ClientUpdateSink {
+        let main = self.main_window.as_weak();
+        let quick = self.quick_add.as_weak();
+        let editor = self.task_editor.as_weak();
+        let focus = Arc::clone(&self.focus_session);
+        Arc::new(move |update| {
+            let quick = quick.clone();
+            let editor = editor.clone();
+            let focus = Arc::clone(&focus);
+            drop(main.upgrade_in_event_loop(move |main| {
+                if let Some(quick) = quick.upgrade()
+                    && let Some(editor) = editor.upgrade()
+                {
+                    apply_client_update(&main, &quick, &editor, &focus, update);
+                }
             }));
         })
-    }
-
-    /// Creates a desktop-shell sink that marshals platform events onto the Slint event loop.
-    #[must_use]
-    pub fn desktop_event_sink(&self) -> DesktopEventSink {
-        let main_weak = self.main_window.as_weak();
-        let quick_add_weak = self.quick_add.as_weak();
-        Arc::new(move |event| {
-            let quick_add_weak = quick_add_weak.clone();
-            drop(main_weak.upgrade_in_event_loop(move |main| match event {
-                DesktopEvent::ShowMainWindow => {
-                    main.window().set_minimized(false);
-                    drop(main.show());
-                }
-                DesktopEvent::OpenQuickAdd => {
-                    if let Some(quick_add) = quick_add_weak.upgrade() {
-                        show_quick_add(&quick_add, &main);
-                    }
-                }
-                DesktopEvent::ExitRequested => drop(slint::quit_event_loop()),
-            }));
-        })
-    }
-
-    /// Applies the capabilities that initialized successfully before the event loop starts.
-    pub fn set_platform_capabilities(&self, capabilities: UiPlatformCapabilities) {
-        self.main_window
-            .set_autostart_supported(capabilities.autostart);
-        self.main_window.set_tray_supported(capabilities.tray);
-        self.main_window
-            .set_global_hotkey_available(capabilities.global_hotkey);
-        self.main_window
-            .set_native_notifications_available(capabilities.native_notifications);
-        self.main_window
-            .set_single_instance_available(capabilities.single_instance);
     }
 
     /// Runs the Slint event loop until normal application shutdown.
@@ -182,18 +136,10 @@ impl UiShell {
     /// # Errors
     ///
     /// Returns an event-loop platform error.
-    pub fn run(self, background_requested: bool) -> Result<(), slint::PlatformError> {
-        let start_hidden = should_hide_at_startup(
-            self.main_window.get_tray_supported(),
-            self.initial_desktop_settings.start_hidden,
-            background_requested,
-        );
-        if !start_hidden {
-            self.main_window.show()?;
-        }
-        // Tray/background operation must not use Slint's default
-        // QuitOnLastWindowClosed behavior: hiding the final visible window is
-        // an expected steady state, not application shutdown.
+    pub fn run(self) -> Result<(), slint::PlatformError> {
+        // Creating a GUI is an explicit presentation request. Agent startup
+        // policy decides whether a GUI should be launched at all.
+        self.main_window.show()?;
         let result = slint::run_event_loop_until_quit();
         drop(self.quick_add.hide());
         drop(self.task_editor.hide());
@@ -201,11 +147,115 @@ impl UiShell {
     }
 }
 
+fn apply_capabilities(main: &MainWindow, capabilities: PlatformCapabilities) {
+    main.set_autostart_supported(capabilities.autostart);
+    main.set_tray_supported(capabilities.tray);
+    main.set_global_hotkey_available(capabilities.global_hotkey);
+    main.set_native_notifications_available(capabilities.native_notifications);
+    main.set_single_instance_available(capabilities.single_instance);
+}
+
+fn apply_client_update(
+    main: &MainWindow,
+    quick: &QuickAddWindow,
+    editor: &TaskEditorWindow,
+    focus: &Arc<Mutex<Option<FocusSession>>>,
+    update: ClientUpdate,
+) {
+    match update {
+        ClientUpdate::Snapshot(snapshot) => {
+            initialize_theme(main, quick, editor, &snapshot);
+            apply_capabilities(main, snapshot.platform_capabilities);
+            apply_desktop_settings(main, snapshot.desktop_settings);
+            apply_quadrants_state(main, &snapshot.quadrants);
+            apply_today_state(main, &snapshot.today);
+            apply_focus_state(main, &snapshot.focus, focus);
+            apply_review_state(main, &snapshot.review);
+            apply_completed_state(main, &snapshot.completed);
+            apply_maintenance_state(main, &snapshot.maintenance);
+            main.set_update_description(snapshot.update_state.description.into());
+            main.set_can_open_releases(snapshot.update_state.can_open_releases);
+        }
+        ClientUpdate::Event(event) => match event {
+            ServerEvent::Application(event) => {
+                apply_application_event(main, &editor.as_weak(), focus, *event);
+            }
+            ServerEvent::ThemeChanged {
+                theme_mode,
+                system_theme,
+            } => {
+                let mode = to_slint_theme_mode(theme_mode);
+                let dark = system_theme == SystemTheme::Dark;
+                main.invoke_apply_theme(mode, dark);
+                quick.invoke_apply_theme(mode, dark);
+                editor.invoke_apply_theme(mode, dark);
+            }
+            ServerEvent::PlatformCapabilitiesChanged(capabilities) => {
+                apply_capabilities(main, capabilities);
+            }
+            ServerEvent::ActivateMainWindow => {
+                main.window().set_minimized(false);
+                drop(main.show());
+            }
+            ServerEvent::OpenQuickAdd => show_quick_add(quick, main),
+            ServerEvent::ExitGui | ServerEvent::AgentShuttingDown => drop(slint::quit_event_loop()),
+        },
+        ClientUpdate::CommandFinished { command, outcome } => match outcome {
+            CommandOutcome::Succeeded => {
+                if let GuiCommand::Application(intent) = &command
+                    && let UiIntent::SubmitQuickAdd(submission) = &**intent
+                    && quick.get_title_text().trim() == submission.title
+                    && placement_from_destination(quick.get_destination())
+                        == Some(submission.placement)
+                {
+                    quick.set_title_text(SharedString::default());
+                    quick.set_error_message(SharedString::default());
+                    drop(quick.hide());
+                }
+            }
+            CommandOutcome::Failed(error) => {
+                if let GuiCommand::Application(intent) = command {
+                    match *intent {
+                        UiIntent::SubmitQuickAdd(_) => {
+                            quick.set_error_message(error.message.clone().into());
+                        }
+                        UiIntent::SubmitTaskEditor(_) => {
+                            editor.set_error_message(error.message.clone().into());
+                        }
+                        _ => {}
+                    }
+                }
+                main.invoke_show_toast(error.message.into(), ToastKind::Error);
+            }
+        },
+        ClientUpdate::Connection { state, message } => {
+            let ready = state == ConnectionState::Ready;
+            let connected = matches!(state, ConnectionState::Ready | ConnectionState::Busy);
+            main.set_agent_connected(connected);
+            main.set_command_pending(state == ConnectionState::Busy);
+            main.set_connection_message(message.clone().into());
+            quick.set_can_submit(ready);
+            editor.set_can_submit(ready);
+            if !connected {
+                let detail: SharedString =
+                    "Not connected. Check the task list before retrying unconfirmed changes."
+                        .into();
+                quick.set_error_message(detail.clone());
+                editor.set_error_message(detail);
+                if state == ConnectionState::Unavailable && !main.window().is_visible() {
+                    // A lost Agent may also remove the only tray recovery surface.
+                    drop(main.show());
+                }
+            }
+        }
+    }
+}
+
 fn initialize_theme(
     main_window: &MainWindow,
     quick_add: &QuickAddWindow,
     task_editor: &TaskEditorWindow,
-    config: &UiShellConfig,
+    config: &AppSnapshot,
 ) {
     #[cfg(target_os = "windows")]
     let ui_font_family = SharedString::from("Segoe UI Variable Text");
@@ -223,12 +273,7 @@ fn initialize_theme(
     task_editor.invoke_apply_theme(mode, system_dark);
 }
 
-fn bind_main_window(
-    main_window: &MainWindow,
-    quick_add: &QuickAddWindow,
-    task_editor: &TaskEditorWindow,
-    intent_handler: &Rc<dyn Fn(UiIntent)>,
-) {
+fn bind_main_window(main_window: &MainWindow, intent_handler: &Rc<dyn Fn(UiIntent)>) {
     let navigation_handler = Rc::clone(intent_handler);
     main_window.on_navigation_requested(move |index| {
         if let Some(route) = NavigationRoute::from_index(index) {
@@ -236,30 +281,12 @@ fn bind_main_window(
         }
     });
 
-    let quick_add_weak = quick_add.as_weak();
-    let main_weak = main_window.as_weak();
     let open_handler = Rc::clone(intent_handler);
-    main_window.on_quick_add_requested(move || {
-        open_handler(UiIntent::OpenQuickAdd);
-        if let Some(window) = quick_add_weak.upgrade()
-            && let Some(main) = main_weak.upgrade()
-        {
-            show_quick_add(&window, &main);
-        }
-    });
+    main_window.on_quick_add_requested(move || open_handler(UiIntent::OpenQuickAdd));
 
-    let theme_quick_add = quick_add.as_weak();
-    let theme_editor = task_editor.as_weak();
     let theme_handler = Rc::clone(intent_handler);
     main_window.on_theme_selected(move |mode| {
-        let application_mode = to_application_theme_mode(mode);
-        theme_handler(UiIntent::SetTheme(application_mode));
-        if let Some(window) = theme_quick_add.upgrade() {
-            window.invoke_set_theme_mode(mode);
-        }
-        if let Some(window) = theme_editor.upgrade() {
-            window.invoke_set_theme_mode(mode);
-        }
+        theme_handler(UiIntent::SetTheme(to_application_theme_mode(mode)));
     });
 
     let desktop_settings_handler = Rc::clone(intent_handler);
@@ -519,7 +546,9 @@ fn bind_main_window_controls(main_window: &MainWindow) {
     let close_weak = main_window.as_weak();
     main_window.on_window_close(move || {
         if let Some(window) = close_weak.upgrade() {
-            if should_hide_to_tray(window.get_tray_supported(), window.get_close_to_tray()) {
+            if window.get_agent_connected()
+                && should_hide_to_tray(window.get_tray_supported(), window.get_close_to_tray())
+            {
                 drop(window.hide());
             } else {
                 drop(slint::quit_event_loop());
@@ -530,7 +559,8 @@ fn bind_main_window_controls(main_window: &MainWindow) {
     let native_close_weak = main_window.as_weak();
     main_window.window().on_close_requested(move || {
         if let Some(window) = native_close_weak.upgrade()
-            && !should_hide_to_tray(window.get_tray_supported(), window.get_close_to_tray())
+            && (!window.get_agent_connected()
+                || !should_hide_to_tray(window.get_tray_supported(), window.get_close_to_tray()))
         {
             drop(slint::quit_event_loop());
         }
@@ -819,7 +849,6 @@ fn bind_quick_add(quick_add: &QuickAddWindow, intent_handler: Rc<dyn Fn(UiIntent
             title: trimmed.to_owned(),
             placement,
         }));
-        drop(window.hide());
     });
 
     let close_weak = quick_add.as_weak();
@@ -970,7 +999,9 @@ fn start_focus_projection_timer(
         let Ok(session) = focus_session.lock() else {
             return;
         };
-        if let Some(session) = session.as_ref() {
+        if main.get_agent_connected()
+            && let Some(session) = session.as_ref()
+        {
             update_focus_projection(&main, session, current_utc());
         }
     });
@@ -1294,14 +1325,6 @@ const fn should_hide_to_tray(tray_available: bool, setting_enabled: bool) -> boo
     tray_available && setting_enabled
 }
 
-const fn should_hide_at_startup(
-    tray_available: bool,
-    setting_enabled: bool,
-    background_requested: bool,
-) -> bool {
-    tray_available && (setting_enabled || background_requested)
-}
-
 fn apply_task_editor_state(editor: &TaskEditorWindow, state: &TaskEditorState) {
     editor.set_task_id(SharedString::from(state.task_id.to_string()));
     editor.set_title_text(SharedString::from(state.title.as_str()));
@@ -1518,10 +1541,14 @@ fn move_window_by(window: &slint::Window, dx: f32, dy: f32) {
 }
 
 #[cfg(test)]
+#[path = "shell_ipc_tests.rs"]
+mod ipc_tests;
+
+#[cfg(test)]
 mod tests {
     use super::{
         inbox_model, parse_editor_schedule, placement_from_destination, scheduled_input,
-        should_hide_at_startup, should_hide_to_tray,
+        should_hide_to_tray,
     };
     use quadrant_application::{Quadrant, TaskId, TaskPlacement, TaskSummary};
     use slint::Model;
@@ -1561,8 +1588,6 @@ mod tests {
     fn tray_window_policies_never_hide_without_a_recovery_surface() {
         assert!(should_hide_to_tray(true, true));
         assert!(!should_hide_to_tray(false, true));
-        assert!(should_hide_at_startup(true, false, true));
-        assert!(!should_hide_at_startup(false, true, true));
     }
 
     #[test]

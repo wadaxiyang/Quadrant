@@ -542,6 +542,18 @@ def cargo_findings() -> list[Finding]:
                     "Product crate depends on quadrant-ui-gallery",
                 )
             )
+    process_rules = {
+        "quadrant-app": {"quadrant-storage", "rusqlite", "quadrant-agent"},
+        "quadrant-ui": {"quadrant-storage", "rusqlite", "quadrant-platform", "quadrant-agent"},
+        "quadrant-agent": {"quadrant-ui", "slint", "slint-build", "winit", "femtovg", "skia-safe"},
+    }
+    for crate, forbidden_names in process_rules.items():
+        manifest = CRATES_ROOT / crate / "Cargo.toml"
+        if manifest.exists():
+            forbidden = sorted(cargo_dependency_names(manifest) & forbidden_names)
+            if forbidden:
+                findings.append(Finding("CAR003", relative(manifest),
+                                        f"Process ownership boundary violated: {', '.join(forbidden)}"))
     return findings
 
 

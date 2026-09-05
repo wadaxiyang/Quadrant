@@ -16,10 +16,12 @@
 
 #![forbid(unsafe_code)]
 
+mod client_update;
 pub mod codec;
 mod handshake;
 mod messages;
 mod snapshot;
+pub use client_update::{ClientUpdate, ConnectionState};
 
 pub use handshake::{ClientHello, GuiDisposition, GuiLaunchMode, ServerHello, SessionId};
 pub use messages::{

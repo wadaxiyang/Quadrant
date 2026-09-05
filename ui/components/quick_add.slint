@@ -31,6 +31,8 @@ export component QuickAddWindow inherits Window {
     in-out property <int> destination: 0;
     in-out property <string> error_message;
 
+    in-out property <bool> can_submit: true;
+
     callback submitted(string, int);
     callback cancelled;
 
@@ -88,7 +90,7 @@ export component QuickAddWindow inherits Window {
             title_field := FluentTextField {
                 text <=> root.title_text;
                 placeholder_text: "What needs your attention?";
-                accepted(value) => { root.submitted(value, root.destination); }
+                accepted(value) => { if root.can_submit { root.submitted(value, root.destination); } }
                 edited(value) => {
                     if (value != "") {
                         root.error_message = "";
@@ -128,6 +130,7 @@ export component QuickAddWindow inherits Window {
                 FluentButton {
                     text: "Add task";
                     primary: true;
+                    enabled: root.can_submit;
                     clicked => { root.submitted(root.title_text, root.destination); }
                 }
             }

@@ -19,10 +19,10 @@ import {
 
 export component SettingsView inherits Rectangle {
     in property <ThemeMode> theme_mode: ThemeMode.system;
-    in-out property <bool> launch_at_startup: false;
-    in-out property <bool> start_hidden: false;
-    in-out property <bool> close_to_tray: true;
-    in-out property <bool> minimize_to_tray: false;
+    in property <bool> launch_at_startup: false;
+    in property <bool> start_hidden: false;
+    in property <bool> close_to_tray: true;
+    in property <bool> minimize_to_tray: false;
     in property <bool> autostart_supported: false;
     in property <bool> tray_supported: false;
     in property <bool> global_hotkey_available: false;
@@ -34,6 +34,10 @@ export component SettingsView inherits Rectangle {
     in property <string> application_version: "0.1.0";
     in property <string> update_description;
     in property <bool> can_open_releases: true;
+    changed launch_at_startup => { launch_at_startup_switch.checked = root.launch_at_startup; }
+    changed start_hidden => { start_hidden_switch.checked = root.start_hidden; }
+    changed close_to_tray => { close_to_tray_switch.checked = root.close_to_tray; }
+    changed minimize_to_tray => { minimize_to_tray_switch.checked = root.minimize_to_tray; }
     callback theme_selected(ThemeMode);
     callback desktop_settings_changed(bool, bool, bool, bool);
     callback create_backup_requested;
@@ -122,12 +126,15 @@ export component SettingsView inherits Rectangle {
                                 title: "Launch at startup";
                                 description: root.autostart_supported ? "Start Quadrant after login." : "Unavailable on this platform.";
                                 enabled: root.autostart_supported;
-                                Switch {
+                                launch_at_startup_switch := Switch {
                                     text: "";
                                     accessible-label: "Launch at startup";
                                     enabled: root.autostart_supported;
-                                    checked <=> root.launch_at_startup;
-                                    toggled => { root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray); }
+                                    checked: root.launch_at_startup;
+                                    toggled => {
+                                        self.checked = root.launch_at_startup;
+                                        root.desktop_settings_changed(!root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray);
+                                    }
                                 }
                             }
 
@@ -137,12 +144,15 @@ export component SettingsView inherits Rectangle {
                                 title: "Start in background";
                                 description: root.tray_supported ? "Do not show the main window at process startup." : "Requires a working tray icon.";
                                 enabled: root.tray_supported;
-                                Switch {
+                                start_hidden_switch := Switch {
                                     text: "";
                                     accessible-label: "Start in background";
                                     enabled: root.tray_supported;
-                                    checked <=> root.start_hidden;
-                                    toggled => { root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray); }
+                                    checked: root.start_hidden;
+                                    toggled => {
+                                        self.checked = root.start_hidden;
+                                        root.desktop_settings_changed(root.launch_at_startup, !root.start_hidden, root.close_to_tray, root.minimize_to_tray);
+                                    }
                                 }
                             }
 
@@ -152,12 +162,15 @@ export component SettingsView inherits Rectangle {
                                 title: "Close to tray";
                                 description: root.tray_supported ? "Close hides the window; Exit remains available in the tray." : "Requires a working tray icon.";
                                 enabled: root.tray_supported;
-                                Switch {
+                                close_to_tray_switch := Switch {
                                     text: "";
                                     accessible-label: "Close to tray";
                                     enabled: root.tray_supported;
-                                    checked <=> root.close_to_tray;
-                                    toggled => { root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray); }
+                                    checked: root.close_to_tray;
+                                    toggled => {
+                                        self.checked = root.close_to_tray;
+                                        root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, !root.close_to_tray, root.minimize_to_tray);
+                                    }
                                 }
                             }
 
@@ -167,12 +180,15 @@ export component SettingsView inherits Rectangle {
                                 title: "Minimize to tray";
                                 description: root.tray_supported ? "Minimize hides the window instead of using the taskbar." : "Requires a working tray icon.";
                                 enabled: root.tray_supported;
-                                Switch {
+                                minimize_to_tray_switch := Switch {
                                     text: "";
                                     accessible-label: "Minimize to tray";
                                     enabled: root.tray_supported;
-                                    checked <=> root.minimize_to_tray;
-                                    toggled => { root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, root.minimize_to_tray); }
+                                    checked: root.minimize_to_tray;
+                                    toggled => {
+                                        self.checked = root.minimize_to_tray;
+                                        root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, !root.minimize_to_tray);
+                                    }
                                 }
                             }
                         }

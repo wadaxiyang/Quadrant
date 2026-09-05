@@ -1,6 +1,6 @@
 [package]
 name = "quadrant-app"
-description = "Quadrant desktop application composition root"
+description = "Quadrant Slint presentation process and local IPC client"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,12 +11,16 @@ build = "build.rs"
 [dependencies]
 quadrant-application.workspace = true
 quadrant-platform.workspace = true
-quadrant-storage.workspace = true
+quadrant-protocol.workspace = true
 quadrant-ui.workspace = true
 tokio.workspace = true
+thiserror.workspace = true
 
 [build-dependencies]
 winresource = "0.1.31"
+
+[dev-dependencies]
+serde_json.workspace = true
 
 [package.metadata.winresource]
 FileDescription = "Quadrant local-first task manager"
