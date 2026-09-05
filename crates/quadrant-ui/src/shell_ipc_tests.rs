@@ -1,226 +1,523 @@
 // SPDX-License-Identifier: GPL-3.0-only
-//! Real Slint components on a headless software window adapter; no native effects.
+//! Real Slint components, queued UI dispatch and weak adapter lifetime assertions.
 
 use super::*;
+use quadrant_protocol::CommandOutcome;
 use slint::platform::{
     Platform, WindowAdapter,
     software_renderer::{MinimalSoftwareWindow, RepaintBufferType},
 };
-use std::cell::RefCell;
+use std::{
+    cell::Cell,
+    collections::VecDeque,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
-struct Headless(
-    Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>,
-    Arc<std::sync::atomic::AtomicUsize>,
-);
-struct EventProxy(Arc<std::sync::atomic::AtomicUsize>);
+type UiCalls = Arc<Mutex<VecDeque<Box<dyn FnOnce() + Send>>>>;
+type WindowHistory = Rc<RefCell<Vec<std::rc::Weak<MinimalSoftwareWindow>>>>;
+
+struct Headless {
+    windows: WindowHistory,
+    quits: Arc<AtomicUsize>,
+    calls: UiCalls,
+    fail_next: Rc<Cell<bool>>,
+}
+struct EventProxy {
+    quits: Arc<AtomicUsize>,
+    calls: UiCalls,
+}
 impl slint::platform::EventLoopProxy for EventProxy {
     fn quit_event_loop(&self) -> Result<(), slint::EventLoopError> {
-        self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.quits.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
     fn invoke_from_event_loop(
         &self,
-        _event: Box<dyn FnOnce() + Send>,
+        event: Box<dyn FnOnce() + Send>,
     ) -> Result<(), slint::EventLoopError> {
-        // This fixture applies transport updates explicitly on the test UI thread.
-        Err(slint::EventLoopError::EventLoopTerminated)
+        self.calls.lock().unwrap().push_back(event);
+        Ok(())
     }
 }
 impl Platform for Headless {
     fn new_event_loop_proxy(&self) -> Option<Box<dyn slint::platform::EventLoopProxy>> {
-        Some(Box::new(EventProxy(self.1.clone())))
+        Some(Box::new(EventProxy {
+            quits: self.quits.clone(),
+            calls: self.calls.clone(),
+        }))
     }
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
+        if self.fail_next.replace(false) {
+            return Err(slint::PlatformError::Other(
+                "Injected window creation failure".into(),
+            ));
+        }
         let window = MinimalSoftwareWindow::new(RepaintBufferType::default());
-        self.0.borrow_mut().push(window.clone());
+        self.windows.borrow_mut().push(Rc::downgrade(&window));
         Ok(window)
     }
-
     fn run_event_loop(&self) -> Result<(), slint::PlatformError> {
-        assert!(self.0.borrow()[0].is_visible());
+        assert!(
+            self.windows
+                .borrow()
+                .iter()
+                .filter_map(std::rc::Weak::upgrade)
+                .any(|window| window.is_visible())
+        );
         Ok(())
     }
 }
 
-#[test]
-#[allow(clippy::too_many_lines)] // One ordered lifecycle story on a single Slint context.
-fn ipc_updates_preserve_drafts_until_confirmation_and_restore_authoritative_state() {
-    let windows = Rc::new(RefCell::new(Vec::new()));
-    let quits = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    slint::platform::set_platform(Box::new(Headless(windows.clone(), quits.clone()))).unwrap();
-    let snapshot: AppSnapshot = serde_json::from_str(include_str!(
-        "../../quadrant-protocol/tests/fixtures/snapshot_v1.json"
-    ))
-    .unwrap();
-    let submissions = Rc::new(RefCell::new(Vec::new()));
-    let received = submissions.clone();
-    let shell = UiShell::new(&snapshot, "test", move |intent| {
-        received.borrow_mut().push(intent);
-        true
-    })
-    .unwrap();
-    let apply = |update| {
-        apply_client_update(
-            &shell.main_window,
-            &shell.quick_add,
-            &shell.task_editor,
-            &shell.focus_session,
-            update,
-        );
-    };
-    apply(ClientUpdate::Connection {
-        state: ConnectionState::Ready,
-        message: String::new(),
-    });
-    shell.main_window.set_current_route(5);
-    shell.quick_add.set_title_text("Keep this draft".into());
-    shell.quick_add.show().unwrap();
-    shell
-        .quick_add
-        .invoke_submitted("Keep this draft".into(), 0);
-    assert!(shell.quick_add.window().is_visible());
-    assert_eq!(shell.quick_add.get_title_text(), "Keep this draft");
-    assert!(!shell.quick_add.get_can_submit());
-    assert!(shell.main_window.get_command_pending());
-    assert_eq!(submissions.borrow().len(), 1);
-    shell.quick_add.invoke_submitted("duplicate".into(), 0);
-    assert_eq!(submissions.borrow().len(), 1);
-
-    apply(ClientUpdate::Connection {
-        state: ConnectionState::Reconnecting,
-        message: "Connection lost; operation outcome unknown.".into(),
-    });
-    assert!(!shell.main_window.get_agent_connected());
-    assert!(!shell.task_editor.get_can_submit());
-    if let Some(directory) = std::env::var_os("QUADRANT_IPC_RENDER_DIR") {
-        shell.main_window.show().unwrap();
-        render_review(
-            &windows.borrow()[0],
-            &std::path::PathBuf::from(&directory).join("disconnected.png"),
-            900,
-            640,
-        );
-        render_review(
-            &windows.borrow()[1],
-            &std::path::PathBuf::from(directory).join("quick-add-disconnected.png"),
-            520,
-            252,
+struct Fixture {
+    windows: WindowHistory,
+    quits: Arc<AtomicUsize>,
+    calls: UiCalls,
+    fail_next: Rc<Cell<bool>>,
+    commands: Rc<RefCell<Vec<GuiCommand>>>,
+    snapshot: AppSnapshot,
+}
+impl Fixture {
+    fn new() -> Self {
+        let fixture = Self {
+            windows: Rc::default(),
+            quits: Arc::default(),
+            calls: Arc::default(),
+            fail_next: Rc::default(),
+            commands: Rc::default(),
+            snapshot: serde_json::from_str(include_str!(
+                "../../quadrant-protocol/tests/fixtures/snapshot_v1.json"
+            ))
+            .unwrap(),
+        };
+        slint::platform::set_platform(Box::new(Headless {
+            windows: fixture.windows.clone(),
+            quits: fixture.quits.clone(),
+            calls: fixture.calls.clone(),
+            fail_next: fixture.fail_next.clone(),
+        }))
+        .unwrap();
+        fixture
+    }
+    fn shell(&self) -> UiShell {
+        let commands = self.commands.clone();
+        UiShell::new(&self.snapshot, "test", move |command| {
+            commands.borrow_mut().push(command);
+            true
+        })
+        .unwrap()
+    }
+    fn pump(&self) {
+        loop {
+            let callback = self.calls.lock().unwrap().pop_front();
+            let Some(callback) = callback else {
+                break;
+            };
+            callback();
+        }
+    }
+    fn apply(&self, shell: &UiShell, update: ClientUpdate) {
+        shell.update_sink()(update);
+        self.pump();
+    }
+    fn event(&self, shell: &UiShell, event: ServerEvent) {
+        self.apply(shell, ClientUpdate::Event(event));
+    }
+    fn ready(&self, shell: &UiShell) {
+        self.apply(
+            shell,
+            ClientUpdate::Connection {
+                state: ConnectionState::Ready,
+                message: String::new(),
+            },
         );
     }
-    assert_eq!(shell.quick_add.get_title_text(), "Keep this draft");
-    shell.main_window.hide().unwrap();
-    apply(ClientUpdate::Connection {
-        state: ConnectionState::Unavailable,
-        message: "Reconnect exhausted.".into(),
-    });
-    assert!(shell.main_window.window().is_visible());
-    apply(ClientUpdate::Snapshot(Box::new(snapshot.clone())));
-    assert_eq!(shell.main_window.get_current_route(), 5);
-    assert_eq!(shell.quick_add.get_title_text(), "Keep this draft");
-    assert_eq!(*shell.focus_session.lock().unwrap(), snapshot.focus.session);
-    apply(ClientUpdate::Connection {
-        state: ConnectionState::Ready,
-        message: String::new(),
-    });
-
-    // Selecting a persistent preference only submits intent. Agent push applies it.
+    fn finish(&self, shell: &UiShell, outcome: CommandOutcome) {
+        self.apply(
+            shell,
+            ClientUpdate::CommandFinished {
+                command: self.commands.borrow().last().unwrap().clone(),
+                outcome,
+            },
+        );
+    }
+    fn live(&self) -> usize {
+        self.windows
+            .borrow()
+            .iter()
+            .filter(|window| window.strong_count() > 0)
+            .count()
+    }
+}
+fn quick(shell: &UiShell) -> QuickAddWindow {
     shell
-        .main_window
-        .invoke_theme_selected(SlintThemeMode::Dark);
-    assert!(matches!(
-        submissions.borrow().last(),
-        Some(GuiCommand::Application(intent)) if matches!(intent.as_ref(), UiIntent::SetTheme(ApplicationThemeMode::Dark))
-    ));
-    apply(ClientUpdate::Event(ServerEvent::ThemeChanged {
-        theme_mode: ApplicationThemeMode::Light,
+        .transients
+        .borrow()
+        .quick_add
+        .as_ref()
+        .unwrap()
+        .component
+        .clone_strong()
+}
+fn editor(shell: &UiShell) -> TaskEditorWindow {
+    shell
+        .transients
+        .borrow()
+        .task_editor
+        .as_ref()
+        .unwrap()
+        .component
+        .clone_strong()
+}
+fn task() -> TaskEditorState {
+    TaskEditorState {
+        task_id: TaskId::generate(),
+        title: "Edit me".into(),
+        notes: String::new(),
+        placement: TaskPlacement::Inbox,
+        planned_on: String::new(),
+        due_at: String::new(),
+        due_time_zone: String::new(),
+        reminder_at: String::new(),
+        reminder_time_zone: String::new(),
+        recurrence: RecurrenceChoice::None,
+        custom_interval_days: String::new(),
+    }
+}
+fn submit_editor(window: &TaskEditorWindow) {
+    window.invoke_submitted(
+        window.get_task_id(),
+        window.get_title_text(),
+        window.get_notes_text(),
+        window.get_destination(),
+        "".into(),
+        "".into(),
+        "".into(),
+        "".into(),
+        "".into(),
+        0,
+        "".into(),
+    );
+}
+fn failed() -> CommandOutcome {
+    CommandOutcome::Failed(quadrant_application::UserFacingError {
+        message: "Save failed".into(),
+    })
+}
+
+#[test]
+fn lazy_windows_preserve_ipc_state_and_release_every_component() {
+    let fixture = Fixture::new();
+    let shell = fixture.shell();
+    assert_eq!(fixture.live(), 1);
+    // Production run() shows Main before queued IPC callbacks are processed.
+    shell.main_window.show().unwrap();
+    assert!(shell.transients.borrow().quick_add.is_none());
+    assert!(shell.transients.borrow().task_editor.is_none());
+    projections_without_auxiliary_windows(&fixture, &shell);
+    quick_add_lifecycle(&fixture, &shell);
+    editor_lifecycle(&fixture, &shell);
+    creation_failures_and_teardown(&fixture, shell);
+    assert_eq!(fixture.live(), 0);
+}
+
+fn projections_without_auxiliary_windows(f: &Fixture, shell: &UiShell) {
+    shell.main_window.set_current_route(5);
+    // Queue multiple transport updates before a UI turn; each must apply in order.
+    let sink = shell.update_sink();
+    let mut snapshot = f.snapshot.clone();
+    snapshot.focus.session = None;
+    sink(ClientUpdate::Snapshot(Box::new(snapshot)));
+    sink(ClientUpdate::Event(ServerEvent::ThemeChanged {
+        theme_mode: ApplicationThemeMode::Dark,
         system_theme: SystemTheme::Dark,
     }));
-    apply(ClientUpdate::Connection {
+    sink(ClientUpdate::Connection {
         state: ConnectionState::Ready,
         message: String::new(),
     });
+    f.pump();
+    assert_eq!(shell.main_window.get_current_route(), 5);
+    assert_eq!(shell.main_window.get_focus_session_status(), -1);
+    assert!(shell.main_window.get_agent_connected());
+    assert_eq!(fixture_window_count(f), 1);
+    shell
+        .main_window
+        .invoke_theme_selected(SlintThemeMode::Light);
+    assert!(
+        matches!(f.commands.borrow().last(), Some(GuiCommand::Application(intent)) if matches!(intent.as_ref(), UiIntent::SetTheme(ApplicationThemeMode::Light)))
+    );
+    f.finish(shell, CommandOutcome::Succeeded);
+    f.ready(shell);
     let before = shell.main_window.get_launch_at_startup();
     shell
         .main_window
         .invoke_desktop_settings_changed(!before, true, true, false);
     assert_eq!(shell.main_window.get_launch_at_startup(), before);
-    apply(ClientUpdate::Event(
+    f.event(
+        shell,
         ApplicationEvent::DesktopSettingsChanged(DesktopSettings {
             launch_at_startup: !before,
-            ..snapshot.desktop_settings
+            ..f.snapshot.desktop_settings
         })
         .into(),
-    ));
-    assert_eq!(shell.main_window.get_launch_at_startup(), !before);
-
-    let quick_command: GuiCommand = UiIntent::SubmitQuickAdd(QuickAddSubmission {
-        title: "Keep this draft".into(),
-        placement: TaskPlacement::Inbox,
-    })
-    .into();
-    apply(ClientUpdate::CommandFinished {
-        command: quick_command.clone(),
-        outcome: CommandOutcome::Failed(quadrant_application::UserFacingError {
-            message: "Save failed".into(),
-        }),
-    });
-    assert_eq!(shell.quick_add.get_title_text(), "Keep this draft");
-    assert!(shell.quick_add.window().is_visible());
-    assert_eq!(shell.quick_add.get_error_message(), "Save failed");
-    shell
-        .quick_add
-        .set_title_text("Next task drafted while saving".into());
-    apply(ClientUpdate::CommandFinished {
-        command: quick_command.clone(),
-        outcome: CommandOutcome::Succeeded,
-    });
-    assert_eq!(
-        shell.quick_add.get_title_text(),
-        "Next task drafted while saving"
     );
-    assert!(shell.quick_add.window().is_visible());
-    shell.quick_add.set_title_text("Keep this draft".into());
-    apply(ClientUpdate::CommandFinished {
-        command: quick_command,
-        outcome: CommandOutcome::Succeeded,
-    });
-    assert!(!shell.quick_add.window().is_visible());
-    assert!(shell.quick_add.get_title_text().is_empty());
-    apply(ClientUpdate::Connection {
-        state: ConnectionState::Ready,
-        message: String::new(),
-    });
+    assert_eq!(shell.main_window.get_launch_at_startup(), !before);
+    f.finish(shell, CommandOutcome::Succeeded);
+    f.ready(shell);
+}
+fn fixture_window_count(f: &Fixture) -> usize {
+    f.windows.borrow().len()
+}
+
+fn quick_add_lifecycle(f: &Fixture, shell: &UiShell) {
+    f.event(shell, ServerEvent::OpenQuickAdd);
+    let window = quick(shell);
+    let original = window.as_weak();
+    assert_eq!(f.live(), 2);
+    assert!(window.get_can_submit());
+    window.set_title_text("Keep this draft".into());
+    window.set_destination(2);
+    let created = fixture_window_count(f);
+    f.event(shell, ServerEvent::OpenQuickAdd);
+    assert_eq!(fixture_window_count(f), created);
+    assert_eq!(window.get_title_text(), "Keep this draft");
+    window.invoke_submitted(window.get_title_text(), 2);
+    let sent = f.commands.borrow().len();
+    window.invoke_submitted("duplicate".into(), 0);
+    assert_eq!(f.commands.borrow().len(), sent);
+    f.finish(shell, failed());
+    assert_eq!(window.get_error_message(), "Save failed");
+    assert_eq!(window.get_title_text(), "Keep this draft");
+    f.ready(shell);
+    window.invoke_submitted(window.get_title_text(), 2);
+    window.set_title_text("Newer draft".into());
+    f.finish(shell, CommandOutcome::Succeeded);
+    assert!(shell.transients.borrow().quick_add.is_some());
+    assert_eq!(window.get_title_text(), "Newer draft");
+    f.ready(shell);
+    window.invoke_submitted(window.get_title_text(), 2);
+    f.finish(shell, CommandOutcome::Succeeded);
+    assert!(shell.transients.borrow().quick_add.is_none());
+    drop(window);
+    assert!(original.upgrade().is_none());
+    assert_eq!(f.live(), 1);
+    quick_reopen_ignores_old_result(f, shell);
+}
+
+fn quick_reopen_ignores_old_result(f: &Fixture, shell: &UiShell) {
+    f.ready(shell);
+    f.event(shell, ServerEvent::OpenQuickAdd);
+    let old = quick(shell);
+    let weak = old.as_weak();
+    old.set_title_text("Same title".into());
+    old.invoke_submitted(old.get_title_text(), 0);
+    old.invoke_cancelled();
+    drop(old);
+    assert!(weak.upgrade().is_none());
+    f.event(shell, ServerEvent::OpenQuickAdd);
+    let current = quick(shell);
+    current.set_title_text("Same title".into());
+    assert!(!current.get_can_submit());
+    f.finish(shell, CommandOutcome::Succeeded);
+    assert_eq!(current.get_title_text(), "Same title");
+    assert!(current.window().is_visible());
+    f.apply(
+        shell,
+        ClientUpdate::Connection {
+            state: ConnectionState::Reconnecting,
+            message: "Connection lost; operation outcome unknown.".into(),
+        },
+    );
+    assert!(!current.get_can_submit());
+    if let Some(directory) = std::env::var_os("QUADRANT_IPC_RENDER_DIR") {
+        shell.main_window.show().unwrap();
+        render_review(
+            &f.windows.borrow()[0].upgrade().unwrap(),
+            &std::path::PathBuf::from(&directory).join("disconnected.png"),
+            900,
+            640,
+        );
+        let adapter = f.windows.borrow().last().unwrap().upgrade().unwrap();
+        render_review(
+            &adapter,
+            &std::path::PathBuf::from(directory).join("quick-add-disconnected.png"),
+            520,
+            252,
+        );
+    }
+    f.apply(shell, ClientUpdate::Snapshot(Box::new(f.snapshot.clone())));
+    assert_eq!(current.get_title_text(), "Same title");
+    assert_eq!(shell.main_window.get_current_route(), 5);
+    shell.main_window.hide().unwrap();
+    f.apply(
+        shell,
+        ClientUpdate::Connection {
+            state: ConnectionState::Unavailable,
+            message: "Reconnect exhausted".into(),
+        },
+    );
+    assert!(shell.main_window.window().is_visible());
+    let weak = current.as_weak();
+    current
+        .window()
+        .dispatch_event(slint::platform::WindowEvent::CloseRequested);
+    drop(current);
+    assert!(weak.upgrade().is_none());
+    assert_eq!(f.live(), 1);
+    f.ready(shell);
+}
+
+fn editor_lifecycle(f: &Fixture, shell: &UiShell) {
+    let state = task();
+    f.event(
+        shell,
+        ApplicationEvent::TaskEditorLoaded(state.clone()).into(),
+    );
+    let window = editor(shell);
+    let weak = window.as_weak();
+    assert_eq!(f.live(), 2);
+    window.set_notes_text("Unsaved notes".into());
+    let created = fixture_window_count(f);
+    f.event(
+        shell,
+        ApplicationEvent::TaskEditorLoaded(state.clone()).into(),
+    );
+    assert_eq!(fixture_window_count(f), created);
+    assert_eq!(window.get_notes_text(), "Unsaved notes");
+    submit_editor(&window);
+    f.event(
+        shell,
+        ApplicationEvent::TaskEditorValidationFailed {
+            field: TaskEditorField::Title,
+            message: "Invalid title".into(),
+        }
+        .into(),
+    );
+    assert_eq!(window.get_title_error(), "Invalid title");
+    f.finish(shell, failed());
+    assert_eq!(window.get_error_message(), "Save failed");
+    f.ready(shell);
+    submit_editor(&window);
+    f.event(shell, ApplicationEvent::TaskEditorSaved.into());
+    assert!(window.window().is_visible()); // Wait for the correlated result.
+    window.set_notes_text("Edited while waiting".into());
+    f.finish(shell, CommandOutcome::Succeeded);
+    assert!(shell.transients.borrow().task_editor.is_some());
+    f.ready(shell);
+    submit_editor(&window);
+    f.finish(shell, CommandOutcome::Succeeded);
+    assert!(shell.transients.borrow().task_editor.is_none());
+    drop(window);
+    assert!(weak.upgrade().is_none());
+    assert_eq!(f.live(), 1);
+    editor_reopen_ignores_old_result(f, shell, &state);
+}
+
+fn editor_reopen_ignores_old_result(f: &Fixture, shell: &UiShell, state: &TaskEditorState) {
+    f.ready(shell);
+    f.event(
+        shell,
+        ApplicationEvent::TaskEditorLoaded(state.clone()).into(),
+    );
+    let old = editor(shell);
+    let weak = old.as_weak();
+    submit_editor(&old);
+    old.window()
+        .dispatch_event(slint::platform::WindowEvent::CloseRequested);
+    drop(old);
+    assert!(weak.upgrade().is_none());
+    f.event(
+        shell,
+        ApplicationEvent::TaskEditorLoaded(state.clone()).into(),
+    );
+    let current = editor(shell);
+    current.set_notes_text("New window".into());
+    f.event(shell, ApplicationEvent::TaskEditorSaved.into());
+    f.event(
+        shell,
+        ApplicationEvent::TaskEditorValidationFailed {
+            field: TaskEditorField::Title,
+            message: "Old validation".into(),
+        }
+        .into(),
+    );
+    f.finish(shell, failed());
+    assert!(current.window().is_visible());
+    assert!(current.get_title_error().is_empty());
+    assert!(current.get_error_message().is_empty());
+    current.invoke_cancelled();
+    let weak = current.as_weak();
+    drop(current);
+    assert!(weak.upgrade().is_none());
+    assert_eq!(f.live(), 1);
+    // Late editor pushes never create a hidden replacement.
+    f.event(shell, ApplicationEvent::TaskEditorSaved.into());
+    assert_eq!(f.live(), 1);
+    f.ready(shell);
+}
+
+fn creation_failures_and_teardown(f: &Fixture, shell: UiShell) {
+    f.fail_next.set(true);
+    f.event(&shell, ServerEvent::OpenQuickAdd);
+    assert!(shell.transients.borrow().quick_add.is_none());
+    assert!(
+        shell
+            .main_window
+            .get_toast_message()
+            .contains("could not be created")
+    );
+    f.event(&shell, ServerEvent::OpenQuickAdd);
+    assert_eq!(f.live(), 2);
+    f.fail_next.set(true);
+    f.event(&shell, ApplicationEvent::TaskEditorLoaded(task()).into());
+    assert!(shell.transients.borrow().task_editor.is_none());
+    f.event(&shell, ApplicationEvent::TaskEditorLoaded(task()).into());
+    assert_eq!(f.live(), 3);
+    let created = fixture_window_count(f);
+    f.event(
+        &shell,
+        ServerEvent::ThemeChanged {
+            theme_mode: ApplicationThemeMode::Dark,
+            system_theme: SystemTheme::Dark,
+        },
+    );
+    assert_eq!(fixture_window_count(f), created);
     shell.main_window.show().unwrap();
     shell.main_window.set_tray_supported(true);
     shell.main_window.set_close_to_tray(true);
-    shell.main_window.set_minimize_to_tray(true); // Obsolete values cannot cause hide.
     shell.main_window.invoke_window_minimize();
     assert!(shell.main_window.window().is_visible());
     shell.main_window.invoke_window_close();
-    assert_eq!(quits.load(std::sync::atomic::Ordering::SeqCst), 1);
-    assert!(shell.main_window.window().is_visible()); // Quit requested, never hide-and-linger.
+    assert_eq!(f.quits.load(Ordering::SeqCst), 1);
     shell
         .main_window
         .window()
         .dispatch_event(slint::platform::WindowEvent::CloseRequested);
-    assert_eq!(quits.load(std::sync::atomic::Ordering::SeqCst), 2);
+    assert_eq!(f.quits.load(Ordering::SeqCst), 2);
     shell.main_window.set_close_to_tray(false);
     shell.main_window.invoke_window_close();
     assert!(matches!(
-        submissions.borrow().last(),
+        f.commands.borrow().last(),
         Some(GuiCommand::ExitApplication)
     ));
-    assert_eq!(quits.load(std::sync::atomic::Ordering::SeqCst), 2); // Wait for Agent shutdown.
-    let sent = submissions.borrow().len();
-    shell.main_window.invoke_window_close(); // Busy full Exit cannot enqueue twice.
-    assert_eq!(submissions.borrow().len(), sent);
-    apply(ClientUpdate::Event(ServerEvent::ExitGui));
-    assert_eq!(quits.load(std::sync::atomic::Ordering::SeqCst), 3);
-    // An explicitly launched GUI must show even when Agent startup is hidden.
-    assert!(snapshot.desktop_settings.start_hidden);
+    let sent = f.commands.borrow().len();
+    shell.main_window.invoke_window_close();
+    assert_eq!(f.commands.borrow().len(), sent);
+    f.event(&shell, ServerEvent::ExitGui);
+    assert_eq!(f.quits.load(Ordering::SeqCst), 3);
+    let main_weak = shell.main_window.as_weak();
+    let quick_weak = quick(&shell).as_weak();
+    let editor_weak = editor(&shell).as_weak();
+    let late_sink = shell.update_sink();
+    assert!(f.snapshot.desktop_settings.start_hidden);
     shell.main_window.hide().unwrap();
-    assert!(!shell.main_window.window().is_visible());
     shell.run().unwrap();
+    assert!(main_weak.upgrade().is_none());
+    assert!(quick_weak.upgrade().is_none());
+    assert!(editor_weak.upgrade().is_none());
+    late_sink(ClientUpdate::Event(ServerEvent::OpenQuickAdd));
+    f.pump();
+    assert_eq!(f.live(), 0);
 }
 
 fn render_review(window: &MinimalSoftwareWindow, path: &std::path::Path, width: u32, height: u32) {

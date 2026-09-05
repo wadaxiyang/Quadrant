@@ -28,6 +28,8 @@ export { QuickAddWindow } from "components/quick_add.slint";
 export { TaskEditorWindow } from "components/task_editor.slint";
 
 export component MainWindow inherits Window {
+    // Rust UI adapter dispatch hook; no business or transport data enters Slint.
+    callback dispatch_client_update;
     title: "Quadrant";
     icon: Branding.app_mark;
     preferred-width: 1100px;

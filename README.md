@@ -24,6 +24,10 @@ reopens the interface, and **Exit** stops both processes. Turning Close to tray
 off makes window Close request a full exit. Startup preferences apply to the
 Agent: **Start in background** means login starts no GUI at all.
 
+Quick Add and Task Editor are created only when opened and released on close or
+confirmed save. Reopening a visible window keeps its draft; closing it discards
+unsaved input. Saves that fail or lose their connection keep the current form.
+
 The GUI communicates only through local IPC and never opens SQLite. Keep both
 executables together. For Agent startup-policy testing, use
 `cargo run --locked -p quadrant-agent -- --background`.
