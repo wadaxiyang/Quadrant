@@ -5,6 +5,7 @@ mod desktop;
 mod external;
 mod instance;
 mod ipc;
+mod launcher;
 mod notifications;
 #[cfg(target_os = "windows")]
 mod windows;
@@ -24,6 +25,7 @@ pub use desktop::DesktopIntegration;
 pub use external::PlatformExternalOpener;
 pub use instance::{ActivationListener, SingleInstanceCoordinator};
 pub use ipc::{AgentEndpoint, AgentListener, AgentStream, PeerIdentity};
+pub use launcher::{GuiLauncher, GuiProcess, PlatformGuiLauncher, launch_agent};
 pub use notifications::PlatformNotificationDelivery;
 
 /// Shared Windows shell identity for the Agent and GUI.

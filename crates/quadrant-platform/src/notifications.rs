@@ -7,6 +7,28 @@ use quadrant_application::{ReminderAlert, ReminderDelivery, ReminderDeliveryErro
 pub struct PlatformNotificationDelivery;
 
 impl PlatformNotificationDelivery {
+    /// Reports a failed tray launch without blocking the Agent on a modal dialog.
+    /// # Errors
+    /// Returns native notification delivery failures.
+    pub fn gui_launch_failed() -> Result<(), crate::PlatformIntegrationError> {
+        #[cfg(target_os = "windows")]
+        {
+            notify_rust::Notification::new()
+                .appname("Quadrant")
+                .summary("Quadrant could not open")
+                .body("The interface could not start. Open Quadrant from a complete installation; check the Agent log if the problem persists.")
+                .show()
+                .map(|_| ())
+                .map_err(crate::PlatformIntegrationError::new)
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            Err(crate::PlatformIntegrationError::new(
+                "native notifications are unavailable",
+            ))
+        }
+    }
+
     /// Delivers a generic Focus deadline notification without requiring a task or GUI.
     ///
     /// # Errors

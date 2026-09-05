@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key><string>en</string>
-    <key>CFBundleExecutable</key><string>quadrant-app</string>
+    <key>CFBundleExecutable</key><string>quadrant</string>
     <key>CFBundleIdentifier</key><string>io.github.wadaxiyang.quadrant</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
     <key>CFBundleName</key><string>Quadrant</string>

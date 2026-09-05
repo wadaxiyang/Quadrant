@@ -19,7 +19,7 @@ use tokio::sync::{mpsc, oneshot};
 pub enum ClientError {
     /// Connection or transport I/O failed.
     #[error(
-        "Quadrant could not connect to its background service. Start the service and try again."
+        "Quadrant could not connect to its background service. Restart Quadrant from the complete installation."
     )]
     Io(#[from] std::io::Error),
     /// Invalid or incomplete frame.
@@ -39,6 +39,12 @@ pub enum ClientError {
 }
 
 impl ClientError {
+    /// Only an absent listener authorizes automatic Agent startup. Permission,
+    /// protocol and response-time failures must never spawn a competing Agent.
+    #[must_use]
+    pub fn agent_absent(&self) -> bool {
+        matches!(self, Self::Io(error) if matches!(error.kind(), std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused))
+    }
     fn recoverable(&self) -> bool {
         matches!(
             self,
@@ -111,6 +117,37 @@ pub struct GuiClient {
 pub(crate) type UpdateSink = Arc<dyn Fn(ClientUpdate) + Send + Sync>;
 
 impl GuiClient {
+    /// Starts a missing Agent once, then waits finitely for an accepted session.
+    /// Agent-launched children pass `false` to prevent parent resurrection on Exit.
+    /// The composition root owns any process handle created by `start`.
+    /// # Errors
+    /// Returns launch, incompatible protocol, denied access or bounded startup errors.
+    pub async fn connect_or_start(
+        endpoint: AgentEndpoint,
+        mode: GuiLaunchMode,
+        allow_start: bool,
+        start: impl FnOnce() -> std::io::Result<()>,
+    ) -> Result<Option<(Self, ClientHandle)>, ClientError> {
+        match Self::connect(endpoint.clone(), mode).await {
+            Err(error) if allow_start && error.agent_absent() => {
+                start()?;
+                tokio::time::timeout(std::time::Duration::from_secs(15), async {
+                    loop {
+                        match Self::connect(endpoint.clone(), mode).await {
+                            Err(error) if error.agent_absent() => {
+                                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                            }
+                            result => break result,
+                        }
+                    }
+                })
+                .await
+                .map_err(|_| ClientError::Timeout)?
+            }
+            result => result,
+        }
+    }
+
     /// Connects, negotiates, and loads the snapshot before any Slint construction.
     /// `None` means the Agent activated an existing GUI and this invocation exits.
     /// # Errors

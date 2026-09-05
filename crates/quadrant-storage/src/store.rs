@@ -516,17 +516,8 @@ impl SettingsRepository for SqliteStore {
             } else {
                 WindowCloseBehavior::Quit
             },
-            minimize_behavior: if load_bool_setting(
-                &connection,
-                "desktop.minimize_to_tray",
-                operation,
-            )?
-            .unwrap_or(defaults.minimize_behavior == WindowMinimizeBehavior::HideToTray)
-            {
-                WindowMinimizeBehavior::HideToTray
-            } else {
-                WindowMinimizeBehavior::Taskbar
-            },
+            // Retired preference: read old profiles without restoring hide-on-minimize.
+            minimize_behavior: WindowMinimizeBehavior::Taskbar,
         })
     }
 
@@ -545,10 +536,7 @@ impl SettingsRepository for SqliteStore {
                 "desktop.close_to_tray",
                 settings.close_behavior == WindowCloseBehavior::HideToTray,
             ),
-            (
-                "desktop.minimize_to_tray",
-                settings.minimize_behavior == WindowMinimizeBehavior::HideToTray,
-            ),
+            ("desktop.minimize_to_tray", false),
         ];
         for (key, value) in values {
             let json = serde_json::to_string(&value)
@@ -1351,7 +1339,7 @@ mod tests {
             launch_at_startup: true,
             start_hidden: true,
             close_behavior: WindowCloseBehavior::Quit,
-            minimize_behavior: WindowMinimizeBehavior::HideToTray,
+            minimize_behavior: WindowMinimizeBehavior::Taskbar,
         };
         store
             .save_desktop_settings(settings, UtcTimestamp::from_unix_seconds(31))
@@ -1362,6 +1350,38 @@ mod tests {
                 .expect("desktop settings query"),
             settings
         );
+    }
+
+    #[test]
+    fn retired_minimize_preference_is_ignored_and_normalized_on_write() {
+        let store = SqliteStore::open_in_memory().unwrap();
+        store.connection.lock().unwrap().execute(
+            "INSERT INTO settings(key, value_json, updated_at_utc) VALUES ('desktop.minimize_to_tray', 'true', 1)", [],
+        ).unwrap();
+        assert_eq!(
+            store.load_desktop_settings().unwrap().minimize_behavior,
+            WindowMinimizeBehavior::Taskbar
+        );
+        store
+            .save_desktop_settings(
+                DesktopSettings {
+                    minimize_behavior: WindowMinimizeBehavior::HideToTray,
+                    ..DesktopSettings::default()
+                },
+                UtcTimestamp::from_unix_seconds(2),
+            )
+            .unwrap();
+        let stored: String = store
+            .connection
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT value_json FROM settings WHERE key = 'desktop.minimize_to_tray'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored, "false");
     }
 
     #[test]

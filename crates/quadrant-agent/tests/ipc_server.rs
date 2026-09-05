@@ -26,6 +26,123 @@ use tokio::{
 const NOW: i64 = 1_788_560_000;
 const TIMEOUT: Duration = Duration::from_secs(8);
 
+struct FakeGui(mpsc::UnboundedSender<oneshot::Sender<()>>);
+impl quadrant_platform::GuiLauncher for FakeGui {
+    fn launch_main(&self) -> std::io::Result<quadrant_platform::GuiProcess> {
+        let (exit, exited) = oneshot::channel();
+        self.0.send(exit).unwrap();
+        Ok(quadrant_platform::GuiProcess {
+            id: std::process::id(),
+            completion: Box::pin(async move {
+                let _ = exited.await;
+                Ok(())
+            }),
+        })
+    }
+}
+
+#[tokio::test]
+async fn tray_reopens_after_gui_close_and_crash_and_full_exit_stops_agent() {
+    let (sender, mut launches) = mpsc::unbounded_channel();
+    let harness = Harness::start_with(Profile::new(), false, Arc::new(FakeGui(sender))).await;
+    (harness.desktop)(DesktopEvent::OpenQuickAdd);
+    let first = tokio::time::timeout(TIMEOUT, launches.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    (harness.desktop)(DesktopEvent::ShowMainWindow);
+    let mut client = Client::connect(&harness.endpoint, GuiLaunchMode::Main).await;
+    client.snapshot().await;
+    assert!(matches!(
+        receive(&mut client.stream).await,
+        Some(ServerMessage::Event(ServerEvent::OpenQuickAdd))
+    ));
+    assert!(launches.try_recv().is_err());
+    (harness.desktop)(DesktopEvent::ShowMainWindow);
+    assert!(matches!(
+        receive(&mut client.stream).await,
+        Some(ServerMessage::Event(ServerEvent::ActivateMainWindow))
+    ));
+
+    client
+        .success(UiIntent::SubmitQuickAdd(QuickAddSubmission {
+            title: "Survives GUI exit".into(),
+            placement: TaskPlacement::Inbox,
+        }))
+        .await;
+    write_message_async(
+        &mut client.stream,
+        &ClientMessage::GuiClosing {
+            session_id: client.session,
+        },
+    )
+    .await
+    .unwrap();
+    // EOF acknowledges removal of this session before the next tray request.
+    assert!(receive(&mut client.stream).await.is_none());
+    drop(client);
+    first.send(()).unwrap();
+    (harness.desktop)(DesktopEvent::ShowMainWindow);
+    let second = tokio::time::timeout(TIMEOUT, launches.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    let mut client = Client::connect(&harness.endpoint, GuiLaunchMode::Main).await;
+    assert_eq!(
+        client.snapshot().await.quadrants.inbox[0].title,
+        "Survives GUI exit"
+    );
+    let old_session = client.session;
+    drop(client); // Abrupt EOF, without GuiClosing.
+    second.send(()).unwrap();
+    let mut recovered = Client::connect(&harness.endpoint, GuiLaunchMode::Main).await;
+    assert_ne!(recovered.session, old_session);
+    recovered.snapshot().await;
+    assert!(launches.try_recv().is_err()); // Crash does not auto-respawn.
+    (harness.desktop)(DesktopEvent::ExitRequested);
+    assert!(matches!(
+        receive(&mut recovered.stream).await,
+        Some(ServerMessage::Event(ServerEvent::AgentShuttingDown))
+    ));
+    harness.finish().await;
+}
+
+#[tokio::test]
+async fn login_uses_start_hidden_but_gui_bootstrap_never_spawns_a_second_gui() {
+    for (hidden, login, should_launch) in [
+        (true, true, false),
+        (false, true, true),
+        (false, false, false),
+    ] {
+        let profile = Profile::new();
+        let store = quadrant_storage::SqliteStore::open(profile.database()).unwrap();
+        store
+            .save_desktop_settings(
+                DesktopSettings {
+                    start_hidden: hidden,
+                    ..DesktopSettings::default()
+                },
+                UtcTimestamp::from_unix_seconds(NOW),
+            )
+            .unwrap();
+        drop(store);
+        let (sender, mut launches) = mpsc::unbounded_channel();
+        let harness = Harness::start_with(profile, login, Arc::new(FakeGui(sender))).await;
+        let mut client = Client::connect(&harness.endpoint, GuiLaunchMode::Main).await;
+        assert_eq!(
+            client.snapshot().await.desktop_settings.start_hidden,
+            hidden
+        );
+        if should_launch {
+            launches.try_recv().unwrap().send(()).unwrap();
+        } else {
+            assert!(launches.try_recv().is_err());
+        }
+        drop(client);
+        harness.finish().await;
+    }
+}
+
 struct Profile(PathBuf);
 impl Profile {
     fn new() -> Self {
@@ -49,6 +166,12 @@ impl Clock for TestClock {
         UtcTimestamp::from_unix_seconds(self.0.load(Ordering::SeqCst))
     }
 }
+struct NoGui;
+impl quadrant_platform::GuiLauncher for NoGui {
+    fn launch_main(&self) -> std::io::Result<quadrant_platform::GuiProcess> {
+        panic!("unexpected native GUI launch in isolated service test")
+    }
+}
 struct TestHost;
 impl AutostartService for TestHost {
     fn is_supported(&self) -> bool {
@@ -68,6 +191,7 @@ impl ExternalOpener for TestHost {
 }
 
 struct Harness {
+    desktop: quadrant_platform::DesktopEventSink,
     profile: Profile,
     endpoint: AgentEndpoint,
     worker: JoinHandle<Result<(), quadrant_agent::AgentError>>,
@@ -79,11 +203,20 @@ struct Harness {
 
 impl Harness {
     async fn start(profile: Profile) -> Self {
+        Self::start_with(profile, false, Arc::new(NoGui)).await
+    }
+
+    async fn start_with(
+        profile: Profile,
+        startup: bool,
+        launcher: Arc<dyn quadrant_platform::GuiLauncher>,
+    ) -> Self {
         let clock = Arc::new(TestClock(AtomicI64::new(NOW)));
         let (sender, delivered) = mpsc::unbounded_channel();
         let focus_notifications = Arc::new(AtomicUsize::new(0));
         let notifications = focus_notifications.clone();
         let host = HostServices {
+            gui_launcher: launcher,
             clock: clock.clone(),
             autostart: Arc::new(TestHost),
             opener: Arc::new(TestHost),
@@ -105,8 +238,10 @@ impl Harness {
             .unwrap()
             .unwrap();
         let (stop, stopped) = oneshot::channel();
-        let worker = tokio::spawn(agent.run(stopped));
+        let desktop = agent.desktop_event_sink();
+        let worker = tokio::spawn(agent.run_with_startup(stopped, startup));
         Self {
+            desktop,
             profile,
             endpoint,
             worker,

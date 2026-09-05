@@ -82,6 +82,69 @@ fn snapshot() -> AppSnapshot {
     ))
     .unwrap()
 }
+
+#[tokio::test]
+async fn user_launch_starts_missing_agent_once_before_loading_snapshot() {
+    let directory = std::env::temp_dir().join(format!(
+        "quadrant-bootstrap-{}",
+        SessionId::generate().as_uuid()
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    let database = directory.join("quadrant-rust.db");
+    let guard = SingleInstanceCoordinator::claim(&database).unwrap();
+    let endpoint = AgentEndpoint::for_database(&database).unwrap();
+    let server_endpoint = endpoint.clone();
+    let (started, starting) = oneshot::channel::<Peer>();
+    let server = tokio::spawn(async move {
+        let peer = starting.await.unwrap();
+        let mut stream = peer.accept(snapshot()).await;
+        assert!(
+            read_message_async::<_, ClientMessage>(&mut stream)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    });
+    let mut calls = 0;
+    let result = GuiClient::connect_or_start(endpoint, GuiLaunchMode::Main, true, || {
+        calls += 1;
+        let listener = guard.bind_agent_listener(&server_endpoint).unwrap();
+        assert!(
+            started
+                .send(Peer {
+                    listener,
+                    endpoint: server_endpoint,
+                    _guard: guard,
+                    directory
+                })
+                .is_ok()
+        );
+        Ok(())
+    })
+    .await
+    .unwrap();
+    assert_eq!(calls, 1);
+    assert_eq!(result.as_ref().unwrap().0.snapshot(), &snapshot());
+    drop(result);
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn agent_launched_child_does_not_resurrect_missing_parent() {
+    let peer = Peer::new();
+    let endpoint = peer.endpoint.clone();
+    drop(peer);
+    let result = GuiClient::connect_or_start(endpoint, GuiLaunchMode::Main, false, || {
+        panic!("must not restart parent")
+    })
+    .await;
+    assert!(result.err().unwrap().agent_absent());
+    assert!(!ClientError::Incompatible.agent_absent());
+    assert!(!ClientError::Timeout.agent_absent());
+    assert!(
+        !ClientError::Io(std::io::Error::from(std::io::ErrorKind::PermissionDenied)).agent_absent()
+    );
+}
 fn command() -> GuiCommand {
     UiIntent::SubmitQuickAdd(QuickAddSubmission {
         title: "Only once".to_owned(),

@@ -27,6 +27,10 @@ struct Connection {
 }
 
 pub(crate) struct Broker {
+    lifecycle: crate::lifecycle::Lifecycle,
+    show_at_startup: bool,
+    pending_quick_add: bool,
+    launch_error_reported: bool,
     sessions: HashMap<SessionId, Connection>,
     services: Services,
     capabilities: PlatformCapabilities,
@@ -48,6 +52,12 @@ impl Broker {
         log: Arc<AgentLog>,
     ) -> Self {
         Self {
+            lifecycle: crate::lifecycle::Lifecycle::new(Arc::new(
+                quadrant_platform::PlatformGuiLauncher,
+            )),
+            show_at_startup: false,
+            pending_quick_add: false,
+            launch_error_reported: false,
             sessions: HashMap::new(),
             services,
             capabilities,
@@ -61,6 +71,15 @@ impl Broker {
 
     pub fn with_startup_notices(mut self, notices: Vec<ApplicationEvent>) -> Self {
         self.startup_notices = notices;
+        self
+    }
+    pub fn with_lifecycle(
+        mut self,
+        launcher: Arc<dyn quadrant_platform::GuiLauncher>,
+        show_at_startup: bool,
+    ) -> Self {
+        self.lifecycle = crate::lifecycle::Lifecycle::new(launcher);
+        self.show_at_startup = show_at_startup;
         self
     }
     pub fn with_focus_notification(
@@ -80,14 +99,23 @@ impl Broker {
         mut desktop: mpsc::UnboundedReceiver<DesktopEvent>,
         mut shutdown: oneshot::Receiver<()>,
     ) -> Result<(), AgentError> {
+        if self.show_at_startup {
+            self.activate(GuiLaunchMode::Main).await;
+        }
         let result = loop {
             tokio::select! {
                 biased;
                 _ = &mut shutdown => break Ok(()),
                 event = desktop.recv() => match event {
                     Some(DesktopEvent::ExitRequested) | None => break Ok(()),
-                    Some(DesktopEvent::ShowMainWindow) => self.activate(GuiLaunchMode::Main),
-                    Some(DesktopEvent::OpenQuickAdd) => self.activate(GuiLaunchMode::QuickAdd),
+                    Some(DesktopEvent::ShowMainWindow) => self.activate(GuiLaunchMode::Main).await,
+                    Some(DesktopEvent::OpenQuickAdd) => self.activate(GuiLaunchMode::QuickAdd).await,
+                },
+                change = self.lifecycle.changed() => {
+                    self.log.event(change.event);
+                    if change.startup_failed && self.existing(GuiLaunchMode::Main).is_none() {
+                        self.launch_failed().await;
+                    }
                 },
                 event = background.recv() => if let Some(event) = event { self.background(event).await; },
                 request = input.recv() => match request {
@@ -105,6 +133,7 @@ impl Broker {
             self.send(id, ServerMessage::Event(ServerEvent::ExitGui));
         }
         self.sessions.clear();
+        self.lifecycle.shutdown().await;
         result
     }
 
@@ -163,6 +192,10 @@ impl Broker {
                         );
                         if let Some(session) = self.sessions.get_mut(&id) {
                             session.snapshot_ready = true;
+                        }
+                        self.lifecycle.connected();
+                        if std::mem::take(&mut self.pending_quick_add) {
+                            self.send_activation(id, GuiLaunchMode::QuickAdd);
                         }
                         for notice in self.startup_notices.clone() {
                             self.send(id, ServerMessage::Event(notice.into()));
@@ -372,11 +405,33 @@ impl Broker {
             .map(|(id, _)| *id)
     }
 
-    fn activate(&mut self, mode: GuiLaunchMode) {
+    async fn activate(&mut self, mode: GuiLaunchMode) {
         if let Some(id) = self.existing(mode) {
             self.send_activation(id, mode);
         } else {
-            self.log.event("gui_launch_pending_phase_4");
+            self.pending_quick_add |= mode == GuiLaunchMode::QuickAdd;
+            match self.lifecycle.launch().await {
+                Ok(true) => self.log.event("gui_spawned"),
+                Ok(false) => self.log.event("gui_launch_coalesced"),
+                Err(_) => {
+                    self.launch_failed().await;
+                }
+            }
+        }
+    }
+
+    async fn launch_failed(&mut self) {
+        self.log.event("gui_launch_failed");
+        self.pending_quick_add = false;
+        if !self.launch_error_reported {
+            self.startup_notices.push(crate::services::failure("The previous interface launch failed. Check that both programs come from the same complete installation."));
+            self.launch_error_reported = true;
+        }
+        if self.capabilities.native_notifications {
+            let _ = tokio::task::spawn_blocking(
+                quadrant_platform::PlatformNotificationDelivery::gui_launch_failed,
+            )
+            .await;
         }
     }
 

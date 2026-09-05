@@ -38,7 +38,7 @@ slint = "=1.17.1"
 slint-build = "=1.17.1"
 thiserror = "2.0.20"
 time = { version = "0.3.55", features = ["formatting", "parsing", "serde"] }
-tokio = { version = "1.53.1", features = ["io-util", "macros", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.53.1", features = ["io-util", "macros", "process", "rt-multi-thread", "sync", "time"] }
 uuid = { version = "1.26.0", features = ["serde", "v7"] }
 
 [workspace.dependencies.global-hotkey]

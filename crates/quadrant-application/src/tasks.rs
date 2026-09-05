@@ -214,7 +214,8 @@ impl TaskApplication {
         }
     }
 
-    fn apply_desktop_settings(&self, settings: DesktopSettings) -> Vec<ApplicationEvent> {
+    fn apply_desktop_settings(&self, mut settings: DesktopSettings) -> Vec<ApplicationEvent> {
+        settings.minimize_behavior = crate::WindowMinimizeBehavior::Taskbar;
         let previous = match self.settings.load_desktop_settings() {
             Ok(previous) => previous,
             Err(error) => return vec![failure_event(&error)],

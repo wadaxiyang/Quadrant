@@ -15,6 +15,20 @@ fn main() -> std::process::ExitCode {
 }
 
 fn run() -> Result<(), quadrant_agent::AgentError> {
+    let mut bootstrap = false;
+    for argument in std::env::args().skip(1) {
+        match argument.as_str() {
+            "--gui-bootstrap" => bootstrap = true,
+            "--background" => {} // Login startup: use the persisted start_hidden setting.
+            _ => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "Unknown Agent argument",
+                )
+                .into());
+            }
+        }
+    }
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .thread_name("quadrant-agent")
         .enable_all()
@@ -27,7 +41,7 @@ fn run() -> Result<(), quadrant_agent::AgentError> {
         .await??;
         if let Some(agent) = agent {
             let (_shutdown_sender, shutdown) = tokio::sync::oneshot::channel();
-            agent.run(shutdown).await?;
+            agent.run_with_startup(shutdown, !bootstrap).await?;
         }
         Ok(())
     })

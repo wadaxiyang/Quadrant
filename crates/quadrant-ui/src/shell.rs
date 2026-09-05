@@ -50,7 +50,7 @@ impl UiShell {
     pub fn new(
         config: &AppSnapshot,
         application_version: &str,
-        on_intent: impl Fn(UiIntent) -> bool + 'static,
+        on_command: impl Fn(GuiCommand) -> bool + 'static,
     ) -> Result<Self, slint::PlatformError> {
         let main_window = MainWindow::new()?;
         let quick_add = QuickAddWindow::new()?;
@@ -59,11 +59,11 @@ impl UiShell {
         let main_weak = main_window.as_weak();
         let quick_weak = quick_add.as_weak();
         let editor_weak = task_editor.as_weak();
-        let intent_handler: Rc<dyn Fn(UiIntent)> = Rc::new(move |intent| {
+        let command_handler: Rc<dyn Fn(GuiCommand)> = Rc::new(move |command| {
             let Some(main) = main_weak.upgrade() else {
                 return;
             };
-            if !main.get_agent_connected() || main.get_command_pending() || !on_intent(intent) {
+            if !main.get_agent_connected() || main.get_command_pending() || !on_command(command) {
                 main.invoke_show_toast(
                     "Wait for the current operation or reconnect before trying again.".into(),
                     ToastKind::Error,
@@ -78,6 +78,10 @@ impl UiShell {
                 editor.set_can_submit(false);
             }
         });
+
+        let commands = command_handler.clone();
+        let intent_handler: Rc<dyn Fn(UiIntent)> = Rc::new(move |intent| commands(intent.into()));
+        bind_main_window_controls(&main_window, command_handler);
 
         initialize_theme(&main_window, &quick_add, &task_editor, config);
         apply_capabilities(&main_window, config.platform_capabilities);
@@ -291,7 +295,7 @@ fn bind_main_window(main_window: &MainWindow, intent_handler: &Rc<dyn Fn(UiInten
 
     let desktop_settings_handler = Rc::clone(intent_handler);
     main_window.on_desktop_settings_changed(
-        move |launch_at_startup, start_hidden, close_to_tray, minimize_to_tray| {
+        move |launch_at_startup, start_hidden, close_to_tray, _minimize_to_tray| {
             desktop_settings_handler(UiIntent::SetDesktopSettings(DesktopSettings {
                 launch_at_startup,
                 start_hidden,
@@ -300,11 +304,7 @@ fn bind_main_window(main_window: &MainWindow, intent_handler: &Rc<dyn Fn(UiInten
                 } else {
                     WindowCloseBehavior::Quit
                 },
-                minimize_behavior: if minimize_to_tray {
-                    WindowMinimizeBehavior::HideToTray
-                } else {
-                    WindowMinimizeBehavior::Taskbar
-                },
+                minimize_behavior: WindowMinimizeBehavior::Taskbar,
             }));
         },
     );
@@ -313,7 +313,6 @@ fn bind_main_window(main_window: &MainWindow, intent_handler: &Rc<dyn Fn(UiInten
     bind_focus_actions(main_window, intent_handler);
     bind_history_actions(main_window, intent_handler);
     bind_maintenance_actions(main_window, intent_handler);
-    bind_main_window_controls(main_window);
 }
 
 fn bind_maintenance_actions(main_window: &MainWindow, intent_handler: &Rc<dyn Fn(UiIntent)>) {
@@ -516,15 +515,11 @@ fn bind_task_actions(main_window: &MainWindow, intent_handler: &Rc<dyn Fn(UiInte
     });
 }
 
-fn bind_main_window_controls(main_window: &MainWindow) {
+fn bind_main_window_controls(main_window: &MainWindow, commands: Rc<dyn Fn(GuiCommand)>) {
     let minimize_weak = main_window.as_weak();
     main_window.on_window_minimize(move || {
         if let Some(window) = minimize_weak.upgrade() {
-            if should_hide_to_tray(window.get_tray_supported(), window.get_minimize_to_tray()) {
-                drop(window.hide());
-            } else {
-                window.window().set_minimized(true);
-            }
+            window.window().set_minimized(true);
         }
     });
 
@@ -544,27 +539,26 @@ fn bind_main_window_controls(main_window: &MainWindow) {
     });
 
     let close_weak = main_window.as_weak();
-    main_window.on_window_close(move || {
+    let close: Rc<dyn Fn()> = Rc::new(move || {
         if let Some(window) = close_weak.upgrade() {
-            if window.get_agent_connected()
-                && should_hide_to_tray(window.get_tray_supported(), window.get_close_to_tray())
-            {
-                drop(window.hide());
-            } else {
-                drop(slint::quit_event_loop());
+            match close_action(
+                window.get_agent_connected(),
+                window.get_tray_supported(),
+                window.get_close_to_tray(),
+            ) {
+                CloseAction::GuiOnly => {
+                    drop(slint::quit_event_loop());
+                }
+                CloseAction::Application => commands(GuiCommand::ExitApplication),
             }
         }
     });
-
-    let native_close_weak = main_window.as_weak();
+    let custom_close = close.clone();
+    main_window.on_window_close(move || custom_close());
     main_window.window().on_close_requested(move || {
-        if let Some(window) = native_close_weak.upgrade()
-            && (!window.get_agent_connected()
-                || !should_hide_to_tray(window.get_tray_supported(), window.get_close_to_tray()))
-        {
-            drop(slint::quit_event_loop());
-        }
-        slint::CloseRequestResponse::HideWindow
+        close();
+        // Keep the window/error surface until Agent confirms full Exit.
+        slint::CloseRequestResponse::KeepWindowShown
     });
 }
 
@@ -1318,11 +1312,21 @@ fn apply_desktop_settings(main: &MainWindow, settings: DesktopSettings) {
     main.set_launch_at_startup(settings.launch_at_startup);
     main.set_start_hidden(settings.start_hidden);
     main.set_close_to_tray(settings.close_behavior == WindowCloseBehavior::HideToTray);
-    main.set_minimize_to_tray(settings.minimize_behavior == WindowMinimizeBehavior::HideToTray);
+    main.set_minimize_to_tray(false);
 }
 
-const fn should_hide_to_tray(tray_available: bool, setting_enabled: bool) -> bool {
-    tray_available && setting_enabled
+#[derive(Debug, PartialEq, Eq)]
+enum CloseAction {
+    GuiOnly,
+    Application,
+}
+
+const fn close_action(connected: bool, tray: bool, close_to_tray: bool) -> CloseAction {
+    if !connected || (tray && close_to_tray) {
+        CloseAction::GuiOnly
+    } else {
+        CloseAction::Application
+    }
 }
 
 fn apply_task_editor_state(editor: &TaskEditorWindow, state: &TaskEditorState) {
@@ -1547,8 +1551,8 @@ mod ipc_tests;
 #[cfg(test)]
 mod tests {
     use super::{
-        inbox_model, parse_editor_schedule, placement_from_destination, scheduled_input,
-        should_hide_to_tray,
+        CloseAction, close_action, inbox_model, parse_editor_schedule, placement_from_destination,
+        scheduled_input,
     };
     use quadrant_application::{Quadrant, TaskId, TaskPlacement, TaskSummary};
     use slint::Model;
@@ -1586,8 +1590,10 @@ mod tests {
 
     #[test]
     fn tray_window_policies_never_hide_without_a_recovery_surface() {
-        assert!(should_hide_to_tray(true, true));
-        assert!(!should_hide_to_tray(false, true));
+        assert_eq!(close_action(true, true, true), CloseAction::GuiOnly);
+        assert_eq!(close_action(false, false, false), CloseAction::GuiOnly);
+        assert_eq!(close_action(true, true, false), CloseAction::Application);
+        assert_eq!(close_action(true, false, true), CloseAction::Application);
     }
 
     #[test]

@@ -2,7 +2,7 @@
 Type=Application
 Name=Quadrant
 Comment=Local-first four-quadrant task manager
-Exec=quadrant-app
+Exec=quadrant
 Icon=quadrant
 Terminal=false
 Categories=Office;ProjectManagement;

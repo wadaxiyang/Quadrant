@@ -37,7 +37,6 @@ export component SettingsView inherits Rectangle {
     changed launch_at_startup => { launch_at_startup_switch.checked = root.launch_at_startup; }
     changed start_hidden => { start_hidden_switch.checked = root.start_hidden; }
     changed close_to_tray => { close_to_tray_switch.checked = root.close_to_tray; }
-    changed minimize_to_tray => { minimize_to_tray_switch.checked = root.minimize_to_tray; }
     callback theme_selected(ThemeMode);
     callback desktop_settings_changed(bool, bool, bool, bool);
     callback create_backup_requested;
@@ -142,7 +141,7 @@ export component SettingsView inherits Rectangle {
 
                             SettingRow {
                                 title: "Start in background";
-                                description: root.tray_supported ? "Do not show the main window at process startup." : "Requires a working tray icon.";
+                                description: root.tray_supported ? "Start only the background service at login; open the interface from the tray." : "Requires a working tray icon.";
                                 enabled: root.tray_supported;
                                 start_hidden_switch := Switch {
                                     text: "";
@@ -160,7 +159,7 @@ export component SettingsView inherits Rectangle {
 
                             SettingRow {
                                 title: "Close to tray";
-                                description: root.tray_supported ? "Close hides the window; Exit remains available in the tray." : "Requires a working tray icon.";
+                                description: root.tray_supported ? "Close releases the interface; reminders and Focus keep running. Use tray Exit to quit Quadrant." : "Requires a working tray icon.";
                                 enabled: root.tray_supported;
                                 close_to_tray_switch := Switch {
                                     text: "";
@@ -177,19 +176,8 @@ export component SettingsView inherits Rectangle {
                             Rectangle { height: 1px; background: Theme.divider; }
 
                             SettingRow {
-                                title: "Minimize to tray";
-                                description: root.tray_supported ? "Minimize hides the window instead of using the taskbar." : "Requires a working tray icon.";
-                                enabled: root.tray_supported;
-                                minimize_to_tray_switch := Switch {
-                                    text: "";
-                                    accessible-label: "Minimize to tray";
-                                    enabled: root.tray_supported;
-                                    checked: root.minimize_to_tray;
-                                    toggled => {
-                                        self.checked = root.minimize_to_tray;
-                                        root.desktop_settings_changed(root.launch_at_startup, root.start_hidden, root.close_to_tray, !root.minimize_to_tray);
-                                    }
-                                }
+                                title: "Minimize to taskbar";
+                                description: "Minimizing keeps the window ready to restore. Closing to tray releases the interface.";
                             }
                         }
                     }
@@ -238,7 +226,7 @@ export component SettingsView inherits Rectangle {
 
                                     Text {
                                         horizontal-stretch: 1;
-                                        text: "The validated restore will be applied after restart.";
+                                        text: "Use Exit in the tray, then reopen Quadrant to apply the restore. Closing only the window keeps the background service running.";
                                         color: Theme.text_primary;
                                         font-size: Typography.caption;
                                         wrap: word-wrap;

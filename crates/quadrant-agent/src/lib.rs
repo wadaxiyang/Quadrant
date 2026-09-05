@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! Resident application composition, secure local IPC, and ordered shutdown.
 //!
-//! Phase 2 provides the Agent server. The old GUI entry point is retained until
-//! Phase 3 and shares the profile ownership guard, so both cannot own one store.
+//! The Agent owns application state and supervises disposable IPC GUI sessions.
 
 #![forbid(unsafe_code)]
 
 mod broker;
+mod lifecycle;
 mod log;
 mod services;
 mod transport;
@@ -58,6 +58,8 @@ impl AgentError {
 /// Host ports injected at the composition boundary; tests use deterministic adapters.
 #[derive(Clone)]
 pub struct HostServices {
+    /// GUI process creation; native details remain in the platform adapter.
+    pub gui_launcher: Arc<dyn quadrant_platform::GuiLauncher>,
     /// Authoritative UTC clock.
     pub clock: Arc<dyn Clock>,
     /// Startup registration, reconciled before clients can mutate settings.
@@ -77,6 +79,7 @@ impl HostServices {
     #[must_use]
     pub fn native() -> Self {
         Self {
+            gui_launcher: Arc::new(quadrant_platform::PlatformGuiLauncher),
             clock: Arc::new(SystemClock),
             autostart: Arc::new(quadrant_platform::PlatformAutostartService),
             reminders: Arc::new(quadrant_platform::PlatformNotificationDelivery),
@@ -91,6 +94,8 @@ impl HostServices {
 
 /// A primary Agent with exclusive profile ownership and no presentation resources.
 pub struct Agent {
+    desktop_sink: quadrant_platform::DesktopEventSink,
+    desktop_receiver: mpsc::UnboundedReceiver<DesktopEvent>,
     services: services::Services,
     listener: AgentListener,
     _instance: SingleInstanceCoordinator,
@@ -148,7 +153,13 @@ impl Agent {
         let endpoint = AgentEndpoint::for_database(database_path)?;
         let listener = instance.bind_agent_listener(&endpoint)?;
         log.event("ipc_listening");
+        let (desktop_sender, desktop_receiver) = mpsc::unbounded_channel();
+        let desktop_sink: quadrant_platform::DesktopEventSink = Arc::new(move |event| {
+            let _ = desktop_sender.send(event);
+        });
         Ok(Some(Self {
+            desktop_sink,
+            desktop_receiver,
             services,
             listener,
             _instance: instance,
@@ -158,17 +169,43 @@ impl Agent {
         }))
     }
 
+    /// Typed host event port used by native desktop adapters and isolated hosts.
+    #[must_use]
+    pub fn desktop_event_sink(&self) -> quadrant_platform::DesktopEventSink {
+        self.desktop_sink.clone()
+    }
+
     /// Runs the Agent until explicit shutdown or `ExitApplication`, even with no GUI.
     ///
     /// All worker tasks are signaled and joined; caller shutdown-sender destruction
     /// is also a shutdown request. The profile guard outlives every worker/store.
     /// # Errors
     /// Returns unexpected listener or owned worker failures after cleanup.
-    pub async fn run(mut self, shutdown: oneshot::Receiver<()>) -> Result<(), AgentError> {
-        let (desktop_sender, desktop_receiver) = mpsc::unbounded_channel::<DesktopEvent>();
-        let desktop_sink: quadrant_platform::DesktopEventSink = Arc::new(move |event| {
-            let _ = desktop_sender.send(event);
-        });
+    pub async fn run(self, shutdown: oneshot::Receiver<()>) -> Result<(), AgentError> {
+        self.run_with_startup(shutdown, false).await
+    }
+
+    async fn show_at_startup(&self) -> Result<bool, AgentError> {
+        let services = self.services.clone();
+        Ok(tokio::task::spawn_blocking(move || {
+            services
+                .store
+                .load_desktop_settings()
+                .map(|settings| !settings.start_hidden)
+        })
+        .await??)
+    }
+
+    /// Runs with login/startup policy, or headless when bootstrapped by a GUI.
+    /// # Errors
+    /// Returns startup settings, listener or worker failures after cleanup.
+    pub async fn run_with_startup(
+        mut self,
+        shutdown: oneshot::Receiver<()>,
+        apply_startup_policy: bool,
+    ) -> Result<(), AgentError> {
+        let show_at_startup = apply_startup_policy && self.show_at_startup().await?;
+        let desktop_sink = self.desktop_sink;
         let desktop = if self.host.desktop_integration {
             let sink = desktop_sink.clone();
             if let Ok(desktop) =
@@ -237,13 +274,14 @@ impl Agent {
             focus_handle.clone(),
             self.log.clone(),
         )
+        .with_lifecycle(self.host.gui_launcher.clone(), show_at_startup)
         .with_startup_notices(std::mem::take(&mut self.startup_notices))
         .with_focus_notification(self.host.focus_completed.clone());
         let result = broker
             .run(
                 input_receiver,
                 background_receiver,
-                desktop_receiver,
+                self.desktop_receiver,
                 shutdown,
             )
             .await;

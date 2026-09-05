@@ -13,12 +13,13 @@ esac
 
 if [ "${1:-}" != "--skip-build" ]; then
     QUADRANT_DISTRIBUTION_CHANNEL=linux-package cargo build \
-        --manifest-path "$repository/Cargo.toml" --locked --release -p quadrant-app
+        --manifest-path "$repository/Cargo.toml" --locked --release -p quadrant-app -p quadrant-agent
 fi
 
 rm -rf -- "$staging"
 mkdir -p "$staging/bin" "$staging/share/applications" "$staging/share/licenses/quadrant"
-cp "$repository/target/release/quadrant-app" "$staging/bin/"
+cp "$repository/target/release/quadrant-app" "$staging/bin/quadrant"
+cp "$repository/target/release/quadrant-agent" "$staging/bin/"
 cp "$repository/packaging/linux/quadrant.desktop" "$staging/share/applications/"
 for size in 16 20 24 32 40 48 64 128 256 512; do
     icon_dir="$staging/share/icons/hicolor/${size}x${size}/apps"

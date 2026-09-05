@@ -13,12 +13,13 @@ esac
 
 if [ "${1:-}" != "--skip-build" ]; then
     QUADRANT_DISTRIBUTION_CHANNEL=macos-bundle cargo build \
-        --manifest-path "$repository/Cargo.toml" --locked --release -p quadrant-app
+        --manifest-path "$repository/Cargo.toml" --locked --release -p quadrant-app -p quadrant-agent
 fi
 
 rm -rf -- "$bundle"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
-cp "$repository/target/release/quadrant-app" "$bundle/Contents/MacOS/"
+cp "$repository/target/release/quadrant-app" "$bundle/Contents/MacOS/quadrant"
+cp "$repository/target/release/quadrant-agent" "$bundle/Contents/MacOS/"
 cp "$repository/assets/branding/Quadrant.icns" "$bundle/Contents/Resources/"
 cp "$repository/LICENSE" "$bundle/Contents/Resources/"
 cp "$repository/packaging/THIRD-PARTY-NOTICES.txt" "$bundle/Contents/Resources/"

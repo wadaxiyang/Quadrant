@@ -15,7 +15,7 @@ $version = $Matches[1]
 
 if (-not $SkipBuild) {
     $env:QUADRANT_DISTRIBUTION_CHANNEL = 'windows-portable'
-    & cargo build --locked --release -p quadrant-app
+    & cargo build --manifest-path (Join-Path $repository 'Cargo.toml') --locked --release -p quadrant-app -p quadrant-agent
     if ($LASTEXITCODE -ne 0) { throw "cargo build failed with exit code $LASTEXITCODE" }
 }
 
@@ -30,7 +30,8 @@ if (Test-Path -LiteralPath $staging) {
 }
 New-Item -ItemType Directory -Path $staging | Out-Null
 
-Copy-Item -LiteralPath (Join-Path $repository 'target\release\quadrant-app.exe') -Destination $staging
+Copy-Item -LiteralPath (Join-Path $repository 'target\release\quadrant-app.exe') -Destination (Join-Path $staging 'quadrant.exe')
+Copy-Item -LiteralPath (Join-Path $repository 'target\release\quadrant-agent.exe') -Destination $staging
 Copy-Item -LiteralPath (Join-Path $repository 'LICENSE') -Destination $staging
 Copy-Item -LiteralPath (Join-Path $repository 'README.md') -Destination $staging
 Copy-Item -LiteralPath (Join-Path $repository 'packaging\THIRD-PARTY-NOTICES.txt') -Destination $staging

@@ -620,11 +620,11 @@ pub enum ThemeMode {
 pub struct DesktopSettings {
     /// Register Quadrant to launch after user login where supported.
     pub launch_at_startup: bool,
-    /// Keep the main window hidden when the process starts and tray is available.
+    /// Start only the Agent at login; explicitly launching the GUI still shows it.
     pub start_hidden: bool,
     /// Behavior when the main-window Close action is requested.
     pub close_behavior: WindowCloseBehavior,
-    /// Behavior when the main-window Minimize action is requested.
+    /// Retained wire field; the application normalizes this to Taskbar.
     pub minimize_behavior: WindowMinimizeBehavior,
 }
 
@@ -644,7 +644,7 @@ impl Default for DesktopSettings {
 pub enum WindowCloseBehavior {
     /// End the application through its normal shutdown path.
     Quit,
-    /// Hide the window and keep the tray application running.
+    /// Exit the GUI process and keep the resident Agent running.
     #[default]
     HideToTray,
 }
@@ -655,7 +655,7 @@ pub enum WindowMinimizeBehavior {
     /// Minimize to the normal platform taskbar/dock representation.
     #[default]
     Taskbar,
-    /// Hide the window and keep it recoverable from the tray.
+    /// Retired value accepted when decoding older settings; normalized to Taskbar.
     HideToTray,
 }
 

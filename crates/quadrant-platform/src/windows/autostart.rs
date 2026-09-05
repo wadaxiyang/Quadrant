@@ -77,9 +77,8 @@ pub(super) fn set_enabled(enabled: bool, start_hidden: bool) -> Result<(), Autos
     Ok(())
 }
 
-fn startup_command(executable: &Path, start_hidden: bool) -> String {
-    let suffix = if start_hidden { " --background" } else { "" };
-    format!("\"{}\"{suffix}", executable.display())
+fn startup_command(executable: &Path, _start_hidden: bool) -> String {
+    format!("\"{}\" --background", executable.display())
 }
 
 fn wide_null(value: &str) -> Vec<u16> {
@@ -93,15 +92,15 @@ mod tests {
     use super::startup_command;
 
     #[test]
-    fn startup_command_quotes_paths_and_adds_background_only_when_requested() {
-        let executable = Path::new("C:/Program Files/Quadrant/quadrant-app.exe");
+    fn startup_command_always_targets_agent_login_policy() {
+        let executable = Path::new("C:/Program Files/Quadrant/quadrant-agent.exe");
         assert_eq!(
             startup_command(executable, false),
-            "\"C:/Program Files/Quadrant/quadrant-app.exe\""
+            "\"C:/Program Files/Quadrant/quadrant-agent.exe\" --background"
         );
         assert_eq!(
             startup_command(executable, true),
-            "\"C:/Program Files/Quadrant/quadrant-app.exe\" --background"
+            "\"C:/Program Files/Quadrant/quadrant-agent.exe\" --background"
         );
     }
 }

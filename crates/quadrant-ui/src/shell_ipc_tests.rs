@@ -8,8 +8,28 @@ use slint::platform::{
 };
 use std::cell::RefCell;
 
-struct Headless(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
+struct Headless(
+    Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>,
+    Arc<std::sync::atomic::AtomicUsize>,
+);
+struct EventProxy(Arc<std::sync::atomic::AtomicUsize>);
+impl slint::platform::EventLoopProxy for EventProxy {
+    fn quit_event_loop(&self) -> Result<(), slint::EventLoopError> {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(())
+    }
+    fn invoke_from_event_loop(
+        &self,
+        _event: Box<dyn FnOnce() + Send>,
+    ) -> Result<(), slint::EventLoopError> {
+        // This fixture applies transport updates explicitly on the test UI thread.
+        Err(slint::EventLoopError::EventLoopTerminated)
+    }
+}
 impl Platform for Headless {
+    fn new_event_loop_proxy(&self) -> Option<Box<dyn slint::platform::EventLoopProxy>> {
+        Some(Box::new(EventProxy(self.1.clone())))
+    }
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
         let window = MinimalSoftwareWindow::new(RepaintBufferType::default());
         self.0.borrow_mut().push(window.clone());
@@ -26,7 +46,8 @@ impl Platform for Headless {
 #[allow(clippy::too_many_lines)] // One ordered lifecycle story on a single Slint context.
 fn ipc_updates_preserve_drafts_until_confirmation_and_restore_authoritative_state() {
     let windows = Rc::new(RefCell::new(Vec::new()));
-    slint::platform::set_platform(Box::new(Headless(windows.clone()))).unwrap();
+    let quits = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    slint::platform::set_platform(Box::new(Headless(windows.clone(), quits.clone()))).unwrap();
     let snapshot: AppSnapshot = serde_json::from_str(include_str!(
         "../../quadrant-protocol/tests/fixtures/snapshot_v1.json"
     ))
@@ -108,7 +129,7 @@ fn ipc_updates_preserve_drafts_until_confirmation_and_restore_authoritative_stat
         .invoke_theme_selected(SlintThemeMode::Dark);
     assert!(matches!(
         submissions.borrow().last(),
-        Some(UiIntent::SetTheme(ApplicationThemeMode::Dark))
+        Some(GuiCommand::Application(intent)) if matches!(intent.as_ref(), UiIntent::SetTheme(ApplicationThemeMode::Dark))
     ));
     apply(ClientUpdate::Event(ServerEvent::ThemeChanged {
         theme_mode: ApplicationThemeMode::Light,
@@ -165,6 +186,36 @@ fn ipc_updates_preserve_drafts_until_confirmation_and_restore_authoritative_stat
     });
     assert!(!shell.quick_add.window().is_visible());
     assert!(shell.quick_add.get_title_text().is_empty());
+    apply(ClientUpdate::Connection {
+        state: ConnectionState::Ready,
+        message: String::new(),
+    });
+    shell.main_window.show().unwrap();
+    shell.main_window.set_tray_supported(true);
+    shell.main_window.set_close_to_tray(true);
+    shell.main_window.set_minimize_to_tray(true); // Obsolete values cannot cause hide.
+    shell.main_window.invoke_window_minimize();
+    assert!(shell.main_window.window().is_visible());
+    shell.main_window.invoke_window_close();
+    assert_eq!(quits.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert!(shell.main_window.window().is_visible()); // Quit requested, never hide-and-linger.
+    shell
+        .main_window
+        .window()
+        .dispatch_event(slint::platform::WindowEvent::CloseRequested);
+    assert_eq!(quits.load(std::sync::atomic::Ordering::SeqCst), 2);
+    shell.main_window.set_close_to_tray(false);
+    shell.main_window.invoke_window_close();
+    assert!(matches!(
+        submissions.borrow().last(),
+        Some(GuiCommand::ExitApplication)
+    ));
+    assert_eq!(quits.load(std::sync::atomic::Ordering::SeqCst), 2); // Wait for Agent shutdown.
+    let sent = submissions.borrow().len();
+    shell.main_window.invoke_window_close(); // Busy full Exit cannot enqueue twice.
+    assert_eq!(submissions.borrow().len(), sent);
+    apply(ClientUpdate::Event(ServerEvent::ExitGui));
+    assert_eq!(quits.load(std::sync::atomic::Ordering::SeqCst), 3);
     // An explicitly launched GUI must show even when Agent startup is hidden.
     assert!(snapshot.desktop_settings.start_hidden);
     shell.main_window.hide().unwrap();

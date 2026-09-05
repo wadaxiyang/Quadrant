@@ -10,21 +10,23 @@ The Rust application includes Quadrants, Today, Focus, Review, Completed history
 
 ## Build
 
-The development build now separates the background Agent from the Slint GUI.
-During this migration, start the Agent first in one terminal:
+Quadrant runs a resident background Agent and a disposable Slint GUI. Build both
+companions, then open the GUI; it starts the Agent automatically when needed:
 
 ```console
-cargo run --locked -p quadrant-agent
-```
-
-Then open the GUI from another terminal:
-
-```console
+cargo build --locked -p quadrant-agent -p quadrant-app
 cargo run --locked -p quadrant-app
 ```
 
-The GUI connects through local IPC and never opens SQLite. Automatic process
-launch and the new close/minimize lifecycle are the next migration stage.
+Minimize keeps the GUI on the taskbar. With **Close to tray** enabled, closing
+exits the GUI process while reminders and Focus continue in the Agent. The tray
+reopens the interface, and **Exit** stops both processes. Turning Close to tray
+off makes window Close request a full exit. Startup preferences apply to the
+Agent: **Start in background** means login starts no GUI at all.
+
+The GUI communicates only through local IPC and never opens SQLite. Keep both
+executables together. For Agent startup-policy testing, use
+`cargo run --locked -p quadrant-agent -- --background`.
 
 For both optimized executables:
 
@@ -58,12 +60,14 @@ properties, accessibility notes, and Kit-only code samples. Snapshot automation
 may select a routed page with `QUADRANT_GALLERY_PAGE=0..8` and a preview width with
 `QUADRANT_GALLERY_PREVIEW=0..2`.
 
-Windows outputs are `target/release/quadrant-agent.exe` and
-`target/release/quadrant-app.exe`. Existing scripts under `packaging/windows/`,
-`packaging/linux/` and `packaging/macos/` still describe the earlier single-binary
-layout; paired-binary packaging is pending the lifecycle migration. Linux/macOS
-packages must be built and signed/notarized on their native release hosts.
+Windows build outputs are `target/release/quadrant-agent.exe` and
+`target/release/quadrant-app.exe`. The scripts under `packaging/windows/`,
+`packaging/linux/` and `packaging/macos/` ship both companions together, with the
+user-facing GUI named `quadrant` (`quadrant.exe` on Windows). Run the GUI from the
+complete extracted package. Executable discovery does not depend on the working
+directory. The macOS bundle includes both programs under `Contents/MacOS`.
+Linux/macOS packages require their native build/signing hosts.
 
-Quadrant stores its local database as `quadrant-rust.db` in the platform application-data directory. Settings can create validated backups and stage the latest backup for restore on the next Agent startup. The previous live database is retained under the adjacent `recovery` directory.
+Quadrant stores its local database as `quadrant-rust.db` in the platform application-data directory. Settings can create validated backups and stage the latest backup for restore on the next Agent startup. Use tray Exit and reopen Quadrant to apply a staged restore; closing only the GUI keeps the Agent running. The previous live database is retained under the adjacent `recovery` directory.
 
 The project is licensed under [GPL-3.0-only](LICENSE). UI primitives are derived from [`owu/wsl-dashboard`](https://github.com/owu/wsl-dashboard), and bundled icons come from [Microsoft Fluent UI System Icons](https://github.com/microsoft/fluentui-system-icons). Release notices are maintained in [`packaging/THIRD-PARTY-NOTICES.txt`](packaging/THIRD-PARTY-NOTICES.txt), with the locked Rust package inventory in [`packaging/DEPENDENCY-LICENSES.txt`](packaging/DEPENDENCY-LICENSES.txt).
