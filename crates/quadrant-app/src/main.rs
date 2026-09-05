@@ -138,8 +138,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let application_event_sink = Arc::clone(&event_sink);
     let worker_reminder_handle = reminder_handle.clone();
     let worker_focus_handle = focus_handle.clone();
+    let (intent_shutdown, mut intent_shutdown_receiver) = tokio::sync::oneshot::channel();
     let worker = runtime.spawn(async move {
-        while let Some(intent) = intent_receiver.recv().await {
+        while let Some(intent) =
+            next_intent_or_shutdown(&mut intent_receiver, &mut intent_shutdown_receiver).await
+        {
             let affects_reminders = intent.affects_reminder_schedule();
             let affects_focus = intent.affects_focus_schedule();
             let refreshes_focus = intent.affects_focus_projection();
@@ -193,6 +196,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let ui_result = shell.run(background_requested());
+    let _ = intent_shutdown.send(());
     if let Some(integration) = desktop_integration {
         integration.shutdown();
     }
@@ -205,6 +209,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     runtime.block_on(activation_worker)?;
     ui_result?;
     Ok(())
+}
+
+async fn next_intent_or_shutdown(
+    intent_receiver: &mut tokio::sync::mpsc::UnboundedReceiver<UiIntent>,
+    shutdown: &mut tokio::sync::oneshot::Receiver<()>,
+) -> Option<UiIntent> {
+    tokio::select! {
+        biased;
+        _ = shutdown => None,
+        intent = intent_receiver.recv() => intent,
+    }
 }
 
 fn report_applied_restore(
@@ -300,4 +315,23 @@ fn native_reminder_delivery(
         }
         Ok::<(), ReminderDeliveryError>(())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::next_intent_or_shutdown;
+
+    #[tokio::test]
+    async fn shutdown_stops_the_intent_worker_while_a_sender_is_still_retained() {
+        let (_intent_sender, mut intent_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (shutdown_sender, mut shutdown_receiver) = tokio::sync::oneshot::channel();
+
+        assert!(shutdown_sender.send(()).is_ok());
+
+        assert!(
+            next_intent_or_shutdown(&mut intent_receiver, &mut shutdown_receiver)
+                .await
+                .is_none()
+        );
+    }
 }

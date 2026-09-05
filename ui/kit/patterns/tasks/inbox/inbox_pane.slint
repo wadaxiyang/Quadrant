@@ -178,6 +178,7 @@ export component InboxPane inherits SurfaceCard {
     in property <bool> loading: false;
     in property <bool> interaction_enabled: true;
     in property <bool> show_add_action: true;
+    in property <bool> content_sized: true;
     in property <string> empty_title: "Inbox is empty";
     in property <string> empty_message: "Capture a task, then classify it when you are ready.";
     // Stable deterministic test hooks used by the development Gallery.
@@ -191,8 +192,8 @@ export component InboxPane inherits SurfaceCard {
     callback item_reorder_requested(string, int);
     callback item_delete_requested(string);
 
-    height: max(112px, pane_content.preferred-height);
-    vertical-stretch: 0;
+    preferred-height: max(112px, pane_content.preferred-height);
+    vertical-stretch: root.content_sized ? 0 : 1;
 
     Rectangle {
         x: 0px;

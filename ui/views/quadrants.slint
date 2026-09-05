@@ -276,6 +276,7 @@ export component QuadrantsView inherits Rectangle {
 
                     InboxPane {
                         width: 280px;
+                        content_sized: false;
                         items: root.inbox_tasks;
                         add_requested => { root.add_requested(); }
                         item_opened(id) => { root.edit_requested(id); }

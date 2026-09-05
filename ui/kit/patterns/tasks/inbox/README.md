@@ -5,6 +5,10 @@ through properties and callbacks. The directory does not import Product views,
 Rust domain types, repositories, application commands, Gallery helpers, or live
 storage.
 
+`InboxPane.content_sized` defaults to `true` for stacked and standalone usage.
+Set it to `false` when the pane is a column that should fill the height assigned
+by its parent layout.
+
 Copy this directory together with these Kit dependencies when embedding it in a
 different Slint root:
 
