@@ -50,6 +50,18 @@ export component MainWindow inherits Window {
     property <length> connection_banner_height: root.agent_connected && !root.command_pending ? 0px : 48px;
     in-out property <int> current_route: 0;
     in-out property <bool> sidebar_user_collapsed: false;
+    out property <bool> sidebar_auto_collapsed: false;
+
+    // Native minimize/restore can report an empty size before updating minimized.
+    // Keep the last usable layout so restoring does not replay sidebar expansion.
+    function update_sidebar_layout() {
+        if (!root.minimized && root.width >= root.min-width && root.height >= root.min-height) {
+            root.sidebar_auto_collapsed = root.width < 920px;
+        }
+    }
+    changed width => { root.update_sidebar_layout(); }
+    changed height => { root.update_sidebar_layout(); }
+    changed minimized => { root.update_sidebar_layout(); }
     in-out property <bool> toast_visible: false;
     in-out property <string> toast_message;
     in-out property <ToastKind> toast_kind: ToastKind.info;
@@ -210,7 +222,7 @@ export component MainWindow inherits Window {
 
                 Sidebar {
                     collapsed <=> root.sidebar_user_collapsed;
-                    auto_collapsed: root.width < 920px;
+                    auto_collapsed: root.sidebar_auto_collapsed;
                     selected_route: root.current_route;
                     route_selected(route) => {
                         root.current_route = route;

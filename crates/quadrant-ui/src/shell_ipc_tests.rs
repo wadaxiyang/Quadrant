@@ -17,6 +17,7 @@ type UiCalls = Arc<Mutex<VecDeque<Box<dyn FnOnce() + Send>>>>;
 type WindowHistory = Rc<RefCell<Vec<std::rc::Weak<MinimalSoftwareWindow>>>>;
 
 struct Headless {
+    elapsed: Rc<Cell<std::time::Duration>>,
     windows: WindowHistory,
     quits: Arc<AtomicUsize>,
     calls: UiCalls,
@@ -40,6 +41,9 @@ impl slint::platform::EventLoopProxy for EventProxy {
     }
 }
 impl Platform for Headless {
+    fn duration_since_start(&self) -> std::time::Duration {
+        self.elapsed.get()
+    }
     fn new_event_loop_proxy(&self) -> Option<Box<dyn slint::platform::EventLoopProxy>> {
         Some(Box::new(EventProxy {
             quits: self.quits.clone(),
@@ -69,6 +73,7 @@ impl Platform for Headless {
 }
 
 struct Fixture {
+    elapsed: Rc<Cell<std::time::Duration>>,
     windows: WindowHistory,
     quits: Arc<AtomicUsize>,
     calls: UiCalls,
@@ -79,6 +84,7 @@ struct Fixture {
 impl Fixture {
     fn new() -> Self {
         let fixture = Self {
+            elapsed: Rc::default(),
             windows: Rc::default(),
             quits: Arc::default(),
             calls: Arc::default(),
@@ -90,6 +96,7 @@ impl Fixture {
             .unwrap(),
         };
         slint::platform::set_platform(Box::new(Headless {
+            elapsed: fixture.elapsed.clone(),
             windows: fixture.windows.clone(),
             quits: fixture.quits.clone(),
             calls: fixture.calls.clone(),
@@ -213,6 +220,8 @@ fn lazy_windows_preserve_ipc_state_and_release_every_component() {
     shell.main_window.show().unwrap();
     assert!(shell.transients.borrow().quick_add.is_none());
     assert!(shell.transients.borrow().task_editor.is_none());
+    sidebar_survives_minimize_and_restore(&shell.main_window);
+    restore_first_frame_matches_settled_icons(&fixture, &shell.main_window);
     projections_without_auxiliary_windows(&fixture, &shell);
     quick_add_lifecycle(&fixture, &shell);
     editor_lifecycle(&fixture, &shell);
@@ -726,4 +735,88 @@ fn capture_host(f: &Fixture) -> GuiShell {
         },
     )
     .unwrap()
+}
+
+fn sidebar_survives_minimize_and_restore(main: &MainWindow) {
+    let resize = |width, height| {
+        main.window()
+            .dispatch_event(slint::platform::WindowEvent::Resized {
+                size: slint::LogicalSize::new(width, height),
+            });
+        slint::platform::update_timers_and_animations();
+    };
+    for (width, auto_collapsed) in [(1100.0, false), (800.0, true)] {
+        for user_collapsed in [false, true] {
+            main.set_sidebar_user_collapsed(user_collapsed);
+            resize(width, 720.0);
+            assert_eq!(main.get_sidebar_auto_collapsed(), auto_collapsed);
+            // Windows may resize before reporting its minimized state.
+            resize(160.0, 28.0);
+            assert_eq!(main.get_sidebar_auto_collapsed(), auto_collapsed);
+            main.window().set_minimized(true);
+            resize(0.0, 0.0);
+            resize(800.0, 600.0); // A usable intermediate size is ignored while minimized.
+            assert_eq!(main.get_sidebar_auto_collapsed(), auto_collapsed);
+            resize(width, 720.0);
+            main.window().set_minimized(false);
+            slint::platform::update_timers_and_animations();
+            assert_eq!(main.get_sidebar_auto_collapsed(), auto_collapsed);
+            assert_eq!(main.get_sidebar_user_collapsed(), user_collapsed);
+        }
+    }
+    main.set_sidebar_user_collapsed(false);
+    resize(1100.0, 720.0);
+    assert!(!main.get_sidebar_auto_collapsed());
+    resize(800.0, 720.0);
+    assert!(main.get_sidebar_auto_collapsed()); // Ordinary responsive resizing still works.
+}
+
+fn restore_first_frame_matches_settled_icons(f: &Fixture, main: &MainWindow) {
+    let adapter = f.windows.borrow()[0].upgrade().unwrap();
+    let advance = || {
+        f.elapsed
+            .set(f.elapsed.get() + std::time::Duration::from_millis(300));
+        slint::platform::update_timers_and_animations();
+    };
+    adapter.set_size(slint::PhysicalSize::new(1100, 720));
+    slint::platform::update_timers_and_animations();
+    let _ = sidebar_pixels(&adapter);
+    advance();
+    let before = sidebar_pixels(&adapter);
+    main.window().set_minimized(true);
+    adapter.set_size(slint::PhysicalSize::new(160, 28));
+    slint::platform::update_timers_and_animations();
+    let _ = sidebar_pixels(&adapter);
+    advance();
+    let _ = sidebar_pixels(&adapter);
+    adapter.set_size(slint::PhysicalSize::new(1100, 720));
+    main.window().set_minimized(false);
+    slint::platform::update_timers_and_animations();
+    let restored = sidebar_pixels(&adapter);
+    advance();
+    let settled = sidebar_pixels(&adapter);
+    assert_eq!(
+        restored, settled,
+        "restore must not animate icon layout after its first frame"
+    );
+    assert_eq!(
+        restored, before,
+        "restore must retain the original icon geometry"
+    );
+}
+
+fn sidebar_pixels(window: &MinimalSoftwareWindow) -> Vec<u8> {
+    let size = window.size();
+    window.request_redraw();
+    let mut pixels = slint::SharedPixelBuffer::<slint::Rgb8Pixel>::new(size.width, size.height);
+    assert!(window.draw_if_needed(|renderer| {
+        renderer.render(pixels.make_mut_slice(), size.width as usize);
+    }));
+    // Fixed icon strip; exclude labels, page data, and focus/hover presentation.
+    let mut strip = Vec::new();
+    for y in 88..size.height as usize {
+        let start = (y * size.width as usize + 10) * 3;
+        strip.extend_from_slice(&pixels.as_bytes()[start..start + 36 * 3]);
+    }
+    strip
 }

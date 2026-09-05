@@ -178,6 +178,8 @@ fn create_tray_icon(sink: DesktopEventSink) -> Result<TrayIcon, PlatformIntegrat
     TrayIconBuilder::new()
         .with_tooltip("Quadrant")
         .with_menu(Box::new(menu))
+        // Left release activates the GUI above; reserve the menu for right click.
+        .with_menu_on_left_click(false)
         .with_icon(quadrant_icon()?)
         .build()
         .map_err(PlatformIntegrationError::new)
