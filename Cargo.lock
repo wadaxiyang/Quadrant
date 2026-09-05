@@ -4038,7 +4038,7 @@ dependencies = [
 
 [[package]]
 name = "quadrant-agent"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "quadrant-application",
  "quadrant-platform",
@@ -4051,7 +4051,7 @@ dependencies = [
 
 [[package]]
 name = "quadrant-app"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "quadrant-application",
  "quadrant-platform",
@@ -4065,7 +4065,7 @@ dependencies = [
 
 [[package]]
 name = "quadrant-application"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "quadrant-domain",
  "serde",
@@ -4077,7 +4077,7 @@ dependencies = [
 
 [[package]]
 name = "quadrant-domain"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "jiff",
  "serde",
@@ -4088,7 +4088,7 @@ dependencies = [
 
 [[package]]
 name = "quadrant-platform"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "global-hotkey",
  "interprocess",
@@ -4105,7 +4105,7 @@ dependencies = [
 
 [[package]]
 name = "quadrant-protocol"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "quadrant-application",
  "serde",
@@ -4117,7 +4117,7 @@ dependencies = [
 
 [[package]]
 name = "quadrant-storage"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "quadrant-application",
  "quadrant-domain",
@@ -4130,7 +4130,7 @@ dependencies = [
 
 [[package]]
 name = "quadrant-ui"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "jiff",
  "png",
@@ -4144,7 +4144,7 @@ dependencies = [
 
 [[package]]
 name = "quadrant-ui-gallery"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "png",
  "slint",
