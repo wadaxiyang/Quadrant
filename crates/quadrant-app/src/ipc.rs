@@ -233,7 +233,17 @@ impl GuiClient {
                     epoch = next_epoch;
                 }
                 Ok(None) => {
-                    sink(ClientUpdate::Event(quadrant_protocol::ServerEvent::ExitGui));
+                    if mode == GuiLaunchMode::QuickAdd {
+                        // A newly opened Main may own capture now. This existing
+                        // form can still hold an unsaved or unconfirmed draft.
+                        status(
+                            &sink,
+                            ConnectionState::Unavailable,
+                            "Another interface is active. This draft was not resent. Check the task list and copy any unsaved text before closing.",
+                        );
+                    } else {
+                        sink(ClientUpdate::Event(quadrant_protocol::ServerEvent::ExitGui));
+                    }
                     return;
                 }
                 Err(error) => {

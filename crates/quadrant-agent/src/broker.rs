@@ -113,7 +113,7 @@ impl Broker {
                 },
                 change = self.lifecycle.changed() => {
                     self.log.event(change.event);
-                    if change.startup_failed && self.existing(GuiLaunchMode::Main).is_none() {
+                    if let Some(mode) = change.startup_failed && self.existing(mode).is_none() {
                         self.launch_failed().await;
                     }
                 },
@@ -193,8 +193,13 @@ impl Broker {
                         if let Some(session) = self.sessions.get_mut(&id) {
                             session.snapshot_ready = true;
                         }
-                        self.lifecycle.connected();
-                        if std::mem::take(&mut self.pending_quick_add) {
+                        if let Some(mode) = self.sessions.get(&id).and_then(|session| session.mode)
+                        {
+                            self.lifecycle.connected(mode);
+                        }
+                        if self.existing(GuiLaunchMode::QuickAdd) == Some(id)
+                            && std::mem::take(&mut self.pending_quick_add)
+                        {
                             self.send_activation(id, GuiLaunchMode::QuickAdd);
                         }
                         for notice in self.startup_notices.clone() {
@@ -271,6 +276,7 @@ impl Broker {
                 self.log.event("gui_accepted");
             }
             GuiDisposition::ActivateExistingAndExit => {
+                self.lifecycle.connected(hello.mode);
                 if let Some(existing) = existing {
                     self.send_activation(existing, hello.mode);
                 }
@@ -286,7 +292,7 @@ impl Broker {
 
     async fn command(&mut self, id: SessionId, request_id: RequestId, intent: UiIntent) {
         if matches!(intent, UiIntent::OpenQuickAdd) {
-            self.send(id, ServerMessage::Event(ServerEvent::OpenQuickAdd));
+            self.activate(GuiLaunchMode::QuickAdd).await;
             self.send(
                 id,
                 ServerMessage::CommandResult {
@@ -394,15 +400,18 @@ impl Broker {
     }
 
     fn existing(&self, mode: GuiLaunchMode) -> Option<SessionId> {
-        self.sessions
-            .iter()
-            .find(|(_, s)| s.mode == Some(GuiLaunchMode::Main) && !s.output.is_closed())
-            .or_else(|| {
-                self.sessions
-                    .iter()
-                    .find(|(_, s)| s.mode == Some(mode) && !s.output.is_closed())
-            })
-            .map(|(id, _)| *id)
+        // Keep a standalone draft reachable even if Main was opened afterwards.
+        let find = |requested| {
+            self.sessions
+                .iter()
+                .find(|(_, s)| s.mode == Some(requested) && !s.output.is_closed())
+                .map(|(id, _)| *id)
+        };
+        find(mode).or_else(|| {
+            (mode == GuiLaunchMode::QuickAdd)
+                .then(|| find(GuiLaunchMode::Main))
+                .flatten()
+        })
     }
 
     async fn activate(&mut self, mode: GuiLaunchMode) {
@@ -410,7 +419,7 @@ impl Broker {
             self.send_activation(id, mode);
         } else {
             self.pending_quick_add |= mode == GuiLaunchMode::QuickAdd;
-            match self.lifecycle.launch().await {
+            match self.lifecycle.launch(mode).await {
                 Ok(true) => self.log.event("gui_spawned"),
                 Ok(false) => self.log.event("gui_launch_coalesced"),
                 Err(_) => {

@@ -33,6 +33,8 @@ export component QuickAddWindow inherits Window {
 
     in-out property <bool> can_submit: true;
 
+    // Rust-only typed IPC dispatch bridge for the standalone capture host.
+    callback dispatch_client_update;
     callback submitted(string, int);
     callback cancelled;
 

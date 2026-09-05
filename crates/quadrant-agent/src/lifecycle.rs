@@ -2,6 +2,7 @@
 //! Event-driven child supervision. Failed launches never cause a respawn loop.
 
 use quadrant_platform::GuiLauncher;
+use quadrant_protocol::GuiLaunchMode;
 use std::{sync::Arc, time::Duration};
 use tokio::{
     task::{AbortHandle, JoinSet},
@@ -11,12 +12,12 @@ use tokio::{
 pub(crate) struct Lifecycle {
     launcher: Arc<dyn GuiLauncher>,
     children: JoinSet<std::io::Result<()>>,
-    starting: Option<(Instant, AbortHandle)>,
+    starting: Vec<(GuiLaunchMode, Instant, AbortHandle)>,
 }
 
 pub(crate) struct LifecycleChange {
     pub event: &'static str,
-    pub startup_failed: bool,
+    pub startup_failed: Option<GuiLaunchMode>,
 }
 
 impl Lifecycle {
@@ -24,45 +25,55 @@ impl Lifecycle {
         Self {
             launcher,
             children: JoinSet::new(),
-            starting: None,
+            starting: Vec::new(),
         }
     }
 
-    pub async fn launch(&mut self) -> Result<bool, crate::AgentError> {
-        if self.starting.is_some() {
+    pub async fn launch(&mut self, mode: GuiLaunchMode) -> Result<bool, crate::AgentError> {
+        if self.starting.iter().any(|(pending, _, _)| {
+            *pending == mode || (mode == GuiLaunchMode::QuickAdd && *pending == GuiLaunchMode::Main)
+        }) {
             return Ok(false);
         }
         let launcher = self.launcher.clone();
-        let process = tokio::task::spawn_blocking(move || launcher.launch_main()).await??;
+        let process = tokio::task::spawn_blocking(move || match mode {
+            GuiLaunchMode::Main => launcher.launch_main(),
+            GuiLaunchMode::QuickAdd => launcher.launch_quick_add(),
+        })
+        .await??;
         let abort = self.children.spawn(process.completion);
-        self.starting = Some((Instant::now() + Duration::from_secs(30), abort));
+        self.starting
+            .push((mode, Instant::now() + Duration::from_secs(30), abort));
         Ok(true)
     }
 
-    pub fn connected(&mut self) {
+    pub fn connected(&mut self, mode: GuiLaunchMode) {
         // An external GUI may win the handshake. Session negotiation redirects
         // the launched child; its completion is still reaped independently.
-        self.starting = None;
+        self.starting.retain(|(pending, _, _)| *pending != mode);
     }
 
     pub async fn changed(&mut self) -> LifecycleChange {
-        let deadline = self.starting.as_ref().map(|(deadline, _)| *deadline);
+        let deadline = self.starting.iter().map(|(_, deadline, _)| *deadline).min();
         tokio::select! {
             completion = self.children.join_next_with_id(), if !self.children.is_empty() => {
                 if let Some(Ok((id, result))) = completion {
-                    let startup_failed = self.starting.as_ref().is_some_and(|(_, abort)| abort.id() == id);
-                    if startup_failed {
-                        self.starting = None;
-                    }
+                    let startup_failed = self.starting.iter().find(|(_, _, abort)| abort.id() == id).map(|(mode, _, _)| *mode);
+                    self.starting.retain(|(_, _, abort)| abort.id() != id);
                     LifecycleChange { event: if result.is_err() { "gui_process_failed" } else { "gui_process_exited" }, startup_failed }
-                } else { LifecycleChange { event: "gui_process_cancelled", startup_failed: false } }
+                } else { LifecycleChange { event: "gui_process_cancelled", startup_failed: None } }
             },
             () = async {
                 if let Some(deadline) = deadline { tokio::time::sleep_until(deadline).await; }
                 else { std::future::pending::<()>().await; }
             } => {
-                if let Some((_, abort)) = self.starting.take() { abort.abort(); }
-                LifecycleChange { event: "gui_startup_timed_out", startup_failed: true }
+                let expired = self.starting.iter().position(|(_, at, _)| *at <= Instant::now());
+                let startup_failed = expired.map(|index| {
+                    let (mode, _, abort) = self.starting.remove(index);
+                    abort.abort();
+                    mode
+                });
+                LifecycleChange { event: "gui_startup_timed_out", startup_failed }
             }
         }
     }
@@ -92,6 +103,9 @@ mod tests {
         children: mpsc::UnboundedSender<oneshot::Sender<()>>,
     }
     impl GuiLauncher for Launcher {
+        fn launch_quick_add(&self) -> std::io::Result<quadrant_platform::GuiProcess> {
+            self.launch_main()
+        }
         fn launch_main(&self) -> std::io::Result<quadrant_platform::GuiProcess> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             let (exit, exited) = oneshot::channel();
@@ -107,6 +121,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn startup_deadlines_are_independent_for_main_and_capture() {
+        let (children, mut completions) = mpsc::unbounded_channel();
+        let mut lifecycle = Lifecycle::new(Arc::new(Launcher {
+            calls: AtomicU32::new(0),
+            children,
+        }));
+        assert!(lifecycle.launch(GuiLaunchMode::QuickAdd).await.unwrap());
+        let mut quick = completions.recv().await.unwrap();
+        assert!(lifecycle.launch(GuiLaunchMode::Main).await.unwrap());
+        let main = completions.recv().await.unwrap();
+        lifecycle.connected(GuiLaunchMode::Main);
+        assert_eq!(lifecycle.starting.len(), 1);
+        lifecycle.starting[0].1 = Instant::now();
+        assert_eq!(
+            lifecycle.changed().await.startup_failed,
+            Some(GuiLaunchMode::QuickAdd)
+        );
+        quick.closed().await;
+        main.send(()).unwrap();
+        lifecycle.shutdown().await;
+    }
+
+    #[tokio::test]
     async fn launch_coalesces_reaps_crashes_and_allows_explicit_reopen() {
         let (children, mut completions) = mpsc::unbounded_channel();
         let launcher = Arc::new(Launcher {
@@ -114,14 +151,14 @@ mod tests {
             children,
         });
         let mut lifecycle = Lifecycle::new(launcher.clone());
-        assert!(lifecycle.launch().await.unwrap());
+        assert!(lifecycle.launch(GuiLaunchMode::Main).await.unwrap());
         let first = completions.recv().await.unwrap();
-        assert!(!lifecycle.launch().await.unwrap());
+        assert!(!lifecycle.launch(GuiLaunchMode::Main).await.unwrap());
         first.send(()).unwrap();
         assert_eq!(lifecycle.changed().await.event, "gui_process_exited");
         assert_eq!(launcher.calls.load(Ordering::SeqCst), 1);
-        assert!(lifecycle.launch().await.unwrap());
-        lifecycle.connected();
+        assert!(lifecycle.launch(GuiLaunchMode::Main).await.unwrap());
+        lifecycle.connected(GuiLaunchMode::Main);
         completions.recv().await.unwrap().send(()).unwrap();
         lifecycle.shutdown().await;
         assert!(lifecycle.children.is_empty());
@@ -134,14 +171,14 @@ mod tests {
             calls: AtomicU32::new(0),
             children,
         }));
-        lifecycle.launch().await.unwrap();
+        lifecycle.launch(GuiLaunchMode::Main).await.unwrap();
         let first = completions.recv().await.unwrap();
-        lifecycle.connected();
-        assert!(lifecycle.launch().await.unwrap());
+        lifecycle.connected(GuiLaunchMode::Main);
+        assert!(lifecycle.launch(GuiLaunchMode::Main).await.unwrap());
         let second = completions.recv().await.unwrap();
         first.send(()).unwrap();
-        assert!(!lifecycle.changed().await.startup_failed);
-        assert!(!lifecycle.launch().await.unwrap());
+        assert!(lifecycle.changed().await.startup_failed.is_none());
+        assert!(!lifecycle.launch(GuiLaunchMode::Main).await.unwrap());
         second.send(()).unwrap();
         lifecycle.shutdown().await;
     }
@@ -153,15 +190,15 @@ mod tests {
             calls: AtomicU32::new(0),
             children,
         }));
-        lifecycle.launch().await.unwrap();
+        lifecycle.launch(GuiLaunchMode::Main).await.unwrap();
         let mut first = completions.recv().await.unwrap();
-        lifecycle.starting.as_mut().unwrap().0 = Instant::now();
+        lifecycle.starting[0].1 = Instant::now();
         let change = lifecycle.changed().await;
         assert_eq!(change.event, "gui_startup_timed_out");
-        assert!(change.startup_failed);
+        assert_eq!(change.startup_failed, Some(GuiLaunchMode::Main));
         first.closed().await;
         lifecycle.changed().await;
-        assert!(lifecycle.launch().await.unwrap());
+        assert!(lifecycle.launch(GuiLaunchMode::Main).await.unwrap());
         completions.recv().await.unwrap().send(()).unwrap();
         lifecycle.shutdown().await;
     }

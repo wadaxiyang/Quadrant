@@ -1,5 +1,6 @@
 //! Main/Quick Add window construction and typed callback binding.
 
+mod standalone;
 mod transients;
 
 use transients::TransientWindows;
@@ -35,6 +36,51 @@ use crate::{
 
 /// Ordered transport-to-presentation sink. Native desktop adapters never own it.
 pub type ClientUpdateSink = Arc<dyn Fn(ClientUpdate) + Send + Sync>;
+
+/// Only the requested presentation host is constructed after negotiation.
+pub enum GuiShell {
+    Main(UiShell),
+    QuickAdd(standalone::QuickAddShell),
+}
+
+impl GuiShell {
+    /// Builds exactly the requested surface.
+    /// # Errors
+    /// Returns a Slint backend/component creation error.
+    pub fn new(
+        mode: quadrant_protocol::GuiLaunchMode,
+        snapshot: &AppSnapshot,
+        version: &str,
+        on_command: impl Fn(GuiCommand) -> bool + 'static,
+    ) -> Result<Self, slint::PlatformError> {
+        match mode {
+            quadrant_protocol::GuiLaunchMode::Main => {
+                UiShell::new(snapshot, version, on_command).map(Self::Main)
+            }
+            quadrant_protocol::GuiLaunchMode::QuickAdd => {
+                standalone::QuickAddShell::new(snapshot, on_command).map(Self::QuickAdd)
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn update_sink(&self) -> ClientUpdateSink {
+        match self {
+            Self::Main(shell) => shell.update_sink(),
+            Self::QuickAdd(shell) => shell.update_sink(),
+        }
+    }
+
+    /// Runs the chosen surface and releases it before returning.
+    /// # Errors
+    /// Returns a window or event-loop error.
+    pub fn run(self) -> Result<(), slint::PlatformError> {
+        match self {
+            Self::Main(shell) => shell.run(),
+            Self::QuickAdd(shell) => shell.run(),
+        }
+    }
+}
 
 /// Constructed Slint shell kept on the UI thread.
 pub struct UiShell {

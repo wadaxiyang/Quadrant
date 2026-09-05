@@ -16,19 +16,7 @@ fn main() -> std::process::ExitCode {
 }
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let mut agent_launched = false;
-    for argument in std::env::args().skip(1) {
-        match argument.as_str() {
-            "--agent-launched" => agent_launched = true,
-            _ => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "Unknown GUI argument",
-                )
-                .into());
-            }
-        }
-    }
+    let options = quadrant_app::GuiOptions::parse(std::env::args().skip(1))?;
     let endpoint = quadrant_platform::AgentEndpoint::for_current_user()?;
     // One transport worker; no application services, timers or blocking SQL work.
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -39,8 +27,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut agent_child = None;
     let connection = runtime.block_on(quadrant_app::ipc::GuiClient::connect_or_start(
         endpoint,
-        quadrant_protocol::GuiLaunchMode::Main,
-        !agent_launched,
+        options.mode,
+        !options.agent_launched,
         || {
             agent_child = Some(quadrant_platform::launch_agent()?);
             Ok(())
@@ -52,7 +40,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     };
     quadrant_platform::initialize_application_identity()?;
-    let shell = quadrant_ui::UiShell::new(
+    let shell = quadrant_ui::GuiShell::new(
+        options.mode,
         client.snapshot(),
         env!("CARGO_PKG_VERSION"),
         move |command| handle.submit(command).is_ok(),

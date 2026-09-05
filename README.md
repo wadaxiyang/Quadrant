@@ -24,6 +24,13 @@ reopens the interface, and **Exit** stops both processes. Turning Close to tray
 off makes window Close request a full exit. Startup preferences apply to the
 Agent: **Start in background** means login starts no GUI at all.
 
+Run `quadrant --quick-add` (development: `cargo run -p quadrant-app -- --quick-add`)
+to capture a task without creating the main window. The Agent also uses this mode
+for the global shortcut when no interface is running. Repeated capture requests
+activate an existing capture window and preserve its draft. Main can be opened
+separately while a standalone capture is active. Confirmed save, Cancel or Escape
+closes the standalone GUI; the Agent continues running.
+
 Quick Add and Task Editor are created only when opened and released on close or
 confirmed save. Reopening a visible window keeps its draft; closing it discards
 unsaved input. Saves that fail or lose their connection keep the current form.

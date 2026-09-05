@@ -186,10 +186,19 @@ async fn start(
     oneshot::Sender<()>,
     tokio::task::JoinHandle<()>,
 ) {
-    let (client, handle) = GuiClient::connect(endpoint, GuiLaunchMode::Main)
-        .await
-        .unwrap()
-        .unwrap();
+    start_mode(endpoint, GuiLaunchMode::Main).await
+}
+
+async fn start_mode(
+    endpoint: AgentEndpoint,
+    mode: GuiLaunchMode,
+) -> (
+    ClientHandle,
+    mpsc::UnboundedReceiver<ClientUpdate>,
+    oneshot::Sender<()>,
+    tokio::task::JoinHandle<()>,
+) {
+    let (client, handle) = GuiClient::connect(endpoint, mode).await.unwrap().unwrap();
     assert_eq!(client.snapshot(), &snapshot());
     let (sender, mut updates) = mpsc::unbounded_channel();
     let (stop, shutdown) = oneshot::channel();
@@ -435,4 +444,53 @@ async fn exhausted_recovery_stays_offline_and_rejects_submissions() {
     }
     worker.await.unwrap();
     assert!(handle.submit(command()).is_err());
+}
+
+#[tokio::test]
+async fn capture_reconnect_redirect_retains_offline_presentation_without_replay() {
+    let peer = Peer::new();
+    let endpoint = peer.endpoint.clone();
+    let server = tokio::spawn(async move {
+        let mut first = peer.accept(snapshot()).await;
+        assert!(matches!(
+            read(&mut first).await,
+            ClientMessage::Command { .. }
+        ));
+        first.close().await; // Drop a response after receiving the mutation.
+        let (mut second, _) = peer.listener.accept().await.unwrap();
+        let ClientMessage::Hello(hello) = read(&mut second).await else {
+            panic!("hello required");
+        };
+        assert_eq!(hello.mode, GuiLaunchMode::QuickAdd);
+        let ack = ServerHello::negotiate(&hello, "test", true, SessionId::generate());
+        write_message_async(&mut second, &ServerMessage::HelloAck(ack))
+            .await
+            .unwrap();
+        assert!(
+            read_message_async::<_, ClientMessage>(&mut second)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    });
+    let (handle, mut updates, _stop, worker) = start_mode(endpoint, GuiLaunchMode::QuickAdd).await;
+    handle.submit(command()).unwrap();
+    loop {
+        match update(&mut updates).await {
+            ClientUpdate::Connection {
+                state: ConnectionState::Unavailable,
+                message,
+            } => {
+                assert!(message.contains("copy any unsaved text"));
+                assert!(handle.submit(command()).is_err());
+                break;
+            }
+            ClientUpdate::Event(ServerEvent::ExitGui) | ClientUpdate::CommandFinished { .. } => {
+                panic!("unknown draft must remain visible")
+            }
+            _ => {}
+        }
+    }
+    worker.await.unwrap();
+    server.await.unwrap();
 }

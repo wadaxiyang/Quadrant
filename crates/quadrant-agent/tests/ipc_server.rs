@@ -26,18 +26,159 @@ use tokio::{
 const NOW: i64 = 1_788_560_000;
 const TIMEOUT: Duration = Duration::from_secs(8);
 
-struct FakeGui(mpsc::UnboundedSender<oneshot::Sender<()>>);
+#[tokio::test]
+async fn dedicated_capture_coalesces_preserves_sessions_and_commits_through_agent() {
+    let (sender, mut launches) = mpsc::unbounded_channel();
+    let harness = Harness::start_with(Profile::new(), false, Arc::new(FakeGui(sender))).await;
+    (harness.desktop)(DesktopEvent::OpenQuickAdd);
+    let (mode, quick_exit) = tokio::time::timeout(TIMEOUT, launches.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(mode, GuiLaunchMode::QuickAdd);
+    (harness.desktop)(DesktopEvent::OpenQuickAdd);
+    let mut quick = Client::connect(&harness.endpoint, GuiLaunchMode::QuickAdd).await;
+    quick.snapshot().await;
+    assert!(matches!(
+        receive(&mut quick.stream).await,
+        Some(ServerMessage::Event(ServerEvent::OpenQuickAdd))
+    ));
+    assert!(launches.try_recv().is_err());
+
+    let (_, ack) = hello(&harness.endpoint, GuiLaunchMode::QuickAdd, PROTOCOL_VERSION).await;
+    assert_eq!(ack.disposition, GuiDisposition::ActivateExistingAndExit);
+    assert!(matches!(
+        receive(&mut quick.stream).await,
+        Some(ServerMessage::Event(ServerEvent::OpenQuickAdd))
+    ));
+
+    // Opening Main must not repurpose or discard the standalone form.
+    (harness.desktop)(DesktopEvent::ShowMainWindow);
+    let (mode, main_exit) = tokio::time::timeout(TIMEOUT, launches.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(mode, GuiLaunchMode::Main);
+    let mut main = Client::connect(&harness.endpoint, GuiLaunchMode::Main).await;
+    main.snapshot().await;
+    assert_ne!(quick.session, main.session);
+    let (_, ack) = hello(&harness.endpoint, GuiLaunchMode::Main, PROTOCOL_VERSION).await;
+    assert_eq!(ack.disposition, GuiDisposition::ActivateExistingAndExit);
+    assert!(matches!(
+        receive(&mut main.stream).await,
+        Some(ServerMessage::Event(ServerEvent::ActivateMainWindow))
+    ));
+    main.success(UiIntent::OpenQuickAdd).await;
+    assert!(matches!(
+        receive(&mut quick.stream).await,
+        Some(ServerMessage::Event(ServerEvent::OpenQuickAdd))
+    ));
+
+    let (outcome, _) = quick
+        .command(UiIntent::SubmitQuickAdd(QuickAddSubmission {
+            title: " ".into(),
+            placement: TaskPlacement::Inbox,
+        }))
+        .await;
+    assert!(matches!(outcome, CommandOutcome::Failed(_)));
+    quick
+        .success(UiIntent::SubmitQuickAdd(QuickAddSubmission {
+            title: "Standalone capture".into(),
+            placement: TaskPlacement::Inbox,
+        }))
+        .await;
+    assert_eq!(
+        main.snapshot().await.quadrants.inbox[0].title,
+        "Standalone capture"
+    );
+    write_message_async(
+        &mut quick.stream,
+        &ClientMessage::GuiClosing {
+            session_id: quick.session,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(receive(&mut quick.stream).await.is_none());
+    quick_exit.send(()).unwrap();
+
+    // With no standalone session, Main owns the capture action again.
+    (harness.desktop)(DesktopEvent::OpenQuickAdd);
+    assert!(matches!(
+        receive(&mut main.stream).await,
+        Some(ServerMessage::Event(ServerEvent::OpenQuickAdd))
+    ));
+    let (_, ack) = hello(&harness.endpoint, GuiLaunchMode::QuickAdd, PROTOCOL_VERSION).await;
+    assert_eq!(ack.disposition, GuiDisposition::ActivateExistingAndExit);
+    assert!(matches!(
+        receive(&mut main.stream).await,
+        Some(ServerMessage::Event(ServerEvent::OpenQuickAdd))
+    ));
+    assert!(launches.try_recv().is_err());
+    main_exit.send(()).unwrap();
+    harness.finish().await;
+}
+
+#[tokio::test]
+async fn main_request_during_capture_startup_is_not_lost_and_exit_reaches_both() {
+    let (sender, mut launches) = mpsc::unbounded_channel();
+    let harness = Harness::start_with(Profile::new(), false, Arc::new(FakeGui(sender))).await;
+    (harness.desktop)(DesktopEvent::OpenQuickAdd);
+    let (mode, quick_exit) = tokio::time::timeout(TIMEOUT, launches.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(mode, GuiLaunchMode::QuickAdd);
+    (harness.desktop)(DesktopEvent::ShowMainWindow);
+    let (mode, main_exit) = tokio::time::timeout(TIMEOUT, launches.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(mode, GuiLaunchMode::Main);
+    let mut quick = Client::connect(&harness.endpoint, GuiLaunchMode::QuickAdd).await;
+    // Main finishes loading first; it must not steal the accepted capture's activation.
+    let mut main = Client::connect(&harness.endpoint, GuiLaunchMode::Main).await;
+    main.snapshot().await;
+    quick.snapshot().await;
+    assert!(matches!(
+        receive(&mut quick.stream).await,
+        Some(ServerMessage::Event(ServerEvent::OpenQuickAdd))
+    ));
+    assert!(launches.try_recv().is_err());
+    main.command(GuiCommand::ExitApplication).await;
+    assert!(matches!(
+        receive(&mut main.stream).await,
+        Some(ServerMessage::Event(ServerEvent::AgentShuttingDown))
+    ));
+    assert!(matches!(
+        receive(&mut quick.stream).await,
+        Some(ServerMessage::Event(ServerEvent::AgentShuttingDown))
+    ));
+    quick_exit.send(()).unwrap();
+    main_exit.send(()).unwrap();
+    harness.finish().await;
+}
+
+struct FakeGui(mpsc::UnboundedSender<(GuiLaunchMode, oneshot::Sender<()>)>);
 impl quadrant_platform::GuiLauncher for FakeGui {
     fn launch_main(&self) -> std::io::Result<quadrant_platform::GuiProcess> {
+        Ok(self.launch(GuiLaunchMode::Main))
+    }
+    fn launch_quick_add(&self) -> std::io::Result<quadrant_platform::GuiProcess> {
+        Ok(self.launch(GuiLaunchMode::QuickAdd))
+    }
+}
+impl FakeGui {
+    fn launch(&self, mode: GuiLaunchMode) -> quadrant_platform::GuiProcess {
         let (exit, exited) = oneshot::channel();
-        self.0.send(exit).unwrap();
-        Ok(quadrant_platform::GuiProcess {
+        self.0.send((mode, exit)).unwrap();
+        quadrant_platform::GuiProcess {
             id: std::process::id(),
             completion: Box::pin(async move {
                 let _ = exited.await;
                 Ok(())
             }),
-        })
+        }
     }
 }
 
@@ -45,12 +186,12 @@ impl quadrant_platform::GuiLauncher for FakeGui {
 async fn tray_reopens_after_gui_close_and_crash_and_full_exit_stops_agent() {
     let (sender, mut launches) = mpsc::unbounded_channel();
     let harness = Harness::start_with(Profile::new(), false, Arc::new(FakeGui(sender))).await;
-    (harness.desktop)(DesktopEvent::OpenQuickAdd);
+    (harness.desktop)(DesktopEvent::ShowMainWindow);
     let first = tokio::time::timeout(TIMEOUT, launches.recv())
         .await
         .unwrap()
         .unwrap();
-    (harness.desktop)(DesktopEvent::ShowMainWindow);
+    (harness.desktop)(DesktopEvent::OpenQuickAdd);
     let mut client = Client::connect(&harness.endpoint, GuiLaunchMode::Main).await;
     client.snapshot().await;
     assert!(matches!(
@@ -81,7 +222,7 @@ async fn tray_reopens_after_gui_close_and_crash_and_full_exit_stops_agent() {
     // EOF acknowledges removal of this session before the next tray request.
     assert!(receive(&mut client.stream).await.is_none());
     drop(client);
-    first.send(()).unwrap();
+    first.1.send(()).unwrap();
     (harness.desktop)(DesktopEvent::ShowMainWindow);
     let second = tokio::time::timeout(TIMEOUT, launches.recv())
         .await
@@ -94,7 +235,7 @@ async fn tray_reopens_after_gui_close_and_crash_and_full_exit_stops_agent() {
     );
     let old_session = client.session;
     drop(client); // Abrupt EOF, without GuiClosing.
-    second.send(()).unwrap();
+    second.1.send(()).unwrap();
     let mut recovered = Client::connect(&harness.endpoint, GuiLaunchMode::Main).await;
     assert_ne!(recovered.session, old_session);
     recovered.snapshot().await;
@@ -134,7 +275,7 @@ async fn login_uses_start_hidden_but_gui_bootstrap_never_spawns_a_second_gui() {
             hidden
         );
         if should_launch {
-            launches.try_recv().unwrap().send(()).unwrap();
+            launches.try_recv().unwrap().1.send(()).unwrap();
         } else {
             assert!(launches.try_recv().is_err());
         }
@@ -168,6 +309,9 @@ impl Clock for TestClock {
 }
 struct NoGui;
 impl quadrant_platform::GuiLauncher for NoGui {
+    fn launch_quick_add(&self) -> std::io::Result<quadrant_platform::GuiProcess> {
+        panic!("unexpected Quick Add launch")
+    }
     fn launch_main(&self) -> std::io::Result<quadrant_platform::GuiProcess> {
         panic!("unexpected native GUI launch in isolated service test")
     }

@@ -23,6 +23,10 @@ pub trait GuiLauncher: Send + Sync {
     /// # Errors
     /// Returns a missing executable or process creation failure.
     fn launch_main(&self) -> io::Result<GuiProcess>;
+    /// Starts only the capture surface, without a main window.
+    /// # Errors
+    /// Returns a missing executable or process creation failure.
+    fn launch_quick_add(&self) -> io::Result<GuiProcess>;
 }
 
 /// Production sibling executable launcher.
@@ -30,14 +34,27 @@ pub struct PlatformGuiLauncher;
 
 impl GuiLauncher for PlatformGuiLauncher {
     fn launch_main(&self) -> io::Result<GuiProcess> {
-        let path = sibling(&std::env::current_exe()?, &["quadrant", "quadrant-app"])?;
-        // A child must never restart its parent during a concurrent full Exit.
-        let child = command(&path)
-            .arg("--agent-launched")
-            .kill_on_drop(true)
-            .spawn()?;
-        owned_gui(child)
+        launch_gui(false)
     }
+
+    fn launch_quick_add(&self) -> io::Result<GuiProcess> {
+        launch_gui(true)
+    }
+}
+
+fn launch_gui(quick_add: bool) -> io::Result<GuiProcess> {
+    let path = sibling(&std::env::current_exe()?, &["quadrant", "quadrant-app"])?;
+    owned_gui(gui_command(&path, quick_add).spawn()?)
+}
+
+fn gui_command(path: &Path, quick_add: bool) -> tokio::process::Command {
+    let mut process = command(path);
+    // A child must never restart its parent during a concurrent full Exit.
+    process.arg("--agent-launched").kill_on_drop(true);
+    if quick_add {
+        process.arg("--quick-add");
+    }
+    process
 }
 
 fn owned_gui(mut child: tokio::process::Child) -> io::Result<GuiProcess> {
@@ -99,6 +116,19 @@ fn sibling(executable: &Path, names: &[&str]) -> io::Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn capture_launch_passes_mode_and_parent_protection_as_separate_arguments() {
+        let path = Path::new("installation with spaces/quadrant.exe");
+        for (quick, expected) in [
+            (false, vec!["--agent-launched"]),
+            (true, vec!["--agent-launched", "--quick-add"]),
+        ] {
+            let command = gui_command(path, quick);
+            assert_eq!(command.as_std().get_program(), path.as_os_str());
+            assert_eq!(command.as_std().get_args().collect::<Vec<_>>(), expected);
+        }
+    }
 
     #[test]
     fn child_process_fixture() {

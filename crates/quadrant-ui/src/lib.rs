@@ -9,4 +9,4 @@ slint::include_modules!();
 
 mod shell;
 
-pub use shell::{ClientUpdateSink, UiShell};
+pub use shell::{ClientUpdateSink, GuiShell, UiShell};

@@ -218,6 +218,7 @@ fn lazy_windows_preserve_ipc_state_and_release_every_component() {
     editor_lifecycle(&fixture, &shell);
     creation_failures_and_teardown(&fixture, shell);
     assert_eq!(fixture.live(), 0);
+    dedicated_capture(&fixture);
 }
 
 fn projections_without_auxiliary_windows(f: &Fixture, shell: &UiShell) {
@@ -537,4 +538,192 @@ fn render_review(window: &MinimalSoftwareWindow, path: &std::path::Path, width: 
         .unwrap()
         .write_image_data(pixels.as_bytes())
         .unwrap();
+}
+
+fn dedicated_capture(f: &Fixture) {
+    use quadrant_protocol::GuiLaunchMode;
+    f.fail_next.set(true);
+    assert!(GuiShell::new(GuiLaunchMode::QuickAdd, &f.snapshot, "test", |_| true).is_err());
+    assert_eq!(f.live(), 0);
+    let created = fixture_window_count(f);
+    let host = capture_host(f);
+    assert_eq!(fixture_window_count(f), created + 1);
+    assert_eq!(f.live(), 1); // No Main, editor or auxiliary component was constructed.
+    let GuiShell::QuickAdd(shell) = &host else {
+        panic!("capture host required");
+    };
+    let window = shell.window.clone_strong();
+    window.show().unwrap();
+    let weak = window.as_weak();
+    let sink = host.update_sink();
+    let apply = |update| {
+        sink(update);
+        f.pump();
+    };
+    let ready = || {
+        apply(ClientUpdate::Connection {
+            state: ConnectionState::Ready,
+            message: String::new(),
+        });
+    };
+    assert!(!window.get_can_submit());
+    let sent = f.commands.borrow().len();
+    window.invoke_submitted("Offline".into(), 0);
+    assert_eq!(f.commands.borrow().len(), sent);
+    ready();
+    assert!(window.get_error_message().is_empty());
+    window.invoke_submitted("  ".into(), 0);
+    assert_eq!(f.commands.borrow().len(), sent);
+    window.set_title_text("Capture draft".into());
+    sink(ClientUpdate::Snapshot(Box::new(f.snapshot.clone())));
+    sink(ClientUpdate::Event(ServerEvent::ThemeChanged {
+        theme_mode: ApplicationThemeMode::Dark,
+        system_theme: SystemTheme::Dark,
+    }));
+    sink(ClientUpdate::Event(ServerEvent::OpenQuickAdd));
+    // Even irrelevant Main/editor pushes never construct another component.
+    sink(ClientUpdate::Event(ServerEvent::ActivateMainWindow));
+    sink(ClientUpdate::Event(
+        ApplicationEvent::TaskEditorLoaded(task()).into(),
+    ));
+    f.pump();
+    assert_eq!(window.get_title_text(), "Capture draft");
+    assert_eq!(fixture_window_count(f), created + 1);
+    capture_results(f, &window, &sink);
+    drop(window);
+    host.run().unwrap();
+    assert!(weak.upgrade().is_none());
+    assert_eq!(f.live(), 0);
+    sink(ClientUpdate::Event(ServerEvent::OpenQuickAdd));
+    f.pump();
+    assert_eq!(f.live(), 0);
+
+    capture_closes(f);
+}
+
+fn capture_closes(f: &Fixture) {
+    for action in 0..3 {
+        let host = capture_host(f);
+        let GuiShell::QuickAdd(shell) = &host else {
+            unreachable!()
+        };
+        let window = shell.window.clone_strong();
+        window.show().unwrap();
+        let weak = window.as_weak();
+        let sink = host.update_sink();
+        sink(ClientUpdate::Connection {
+            state: ConnectionState::Ready,
+            message: String::new(),
+        });
+        f.pump();
+        window.set_title_text("Pending close".into());
+        window.invoke_submitted(window.get_title_text(), 0);
+        let quits = f.quits.load(Ordering::SeqCst);
+        match action {
+            0 => window.invoke_cancelled(),
+            1 => window
+                .window()
+                .dispatch_event(slint::platform::WindowEvent::CloseRequested),
+            _ => {
+                sink(ClientUpdate::Event(ServerEvent::AgentShuttingDown));
+                f.pump();
+            }
+        }
+        assert_eq!(f.quits.load(Ordering::SeqCst), quits + 1);
+        sink(ClientUpdate::CommandFinished {
+            command: f.commands.borrow().last().unwrap().clone(),
+            outcome: failed(),
+        });
+        f.pump();
+        drop(window);
+        drop(host);
+        assert!(weak.upgrade().is_none());
+        assert_eq!(f.live(), 0);
+    }
+}
+
+fn capture_results(f: &Fixture, window: &QuickAddWindow, sink: &ClientUpdateSink) {
+    let sent = f.commands.borrow().len();
+    let apply = |update| {
+        sink(update);
+        f.pump();
+    };
+    let ready = || {
+        apply(ClientUpdate::Connection {
+            state: ConnectionState::Ready,
+            message: String::new(),
+        });
+    };
+    window.invoke_submitted(window.get_title_text(), 0);
+    let command = f.commands.borrow().last().unwrap().clone();
+    assert!(!window.get_can_submit());
+    window.invoke_submitted(window.get_title_text(), 0);
+    assert_eq!(f.commands.borrow().len(), sent + 1);
+    apply(ClientUpdate::CommandFinished {
+        command: command.clone(),
+        outcome: failed(),
+    });
+    ready();
+    assert_eq!(window.get_error_message(), "Save failed");
+    assert_eq!(window.get_title_text(), "Capture draft");
+    let quits = f.quits.load(Ordering::SeqCst);
+    window.invoke_submitted(window.get_title_text(), 0);
+    window.set_title_text("Newer draft".into());
+    apply(ClientUpdate::CommandFinished {
+        command,
+        outcome: CommandOutcome::Succeeded,
+    });
+    ready();
+    assert_eq!(f.quits.load(Ordering::SeqCst), quits);
+    assert_eq!(window.get_title_text(), "Newer draft");
+    window.invoke_submitted(window.get_title_text(), 0);
+    let uncertain = f.commands.borrow().last().unwrap().clone();
+    apply(ClientUpdate::Connection {
+        state: ConnectionState::Reconnecting,
+        message: "Connection lost; outcome unknown.".into(),
+    });
+    assert!(!window.get_can_submit());
+    let sent = f.commands.borrow().len();
+    apply(ClientUpdate::Snapshot(Box::new(f.snapshot.clone())));
+    ready();
+    apply(ClientUpdate::CommandFinished {
+        command: uncertain,
+        outcome: CommandOutcome::Succeeded,
+    });
+    assert_eq!(f.commands.borrow().len(), sent); // No replay, no late uncertain close.
+    assert_eq!(f.quits.load(Ordering::SeqCst), quits);
+    assert_eq!(window.get_title_text(), "Newer draft");
+    if let Some(directory) = std::env::var_os("QUADRANT_IPC_RENDER_DIR") {
+        render_review(
+            &f.windows.borrow().last().unwrap().upgrade().unwrap(),
+            &std::path::PathBuf::from(directory).join("standalone-capture.png"),
+            520,
+            252,
+        );
+    }
+    window.invoke_submitted(window.get_title_text(), 0);
+    apply(ClientUpdate::CommandFinished {
+        command: f.commands.borrow().last().unwrap().clone(),
+        outcome: CommandOutcome::Succeeded,
+    });
+    assert_eq!(f.quits.load(Ordering::SeqCst), quits + 1);
+    let sent = f.commands.borrow().len();
+    ready(); // Queued Ready/activation after success cannot reopen the closing host.
+    apply(ClientUpdate::Event(ServerEvent::OpenQuickAdd));
+    window.invoke_submitted("Must not send".into(), 0);
+    assert_eq!(f.commands.borrow().len(), sent);
+}
+
+fn capture_host(f: &Fixture) -> GuiShell {
+    let commands = f.commands.clone();
+    GuiShell::new(
+        quadrant_protocol::GuiLaunchMode::QuickAdd,
+        &f.snapshot,
+        "test",
+        move |command| {
+            commands.borrow_mut().push(command);
+            true
+        },
+    )
+    .unwrap()
 }
