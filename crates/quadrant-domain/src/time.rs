@@ -67,8 +67,25 @@ impl From<TimeZoneId> for String {
 }
 
 /// A calendar date without an implicit timezone.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(
+    Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
+)]
+#[serde(try_from = "String", into = "String")]
 pub struct LocalDate(Date);
+
+impl TryFrom<String> for LocalDate {
+    type Error = TimeValueError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::parse_iso(&value)
+    }
+}
+
+impl From<LocalDate> for String {
+    fn from(value: LocalDate) -> Self {
+        value.to_string()
+    }
+}
 
 impl LocalDate {
     /// Builds a validated calendar date.

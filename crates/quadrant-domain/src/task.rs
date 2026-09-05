@@ -32,7 +32,9 @@ pub enum TaskPlacement {
 }
 
 /// Opaque task identity backed by a `UUIDv7` value.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(
+    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
+)]
 pub struct TaskId(Uuid);
 
 impl TaskId {
@@ -70,8 +72,23 @@ impl FromStr for TaskId {
 }
 
 /// A validated non-empty task title.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "String", into = "String")]
 pub struct TaskTitle(String);
+
+impl TryFrom<String> for TaskTitle {
+    type Error = TaskDomainError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl From<TaskTitle> for String {
+    fn from(value: TaskTitle) -> Self {
+        value.0
+    }
+}
 
 impl TaskTitle {
     /// Trims and validates a user-entered title.
@@ -192,7 +209,7 @@ impl NewTask {
 }
 
 /// Editable task details, separate from identity and lifecycle state.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TaskDetailsUpdate {
     /// Replacement title.
     pub title: TaskTitle,

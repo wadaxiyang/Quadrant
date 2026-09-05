@@ -21,7 +21,7 @@ pub struct TodayContext {
 }
 
 /// One task row rendered by the Today page.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TodayTaskSummary {
     /// Stable task identity.
     pub id: TaskId,
@@ -53,7 +53,7 @@ impl From<&Task> for TodayTaskSummary {
 }
 
 /// Precedence-grouped, duplicate-free Today projection.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TodayViewState {
     /// Due before the current instant.
     pub overdue: Vec<TodayTaskSummary>,

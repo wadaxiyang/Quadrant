@@ -19,6 +19,10 @@ tokio.workspace = true
 global-hotkey.workspace = true
 tray-icon.workspace = true
 windows.workspace = true
+widestring = "1.2.1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.189"
 
 [lints]
 workspace = true

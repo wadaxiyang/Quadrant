@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod execution;
 mod focus;
 mod history;
 mod maintenance;
@@ -11,6 +12,7 @@ mod tasks;
 mod today;
 mod updates;
 
+pub use execution::{ExecutionGate, ExecutionGateError};
 pub use focus::{FocusApplication, FocusScheduler, FocusSchedulerHandle};
 pub use history::{
     CompletedTaskSummary, CompletedViewState, HistoryApplication, HistoryLoadError,
@@ -44,7 +46,7 @@ use std::fmt;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 /// A typed intent emitted by the presentation layer.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum UiIntent {
     /// Navigate to a top-level application route.
     Navigate(NavigationRoute),
@@ -206,7 +208,7 @@ impl UiIntent {
 }
 
 /// User selection for beginning a Focus session.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FocusStartRequest {
     /// Count upward or down from a Pomodoro duration.
     pub mode: FocusMode,
@@ -217,7 +219,7 @@ pub struct FocusStartRequest {
 }
 
 /// Active task available for Focus association.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FocusTaskSummary {
     /// Stable task identity.
     pub id: TaskId,
@@ -228,7 +230,7 @@ pub struct FocusTaskSummary {
 }
 
 /// Productive Focus completed on one host-local date.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FocusDaySummary {
     /// Sum of productive completed running time.
     pub total_seconds: u64,
@@ -237,7 +239,7 @@ pub struct FocusDaySummary {
 }
 
 /// Repository-backed state consumed by the Focus view.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FocusViewState {
     /// Active tasks available to associate with a new productive session.
     pub tasks: Vec<FocusTaskSummary>,
@@ -250,7 +252,7 @@ pub struct FocusViewState {
 }
 
 /// Relative manual-order operation within one task placement.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ReorderDirection {
     /// Move one visible position toward the start.
     Up,
@@ -259,7 +261,7 @@ pub enum ReorderDirection {
 }
 
 /// Recurrence choice exposed by the task editor without leaking Slint indices.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum RecurrenceChoice {
     /// No recurrence.
     #[default]
@@ -275,7 +277,7 @@ pub enum RecurrenceChoice {
 }
 
 /// Repository-backed values used to populate the task editor.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TaskEditorState {
     /// Edited task identity.
     pub task_id: TaskId,
@@ -349,7 +351,7 @@ fn format_scheduled(value: Option<&ScheduledInstant>) -> String {
 }
 
 /// Raw editor fields crossing from presentation into application validation.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TaskEditorSubmission {
     /// Edited task identity.
     pub task_id: TaskId,
@@ -475,7 +477,7 @@ pub enum TaskEditorValidationError {
 }
 
 /// Task editor field that should own a validation message.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TaskEditorField {
     /// Validation is not attributable to a single editable field.
     General,
@@ -551,7 +553,7 @@ impl fmt::Display for TaskEditorValidationError {
 }
 
 /// Top-level routes shared by the application and UI adapter.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum NavigationRoute {
     /// Four-quadrant task view.
     #[default]
@@ -602,7 +604,7 @@ impl NavigationRoute {
 }
 
 /// User-selected theme behavior.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ThemeMode {
     /// Follow the normalized platform theme source.
     #[default]
@@ -614,7 +616,7 @@ pub enum ThemeMode {
 }
 
 /// Validated desktop lifecycle preferences.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DesktopSettings {
     /// Register Quadrant to launch after user login where supported.
     pub launch_at_startup: bool,
@@ -638,7 +640,7 @@ impl Default for DesktopSettings {
 }
 
 /// Main-window Close behavior.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum WindowCloseBehavior {
     /// End the application through its normal shutdown path.
     Quit,
@@ -648,7 +650,7 @@ pub enum WindowCloseBehavior {
 }
 
 /// Main-window Minimize behavior.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum WindowMinimizeBehavior {
     /// Minimize to the normal platform taskbar/dock representation.
     #[default]
@@ -658,7 +660,7 @@ pub enum WindowMinimizeBehavior {
 }
 
 /// Normalized platform theme reported to application/UI code.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SystemTheme {
     /// Light platform appearance.
     #[default]
@@ -674,7 +676,7 @@ pub trait SystemThemeSource {
 }
 
 /// A keyboard-first capture submitted by the M1 Quick Add shell.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct QuickAddSubmission {
     /// Trimmed task title entered by the user.
     pub title: String,
@@ -683,7 +685,7 @@ pub struct QuickAddSubmission {
 }
 
 /// Lightweight task projection consumed by the Quadrants UI.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TaskSummary {
     /// Stable task identity.
     pub id: TaskId,
@@ -705,7 +707,7 @@ impl From<&Task> for TaskSummary {
 }
 
 /// Active-task projection grouped for the four-quadrant screen.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct QuadrantsViewState {
     /// Unclassified captures.
     pub inbox: Vec<TaskSummary>,
@@ -739,7 +741,7 @@ impl QuadrantsViewState {
 }
 
 /// Typed events sent from application work back to the UI adapter.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ApplicationEvent {
     /// Replace the active Quadrants projection.
     QuadrantsChanged(QuadrantsViewState),
@@ -786,7 +788,7 @@ pub enum DesktopEvent {
 }
 
 /// Stable UI-safe error information.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UserFacingError {
     /// Short message safe to render directly.
     pub message: String,

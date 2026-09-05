@@ -4,6 +4,7 @@ mod autostart;
 mod desktop;
 mod external;
 mod instance;
+mod ipc;
 mod notifications;
 #[cfg(target_os = "windows")]
 mod windows;
@@ -22,7 +23,30 @@ pub use autostart::PlatformAutostartService;
 pub use desktop::DesktopIntegration;
 pub use external::PlatformExternalOpener;
 pub use instance::{ActivationListener, SingleInstanceCoordinator};
+pub use ipc::{AgentEndpoint, AgentListener, AgentStream, PeerIdentity};
 pub use notifications::PlatformNotificationDelivery;
+
+/// Shared Windows shell identity for the Agent and GUI.
+pub const QUADRANT_AUMID: &str = "Quadrant.Tasks";
+
+/// Initializes process identity before native notifications, tray, or windows.
+///
+/// # Errors
+/// Returns a platform failure if the host rejects the application identity.
+pub fn initialize_application_identity() -> Result<(), PlatformIntegrationError> {
+    #[cfg(target_os = "windows")]
+    {
+        use ::windows::core::HSTRING;
+        // SAFETY: the owned string remains live and the API retains its own copy.
+        unsafe {
+            ::windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(&HSTRING::from(
+                QUADRANT_AUMID,
+            ))
+        }
+        .map_err(PlatformIntegrationError::new)?;
+    }
+    Ok(())
+}
 
 /// Reports a fatal startup failure before the Slint shell exists.
 pub fn report_startup_error(error: &dyn std::fmt::Display) {

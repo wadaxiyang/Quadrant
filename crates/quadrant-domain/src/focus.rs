@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::{LocalDate, Quadrant, TaskId, UtcTimestamp};
 
 /// Opaque identity for one persisted focus session.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FocusSessionId(Uuid);
 
 impl FocusSessionId {
@@ -41,7 +41,7 @@ impl FromStr for FocusSessionId {
 }
 
 /// Timer style chosen for a session.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FocusMode {
     /// Count upward until the user finishes.
     Stopwatch,
@@ -50,7 +50,7 @@ pub enum FocusMode {
 }
 
 /// Pomodoro phase represented by a session.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PomodoroKind {
     /// Productive focus interval.
     Focus,
@@ -61,7 +61,7 @@ pub enum PomodoroKind {
 }
 
 /// Persisted session lifecycle.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FocusStatus {
     /// A time-anchored segment is accumulating.
     Running,
@@ -82,7 +82,7 @@ impl FocusStatus {
 }
 
 /// Task details copied into focus history so later task edits/deletion do not rewrite Review.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FocusTaskSnapshot {
     /// Associated task identity while the source task still exists.
     pub id: Option<TaskId>,
@@ -156,7 +156,7 @@ impl PomodoroSettings {
 }
 
 /// Persistence-shaped validated focus state.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FocusSessionRecord {
     /// Session identity.
     pub id: FocusSessionId,
@@ -183,8 +183,23 @@ pub struct FocusSessionRecord {
 }
 
 /// Validated focus aggregate.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "FocusSessionRecord", into = "FocusSessionRecord")]
 pub struct FocusSession(FocusSessionRecord);
+
+impl TryFrom<FocusSessionRecord> for FocusSession {
+    type Error = FocusDomainError;
+
+    fn try_from(value: FocusSessionRecord) -> Result<Self, Self::Error> {
+        Self::restore(value)
+    }
+}
+
+impl From<FocusSession> for FocusSessionRecord {
+    fn from(value: FocusSession) -> Self {
+        value.0
+    }
+}
 
 impl FocusSession {
     /// Starts a session from an explicit clock value.

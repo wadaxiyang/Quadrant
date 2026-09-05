@@ -7,7 +7,7 @@ use crate::{
 };
 
 /// One validated backup shown in Settings.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct BackupInfo {
     /// Absolute backup file path.
     pub path: PathBuf,
@@ -16,7 +16,7 @@ pub struct BackupInfo {
 }
 
 /// Repository-backed data-maintenance projection.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MaintenanceState {
     /// Absolute application-private backup directory.
     pub backup_directory: PathBuf,

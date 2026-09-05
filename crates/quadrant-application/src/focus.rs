@@ -375,6 +375,7 @@ pub struct FocusScheduler {
     application: FocusApplication,
     events: Arc<dyn Fn(ApplicationEvent) + Send + Sync>,
     signals: mpsc::UnboundedReceiver<FocusSignal>,
+    gate: Arc<crate::ExecutionGate>,
 }
 
 impl FocusScheduler {
@@ -390,9 +391,17 @@ impl FocusScheduler {
                 application,
                 events,
                 signals,
+                gate: Arc::default(),
             },
             FocusSchedulerHandle { sender },
         )
+    }
+
+    /// Shares the Agent's command/snapshot boundary for deadline mutations.
+    #[must_use]
+    pub fn with_execution_gate(mut self, gate: Arc<crate::ExecutionGate>) -> Self {
+        self.gate = gate;
+        self
     }
 
     /// Runs until shutdown or all signal senders are dropped.
@@ -415,10 +424,20 @@ impl FocusScheduler {
                 tokio::select! {
                     () = tokio::time::sleep(wait) => {
                         let application = self.application.clone();
-                        if let Ok(events) = tokio::task::spawn_blocking(move || application.complete_due()).await {
-                            for event in events {
-                                (self.events)(event);
-                            }
+                        let gate = Arc::clone(&self.gate);
+                        let events = match tokio::task::spawn_blocking(move || gate.run(|| application.complete_due())).await {
+                            Ok(Ok(events)) => events,
+                            _ => vec![ApplicationEvent::OperationFailed(crate::UserFacingError {
+                                message: "The focus scheduler could not complete its work.".to_owned(),
+                            })],
+                        };
+                        let failed = events.iter().any(|event| matches!(event, ApplicationEvent::OperationFailed(_)));
+                        for event in events {
+                            (self.events)(event);
+                        }
+                        // A failed past-due write must not become a busy retry loop.
+                        if failed && !self.wait_for_change().await {
+                            break;
                         }
                     }
                     signal = self.signals.recv() => {

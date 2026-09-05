@@ -4037,6 +4037,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "quadrant-agent"
+version = "0.1.0"
+dependencies = [
+ "quadrant-application",
+ "quadrant-platform",
+ "quadrant-protocol",
+ "quadrant-storage",
+ "thiserror 2.0.20",
+ "tokio",
+ "winresource",
+]
+
+[[package]]
 name = "quadrant-app"
 version = "0.1.0"
 dependencies = [
@@ -4053,6 +4066,7 @@ name = "quadrant-application"
 version = "0.1.0"
 dependencies = [
  "quadrant-domain",
+ "serde",
  "thiserror 2.0.20",
  "time",
  "tokio",
@@ -4077,12 +4091,26 @@ dependencies = [
  "global-hotkey",
  "interprocess",
  "jiff",
+ "libc",
  "notify-rust",
  "quadrant-application",
  "single-instance",
  "tokio",
  "tray-icon",
+ "widestring 1.2.1",
  "windows 0.62.2",
+]
+
+[[package]]
+name = "quadrant-protocol"
+version = "0.1.0"
+dependencies = [
+ "quadrant-application",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]

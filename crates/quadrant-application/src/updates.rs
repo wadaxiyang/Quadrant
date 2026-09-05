@@ -12,7 +12,7 @@ pub enum DistributionChannel {
 }
 
 /// Static update capability projected into Settings/About.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UpdateViewState {
     /// Canonical Cargo package version.
     pub current_version: String,

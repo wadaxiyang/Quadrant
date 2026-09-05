@@ -23,6 +23,7 @@ pub struct SingleInstanceCoordinator {
     _guard: single_instance::SingleInstance,
     primary: bool,
     socket_name: String,
+    profile_identity: u64,
 }
 
 impl SingleInstanceCoordinator {
@@ -32,7 +33,9 @@ impl SingleInstanceCoordinator {
     ///
     /// Returns a platform error if the OS ownership primitive cannot be created.
     pub fn claim(database_path: &Path) -> Result<Self, PlatformIntegrationError> {
-        let identity = instance_identity(database_path);
+        let database_path = crate::ipc::canonical_database_path(database_path)
+            .map_err(PlatformIntegrationError::new)?;
+        let identity = instance_identity(&database_path);
         let guard = single_instance::SingleInstance::new(&format!(
             "Quadrant.Tasks.Instance.{identity:016x}"
         ))
@@ -42,6 +45,7 @@ impl SingleInstanceCoordinator {
             _guard: guard,
             primary,
             socket_name: format!("quadrant-tasks-activation-{identity:016x}"),
+            profile_identity: identity,
         })
     }
 
@@ -49,6 +53,22 @@ impl SingleInstanceCoordinator {
     #[must_use]
     pub const fn is_primary(&self) -> bool {
         self.primary
+    }
+
+    /// Binds the secure Agent endpoint only while this process owns the profile.
+    ///
+    /// # Errors
+    /// Rejects secondary ownership and native endpoint/permission failures.
+    pub fn bind_agent_listener(
+        &self,
+        endpoint: &crate::AgentEndpoint,
+    ) -> Result<crate::AgentListener, PlatformIntegrationError> {
+        if !self.primary || self.profile_identity != endpoint.profile_identity() {
+            return Err(PlatformIntegrationError::new(
+                "a secondary instance cannot bind Agent IPC",
+            ));
+        }
+        endpoint.bind().map_err(PlatformIntegrationError::new)
     }
 
     /// Binds the primary activation listener on the current Tokio runtime.
@@ -149,12 +169,15 @@ impl ActivationListener {
     }
 }
 
-fn instance_identity(database_path: &Path) -> u64 {
+pub(crate) fn instance_identity(database_path: &Path) -> u64 {
     let mut hasher = DefaultHasher::new();
+    #[cfg(target_os = "windows")]
     database_path
         .to_string_lossy()
         .to_lowercase()
         .hash(&mut hasher);
+    #[cfg(not(target_os = "windows"))]
+    database_path.hash(&mut hasher);
     hasher.finish()
 }
 

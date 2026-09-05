@@ -21,7 +21,7 @@ const COMPLETED_PAGE_SIZE: u32 = 50;
 const MAX_COMPLETED_LIMIT: u32 = 500;
 
 /// User-selectable Review period.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ReviewRange {
     /// Today plus the preceding six local dates.
     #[default]
@@ -78,7 +78,7 @@ pub struct ReviewDateRange {
 }
 
 /// Aggregate counts for one Review range.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ReviewTotals {
     /// Active (not reverted) completion events.
     pub completed_tasks: u64,
@@ -101,7 +101,7 @@ impl ReviewTotals {
 }
 
 /// One date's unbucketed completion and Focus values.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ReviewActivityPoint {
     /// Local date represented by the point/bucket start.
     pub date: LocalDate,
@@ -112,7 +112,7 @@ pub struct ReviewActivityPoint {
 }
 
 /// Completion and Focus values for a quadrant or unclassified/unlinked work.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ReviewQuadrantValue {
     /// `None` means Inbox for completions and unlinked for Focus.
     pub quadrant: Option<Quadrant>,
@@ -123,7 +123,7 @@ pub struct ReviewQuadrantValue {
 }
 
 /// Rich Focus highlights for the active Review range.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ReviewFocusHighlights {
     /// Longest productive session.
     pub longest_session_seconds: u64,
@@ -140,7 +140,7 @@ pub struct ReviewFocusHighlights {
 }
 
 /// One active completion event shown in Review's recent list.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ReviewRecentCompletion {
     /// Immutable snapshot title.
     pub title: String,
@@ -189,7 +189,7 @@ pub struct ReviewQueryData {
 }
 
 /// Repository-backed Review dashboard projection.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ReviewViewState {
     /// Selected period.
     pub range: ReviewRange,
@@ -216,7 +216,7 @@ pub struct ReviewViewState {
 }
 
 /// One completed task rendered by the bounded history page.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CompletedTaskSummary {
     /// Task identity used by restore/delete commands.
     pub id: TaskId,
@@ -227,7 +227,7 @@ pub struct CompletedTaskSummary {
 }
 
 /// Bounded Completed history projection.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CompletedViewState {
     /// Newest-first completed tasks currently loaded.
     pub tasks: Vec<CompletedTaskSummary>,

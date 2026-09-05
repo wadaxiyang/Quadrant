@@ -1,0 +1,66 @@
+{
+  "captured_at": 1788566460,
+  "quadrants": {
+    "inbox": [{"id":"019918c0-0000-7000-8000-000000000001","title":"收集想法 📝","placement":"Inbox"}],
+    "q1": [], "q2": [], "q3": [], "q4": []
+  },
+  "today": {
+    "overdue": [],
+    "planned_today": [{"id":"019918c0-0000-7000-8000-000000000001","title":"收集想法 📝","metadata":"Inbox · Daily"}],
+    "due_today": [], "needs_reschedule": [], "unique_task_count": 1
+  },
+  "focus": {
+    "tasks": [{"id":"019918c0-0000-7000-8000-000000000001","title":"收集想法 📝","placement":"Inbox"}],
+    "session": {
+      "id": "019918c0-0000-7000-8000-000000000002",
+      "task": {"id":"019918c0-0000-7000-8000-000000000001","title":"收集想法 📝","quadrant":null},
+      "mode": "Pomodoro", "pomodoro_kind": "Focus",
+      "started_at": 1788566400, "active_segment_started_at": 1788566400,
+      "ended_at": null, "target_duration_seconds": 1500, "duration_seconds": 0,
+      "status": "Running", "created_local_date": "2026-09-05"
+    },
+    "settings": {
+      "focus_minutes":25,"short_break_minutes":5,"long_break_minutes":15,
+      "long_break_interval":4,"auto_start_break":false,"auto_start_focus":false
+    },
+    "today": {"total_seconds":1500,"session_count":1}
+  },
+  "review": {
+    "range":"SevenDays",
+    "current":{"completed_tasks":1,"focus_sessions":1,"focus_seconds":1500},
+    "previous":{"completed_tasks":0,"focus_sessions":0,"focus_seconds":0},
+    "activity":[{"date":"2026-09-05","completed":1,"focus_seconds":1500}],
+    "completed_activity_max":1,"focus_activity_max":1500,
+    "quadrants":[{"quadrant":"Q2","completed":1,"focus_seconds":1500}],
+    "focus": {
+      "longest_session_seconds":1500,"most_focused_task_title":"已完成",
+      "most_focused_task_seconds":1500,"most_focused_task_sessions":1,
+      "most_focused_quadrant":"Q2","most_focused_quadrant_seconds":1500
+    },
+    "recent_completed":[{
+      "title":"已完成","completed_at":1788566400,"completed_local_date":"2026-09-05",
+      "quadrant":"Q2","was_overdue":false
+    }],
+    "current_inbox_count":1,"current_overdue_count":0
+  },
+  "completed": {
+    "tasks":[{"id":"019918c0-0000-7000-8000-000000000003","title":"已完成","metadata":"Q2"}],
+    "has_more":true
+  },
+  "maintenance": {
+    "backup_directory":"/quadrant-test/备份",
+    "latest_backup":{"path":"/quadrant-test/备份/snapshot.quadrant-backup","size_bytes":32768},
+    "restore_pending":true
+  },
+  "desktop_settings": {
+    "launch_at_startup":true,"start_hidden":true,
+    "close_behavior":"HideToTray","minimize_behavior":"Taskbar"
+  },
+  "theme_mode":"System","system_theme":"Dark",
+  "platform_capabilities": {
+    "autostart":true,"tray":true,"global_hotkey":true,"native_notifications":true,"single_instance":true
+  },
+  "update_state": {
+    "current_version":"0.1.0","description":"Portable build · download replacement releases manually","can_open_releases":true
+  }
+}

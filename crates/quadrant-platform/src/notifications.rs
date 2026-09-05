@@ -6,6 +6,31 @@ use quadrant_application::{ReminderAlert, ReminderDelivery, ReminderDeliveryErro
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PlatformNotificationDelivery;
 
+impl PlatformNotificationDelivery {
+    /// Delivers a generic Focus deadline notification without requiring a task or GUI.
+    ///
+    /// # Errors
+    /// Returns unavailable/native delivery failures at the platform boundary.
+    pub fn focus_completed() -> Result<(), crate::PlatformIntegrationError> {
+        #[cfg(target_os = "windows")]
+        {
+            notify_rust::Notification::new()
+                .appname("Quadrant")
+                .summary("Focus interval completed")
+                .body("Your Quadrant focus interval has finished.")
+                .show()
+                .map(|_| ())
+                .map_err(crate::PlatformIntegrationError::new)
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            Err(crate::PlatformIntegrationError::new(
+                "native Focus notifications are unavailable",
+            ))
+        }
+    }
+}
+
 impl ReminderDelivery for PlatformNotificationDelivery {
     fn deliver(&self, alert: ReminderAlert) -> Result<(), ReminderDeliveryError> {
         deliver_notification(&alert)
